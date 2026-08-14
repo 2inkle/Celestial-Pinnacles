@@ -412,11 +412,42 @@ skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
 - 티어(장비 등급) 개념은 데이터 필드로 존재하지 않음 — "같은 handle 대비
   성능"이라는 설계자 머릿속 개념일 뿐, 코드가 참조하는 값이 아님.
 
-## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-13, 아직 구현 안 함)
+## 로그인 (2026-08-14, Discord OAuth 실제 동작 확인함)
 
-지금은 전부 `localStorage` 단일 브라우저 저장이라 로그인이 없다(`battleSim_username`은
-`"2inkle"` 문자열 비교로 개발자 여부만 가르는 임시 장치). 실제 다중 사용자
-서비스로 갈 때 다음을 API/DB 설계 단계에서 결정해야 한다. **README.md는 낡은
+Supabase Auth에 인증을 전부 위임하고, 로그인 수단은 **Discord OAuth
+단독**(이메일/비밀번호 등 다른 수단 없음)으로 결정함 — 직접 구현 대신 외부
+API 위임을 선택했고, 디스코드 커뮤니티 계획이 있어 Discord로 좁혔다. 계정당
+디스코드 계정 하나만 있으면 되고, 다중 계정 자체는 문제삼지 않되 스팸은
+Supabase 기본 보호기능(이메일 인증/CAPTCHA/rate limit)에 맡김. 디스코드
+커뮤니티 서버 가입은 로그인과 완전히 별개로, 선택 사항으로 둠.
+
+- `web/supabase-client.js` — 클라이언트 초기화 공용 파일(프로젝트 URL +
+  anon key, 노출돼도 되는 값). 로그인 관련 페이지는 전부 이 파일을 통해
+  같은 클라이언트 인스턴스를 씀.
+- `web/login.html` — `signInWithOAuth({provider:"discord"})` 트리거.
+- `web/auth-callback.html` — `onAuthStateChange`/`getSession`으로 세션
+  감지 후 `roster-index.html`로 리다이렉트.
+- 배포처: GitHub Pages(`https://2inkle.github.io/Celestial-Pinnacles/`).
+  Supabase 프로젝트 ref: `pauhrbebgmukknbrofon`.
+- **겪은 함정**: `signInWithOAuth`의 `redirectTo`는 Supabase 대시보드의
+  Authentication → URL Configuration → Redirect URLs에 **정확히 등록된
+  주소만** 실제로 적용된다. 등록 안 하면 조용히 프로젝트 기본 Site URL(기본값
+  `http://localhost:3000`)로 폴백해서, 세션 토큰이 그대로 붙은 채 연결 불가
+  로컬 주소로 새 나간다(실제로 재현해서 확인함). 콜백 주소를 바꾸거나 새
+  배포처를 추가할 때마다 이 허용 목록부터 갱신할 것.
+- 2026-08-14에 실제 Discord 계정으로 로그인 → 세션 생성 → 콜백 리다이렉트까지
+  브라우저에서 end-to-end 검증 완료.
+
+**아직 안 된 것**: 아래 "API 단계에서 검증/방어가 필요한 지점"과 "API 설계
+논의"에 정리된 대로, 로그인은 됐지만 그 뒤로 이어지는 실제 유저별 DB
+스키마·`localStorage` → 서버 이전은 아직 시작 전이다.
+
+## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-13, DB 스키마는 아직 구현 안 함)
+
+지금은 게임 데이터가 전부 `localStorage` 단일 브라우저 저장이다(로그인 자체는
+위 "로그인" 섹션 참조. `battleSim_username`은 `"2inkle"` 문자열 비교로 개발자
+여부만 가르는 임시 장치로 아직 남아있음). 실제 다중 사용자 서비스로 갈 때
+다음을 API/DB 설계 단계에서 결정해야 한다. **README.md는 낡은
 내용이라 참고하지 말 것** — 아래는 현재 코드(`web/*.html`)를 직접 훑어서 낸 결론.
 
 - **유저별 DB가 필요한 데이터**: `battleSim_roster`(캐릭터), `battleSim_gold`,
