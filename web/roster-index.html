@@ -109,41 +109,40 @@
     </div>
   </div>
   <div class="desc">보유한 모든 용병을 한눈에 확인하세요. 카드를 클릭하면 해당 캐릭터의 정보창(Sheet)으로 이동해서 스탯을 배분하고, 장비를 갈아입히고, 패턴을 짤 수 있습니다.</div>
-  <div class="mock-badge">⚠ 정적 목업 — 고용소에서 고용한 용병만 브라우저에 임시 저장됩니다(서버 연동 없음)</div>
+  <div class="mock-badge">⚠ 테스트 빌드 — 계정에 저장된 용병만 표시됩니다</div>
 </header>
 
 <main>
   <div class="grid" id="grid"></div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
-
-  // 로스터는 고용소(hire.html)에서 고용한 용병이 브라우저 저장소에 쌓이는 구조.
-  // 처음 방문했거나 아직 아무도 고용하지 않았다면 빈 상태가 정상입니다.
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
+  // DB 행(snake_case)을 기존 렌더링 코드가 기대하는 camelCase 모양으로 매핑.
+  // 렌더링/추정 함수 자체는 최대한 안 건드리고 이 어댑터에서만 흡수함.
+  function mapCharacterRow(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      job: row.job,
+      level: row.level,
+      exp: row.exp,
+      expToNext: row.exp_to_next,
+      portrait: row.portrait,
+      realStats: row.real_stats || {},
+      learnedSkillNames: row.learned_skill_names || [],
+      personalResources: row.personal_resources || {},
+      row: row.row_position,
+      guardAllies: row.guard_allies,
+      presets: row.presets || [],
+    };
   }
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
-  }
-
-  document.getElementById("goldVal").textContent = getGold().toLocaleString();
 
   const grid = document.getElementById("grid");
-  const roster = getRoster();
+  let roster = [];
+  let equippedByCharacter = {}; // characterId -> warehouse_items 행 배열(held_by로 장착된 것들)
 
   function render() {
     if (roster.length === 0) {
@@ -159,16 +158,21 @@
     }
     grid.innerHTML = "";
     // character-sheet.html과 동일한 기본 공식(1+⌊INT/10⌋) + 장착 장비의
-    // patternSlotBonus. 세트 보너스까지는 카드 요약에서 생략(정확한 값은 정보창에서).
+    // pattern_slot_bonus. 세트 보너스까지는 카드 요약에서 생략(정확한 값은 정보창에서).
+    // warehouse_items.held_by가 장비 장착의 유일한 진실 공급원이라(equipment
+    // 컬럼 없음), 캐릭터별 장착 아이템은 배열로 미리 그룹핑해서 받음 — 예전
+    // Object.values(r.equipment)가 하던 일을 이 배열이 그대로 대신함.
     function estimateMaxPatternSlots(r) {
       const base = 1 + Math.floor((r.realStats?.int || 0) / 10);
-      const itemBonus = Object.values(r.equipment || {}).reduce((sum, it) => sum + ((it && it.patternSlotBonus) || 0), 0);
+      const items = equippedByCharacter[r.id] || [];
+      const itemBonus = items.reduce((sum, it) => sum + (it.pattern_slot_bonus || 0), 0);
       return base + itemBonus;
     }
     // Max HP/SP도 마찬가지로 공식(JOB_BASE_HP+STR×20 등) + 장비의 real형 스탯
-    // 보너스(statRealBonus)까지 반영해 추정(세트 보너스는 카드 요약에서 생략).
+    // 보너스(stat_real_bonus)까지 반영해 추정(세트 보너스는 카드 요약에서 생략).
     function estimateEquipRealBonus(r, key) {
-      return Object.values(r.equipment || {}).reduce((sum, it) => sum + ((it && it.statRealBonus && it.statRealBonus[key]) || 0), 0);
+      const items = equippedByCharacter[r.id] || [];
+      return items.reduce((sum, it) => sum + ((it.stat_real_bonus && it.stat_real_bonus[key]) || 0), 0);
     }
     function estimateMaxHp(r) {
       const str = (r.realStats?.str || 0) + estimateEquipRealBonus(r, "str");
@@ -206,7 +210,46 @@
       grid.appendChild(a);
     });
   }
-  render();
+
+  (async () => {
+    const session = await window.AuthGuard.requireSession();
+    const userId = session.user.id;
+
+    try {
+      const [{ data: profile, error: profileError }, { data: charRows, error: charError }] = await Promise.all([
+        window.sbClient.from("profiles").select("gold").eq("user_id", userId).single(),
+        window.sbClient.from("characters").select("*").eq("user_id", userId),
+      ]);
+      if (profileError) throw profileError;
+      if (charError) throw charError;
+
+      document.getElementById("goldVal").textContent = (profile?.gold ?? 0).toLocaleString();
+      roster = (charRows || []).map(mapCharacterRow);
+
+      if (roster.length > 0) {
+        const characterIds = roster.map((r) => r.id);
+        const { data: itemRows, error: itemError } = await window.sbClient
+          .from("warehouse_items")
+          .select("*")
+          .in("held_by", characterIds);
+        if (itemError) throw itemError;
+        equippedByCharacter = {};
+        (itemRows || []).forEach((it) => {
+          (equippedByCharacter[it.held_by] ||= []).push(it);
+        });
+      }
+
+      render();
+    } catch (err) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="e-icon">⚠️</div>
+          <div class="e-title">불러오기 실패</div>
+          <div class="e-desc">${err.message || "알 수 없는 오류"}</div>
+        </div>
+      `;
+    }
+  })();
 </script>
 
 </body>
