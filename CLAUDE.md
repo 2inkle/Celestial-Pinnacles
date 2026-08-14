@@ -499,13 +499,36 @@ insert → 카드에 Max HP 900(=200+35×20, 장비 보너스 포함)/Max SP 150
 삭제함. 세션 없는 상태로 접속 시 `login.html`로 정상 리다이렉트되는 것도
 확인함.
 
-**다음 전환 후보**: 나머지 페이지들(`village.html`/`hire.html`/
-`character-sheet.html`/`shop.html`/`refinery.html`/`workshop.html`/
-`dispatch.html`/`guild.html`/`battle-select.html`/`battle-view.html`)은 전부
-쓰기 동작이 있어서 `roster-index.html`보다 복잡함 — 이 페이지에서 확립한
-패턴(auth-guard/DB row 매핑/warehouse_items join)을 그대로 재사용하되, 쓰기
-경로(캐릭터 생성/골드 차감/아이템 장착 등)는 각 페이지 전환 시 별도로
-설계해야 함.
+**`hire.html` 2차 전환 완료** (2026-08-14): 첫 쓰기 경로 전환 사례.
+`getRoster/saveRoster/getGold/setGold/getUsername/nextCharacterId` 전부
+제거하고 `characters` insert + `profiles.gold` update로 교체. `characters.id`가
+DB에서 `gen_random_uuid()`로 자동 생성되므로 예전의 "유저이름_순번" 수동 id
+계산 로직 자체가 통째로 불필요해짐(스키마 전환이 코드를 오히려 단순하게 만든
+두 번째 사례 — 첫 번째는 `roster-index.html`의 `Object.values(equipment)`→배열).
+`buildCharacter()`에서 `equipment`/`inventory` 필드도 제거(테이블에 컬럼 자체가
+없음, 새 캐릭터는 장착 장비가 없으니 애초에 넣을 게 없음). 골드 차감은 클라이언트가
+들고 있는 값 기준 read-modify-write(원자적 아님) — 예전 localStorage 방식과
+동일한 수준의 위험만 있고 새로 생긴 문제는 아님, 원자적 처리는 "API 단계에서
+검증/방어가 필요한 지점"의 더 큰 과제와 함께 나중에.
+
+**실측 검증**: 실제 UI로 이름 입력 → 고용 버튼 클릭 → `characters`에
+정확한 필드(job/learned_skill_names/real_stats/presets 등)로 행 생성,
+`profiles.gold`가 3000→2800(사제 고용비 200)으로 정확히 차감, 토스트 메시지
+정상 표시, 콘솔 에러 0건 확인 → 테스트 캐릭터 삭제 + 골드 3000으로 복구.
+
+**GitHub Pages 배포 관련 메모**: 캐시 관련 브라우저 문제로 배포 직후
+쿼리스트링 없는 URL은 낡은 캐시를 서빙하는 경우가 있었음(`fetch()`로 직접
+확인하면 새 콘텐츠가 맞는데, 브라우저 탐색으로 로드하면 예전 버전이 뜨는
+현상) — 새 탭에서도 재현됨. `?v=숫자` 같은 캐시 무효화 쿼리를 붙이면
+즉시 새 버전이 로드됨. 이후 페이지 전환을 배포 직후 검증할 때 재현되면
+같은 방법을 쓸 것.
+
+**다음 전환 후보**: 남은 페이지들(`village.html`/`character-sheet.html`/
+`shop.html`/`refinery.html`/`workshop.html`/`dispatch.html`/`guild.html`/
+`battle-select.html`/`battle-view.html`)은 이 두 페이지에서 확립한 패턴
+(auth-guard/DB row 매핑/warehouse_items join)을 재사용하되, `character-sheet.html`
+(장비 장착/해제, 스탯 배분, 전직 등 가장 복잡)과 `dispatch.html`/`battle-view.html`
+(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 특히 더 큰 별도 설계가 필요함.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
