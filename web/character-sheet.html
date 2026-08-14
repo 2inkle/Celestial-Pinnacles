@@ -1524,8 +1524,37 @@ function renderStatSection() {
 // ============================================================================
 // 패턴 빌더 (오른쪽, 핵심 기능)
 // ============================================================================
+// job이 어떤 전직 경로를 거쳐 지금 직업에 도달했는지 — isJobOrDescendantOf와
+// 반대 방향 탐색(그건 "job이 ancestorJob의 하위인가"만 판정하지 실제 경로
+// 목록은 안 만들어줌). JOB_ADVANCEMENT_TABLE을 훑어서 toJob이 target인
+// 항목의 키(=한 단계 전 직업)를 찾고 재귀적으로 더 거슬러 올라감.
+// 2026-08-15: 전직하면 하위 직업 스킬을 영영 못 배우던 버그를 고치며 추가
+// (아래 jobSkillTable() 참조) — 실측으로 확인: 비숍(전직 후) 자체 스킬은
+// 3개뿐인데 사제(기본) 스킬은 20개라, 전직 직전에 다 못 배운 사제 스킬
+// 17개가 전직하는 순간 습득 불가능해지고 있었음.
+function jobAncestryChain(job) {
+  const chain = [job];
+  Object.entries(JOB_ADVANCEMENT_TABLE).forEach(([fromJob, advs]) => {
+    if ((advs || []).some((adv) => adv.toJob === job)) {
+      jobAncestryChain(fromJob).forEach((j) => { if (!chain.includes(j)) chain.push(j); });
+    }
+  });
+  return chain;
+}
+// 지금 직업 + 그 직업에 도달하기까지 거쳐온 모든 하위 직업의 스킬을 전부
+// 합쳐서 돌려줌 — 전직해도 이전 단계에서 못 배운 스킬을 계속 배울 수 있어야
+// 하므로. 같은 이름의 스킬이 여러 단계에 중복 정의돼 있으면 한 번만 포함.
 function jobSkillTable() {
-  return [...COMMON_SKILLS, ...(SKILL_TABLE[data.job] || [])];
+  const seen = new Set();
+  const skills = [...COMMON_SKILLS];
+  jobAncestryChain(data.job).forEach((job) => {
+    (SKILL_TABLE[job] || []).forEach((s) => {
+      if (seen.has(s.name)) return;
+      seen.add(s.name);
+      skills.push(s);
+    });
+  });
+  return skills;
 }
 function formatCosts(costs) {
   return costs.map(c => {
