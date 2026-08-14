@@ -144,95 +144,57 @@
   <button class="reset-btn" id="randomTenBtn" style="margin-left:8px;">🧪 무작위 용병 10명 생성</button>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  let session = null;
 
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
-  }
-  document.getElementById("goldVal").textContent = getGold().toLocaleString();
-
-  // ============================================================================
-  // 로스터 공용 헬퍼 (hire.html과 동일한 규칙) — 이 버튼들에서 같이 씀
-  // ============================================================================
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
-  }
-  function saveRoster(roster) {
-    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
-  }
-  function getUsername() {
-    return localStorage.getItem("battleSim_username") || "2inkle";
-  }
-  function nextCharacterId(roster) {
-    const username = getUsername();
-    const prefix = username + "_";
-    const usedSeq = roster
-      .map(c => c.id)
-      .filter(id => typeof id === "string" && id.startsWith(prefix))
-      .map(id => Number(id.slice(prefix.length)))
-      .filter(n => Number.isInteger(n));
-    const nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
-    return `${prefix}${nextSeq}`;
-  }
-
-  document.getElementById("resetBtn").addEventListener("click", () => {
+  document.getElementById("resetBtn").addEventListener("click", async () => {
     if (!confirm("로스터와 골드를 초기 상태로 되돌릴까요? 고용했던 용병이 모두 사라집니다.")) return;
-    localStorage.removeItem("battleSim_roster");
-    localStorage.removeItem("battleSim_gold");
-    localStorage.removeItem("battleSim_hiredPoolIds");
+    if (!session) return;
+    // 창고(warehouse_items)는 예전 localStorage 버전도 안 건드렸던 범위라
+    // 그대로 유지함 — 이 리셋은 로스터/골드만 대상.
+    const { error: delError } = await window.sbClient.from("characters").delete().eq("user_id", session.user.id);
+    if (delError) { alert(`리셋 실패: ${delError.message}`); return; }
+    const { error: goldError } = await window.sbClient.from("profiles").update({ gold: 3000 }).eq("user_id", session.user.id);
+    if (goldError) { alert(`리셋 실패: ${goldError.message}`); return; }
     location.reload();
   });
 
   // ============================================================================
-  // 🧪 예제 캐릭터 주입 — hire.html과 동일한 id 규칙(유저이름_순번)을 그대로 따름.
-  // Sheet 화면의 필드/기능(스탯 포인트, 스킬, 전직, 장비)이 실제로 동작하는지
-  // 확인하기 위한 테스트 데이터를 즉시 로스터에 넣고 Sheet로 이동시켜줌.
+  // 🧪 예제 캐릭터 주입 — characters.id는 DB가 자동 생성하므로(gen_random_uuid())
+  // insert 후 반환된 id로 바로 Sheet로 이동. Sheet 화면의 필드/기능(스탯 포인트,
+  // 스킬, 전직, 장비)이 실제로 동작하는지 확인하기 위한 테스트 데이터.
   // ============================================================================
-  document.getElementById("seedExampleBtn").addEventListener("click", () => {
-    const id = nextCharacterId(getRoster());
+  document.getElementById("seedExampleBtn").addEventListener("click", async () => {
+    if (!session) return;
     const exampleCharacter = {
-      id,
+      user_id: session.user.id,
       name: "1",
       job: "사제",
       level: 30,
       exp: 0,
-      expToNext: window.ExpTable.expToNextForLevel(30), // 만렙 — 사실상 도달 불가값
+      exp_to_next: window.ExpTable.expToNextForLevel(30), // 만렙 — 사실상 도달 불가값
       portrait: "✨",
-      realStats: { str:10, int:10, dex:10, spd:10, luk:10 },
+      real_stats: { str:10, int:10, dex:10, spd:10, luk:10 },
       // unassignedPoints/skillPoints는 저장 안 함 — Sheet가 레벨 공식으로 계산함.
       // Lv.30이면 (30-1)*5=145 스탯 포인트, (30-1)*2=58 스킬 포인트가 자동으로 뜸.
       // hp/maxHp/sp/maxSp는 저장 안 함 — Sheet가 JOB_BASE_HP+STR×20 공식으로 계산함.
       // Lv.30, STR/INT 10(투자 안 함)이면 Max HP 400, Max SP 150이 자동으로 뜸.
       // maxPatternSlots/weightCapacity는 저장 안 함 — Sheet가 INT/DEX + 장비로 계산함.
-      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
-      inventory: [],
-      learnedSkillNames: ["공격", "치유"], // "공격"은 전 직업 공통 무료 스킬, "치유"는 사제 Lv.1 무료 시작 스킬
-      personalResources: {},
-      row: "front",
-      guardAllies: false,
+      learned_skill_names: ["공격", "치유"], // "공격"은 전 직업 공통 무료 스킬, "치유"는 사제 Lv.1 무료 시작 스킬
+      personal_resources: {},
+      row_position: "front",
+      guard_allies: false,
       presets: [
         { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
       ]
     };
 
-    const roster = getRoster();
-    roster.push(exampleCharacter);
-    saveRoster(roster);
-
-    location.href = `character-sheet.html?id=${encodeURIComponent(id)}`;
+    const { data, error } = await window.sbClient.from("characters").insert(exampleCharacter).select().single();
+    if (error) { alert(`생성 실패: ${error.message}`); return; }
+    location.href = `character-sheet.html?id=${encodeURIComponent(data.id)}`;
   });
 
   // ============================================================================
@@ -251,46 +213,45 @@
   };
   const RANDOM_NAMES = ["아렌","벨라","카심","도린","엘윈","파이라","그레이스","할둔","이졸데","유리안","제피르","클라라","루안","미라벨","니코","세라핀","오윈","타린"];
 
-  function buildRandomCharacter(id) {
+  function buildRandomCharacter(userId) {
     const jobs = Object.keys(RANDOM_JOB_META);
     const job = jobs[Math.floor(Math.random() * jobs.length)];
     const meta = RANDOM_JOB_META[job];
     const name = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
     return {
-      id, name, job,
-      level: 1, exp: 0, expToNext: window.ExpTable.expToNextForLevel(1),
+      user_id: userId, name, job,
+      level: 1, exp: 0, exp_to_next: window.ExpTable.expToNextForLevel(1),
       portrait: meta.portrait,
-      realStats: { str:10, int:10, dex:10, spd:10, luk:10 },
-      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
-      inventory: [],
-      learnedSkillNames: ["공격", meta.startSkill],
-      personalResources: {},
-      row: "front",
-      guardAllies: false,
+      real_stats: { str:10, int:10, dex:10, spd:10, luk:10 },
+      learned_skill_names: ["공격", meta.startSkill],
+      personal_resources: {},
+      row_position: "front",
+      guard_allies: false,
       presets: [
         { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
       ]
     };
   }
 
-  document.getElementById("randomTenBtn").addEventListener("click", () => {
-    const roster = getRoster();
-    const username = getUsername();
-    const prefix = username + "_";
-    const usedSeq = roster
-      .map(c => c.id)
-      .filter(id => typeof id === "string" && id.startsWith(prefix))
-      .map(id => Number(id.slice(prefix.length)))
-      .filter(n => Number.isInteger(n));
-    let nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
-
-    for (let i = 0; i < 10; i++) {
-      roster.push(buildRandomCharacter(`${prefix}${nextSeq++}`));
-    }
-    saveRoster(roster);
+  document.getElementById("randomTenBtn").addEventListener("click", async () => {
+    if (!session) return;
+    const rows = Array.from({ length: 10 }, () => buildRandomCharacter(session.user.id));
+    const { error } = await window.sbClient.from("characters").insert(rows);
+    if (error) { alert(`생성 실패: ${error.message}`); return; }
     alert("무작위 용병 10명을 로스터에 추가했어요. Home에서 확인해보세요!");
     location.href = "roster-index.html";
   });
+
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+    const { data: profile, error } = await window.sbClient
+      .from("profiles")
+      .select("gold")
+      .eq("user_id", session.user.id)
+      .single();
+    if (error) { document.getElementById("goldVal").textContent = "?"; return; }
+    document.getElementById("goldVal").textContent = (profile?.gold ?? 0).toLocaleString();
+  })();
 </script>
 
 </body>
