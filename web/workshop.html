@@ -83,6 +83,9 @@
 </main>
 
 <script src="craft-materials.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
 // ============================================================================
 // 제작공방
@@ -100,37 +103,75 @@
 // 저장 형식: 개조 결과물은 원본 이름을 그대로 쓰고 craftMaterial 필드로만
 // 구분됨(유저에게 소재명을 이름으로 노출하지 않는 게 의도). 창고 병합도
 // craftMaterial까지 같아야 합쳐지도록 아래 findStackable에서 처리함.
+//
+// 선택 상태는 예전엔 배열 인덱스(_idx)로 관리했는데(삭제 시 "인덱스가 밀리지
+// 않도록 큰 쪽부터 지움" 같은 방어 코드가 필요했음), DB 행은 고유 id를 이미
+// 갖고 있어서 그 id를 그대로 선택 키로 씀 — 인덱스 시프트 문제 자체가 사라짐.
 // ============================================================================
-(function () {
+(async function () {
   const $ = (sel) => document.querySelector(sel);
 
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
-  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
-  function getGold() { return Number(localStorage.getItem("battleSim_gold") || 0); }
-  function setGold(v) { localStorage.setItem("battleSim_gold", String(Math.max(0, Math.floor(v)))); }
+  const session = await window.AuthGuard.requireSession();
+  let currentGold = 0;
+  let warehousePool = []; // held_by IS NULL인 내 창고 전체(장비+소재 둘 다 포함)
 
-  // 감정 완료 기록 — 개별 인스턴스 단위라 창고 항목에 appraised 플래그를 직접 붙임.
-  // (같은 소재라도 다른 더미는 따로 감정해야 함 — 알아가는 과정 자체를 재미로 보는 설계)
+  // DB 행(snake_case) → camelCase. 다른 페이지들과 동일한 어댑터 컨벤션.
+  function mapItemRow(row) {
+    return {
+      id: row.id, name: row.name, category: row.category, quantity: row.quantity,
+      description: row.description, slot: row.slot, heldBy: row.held_by,
+      enhanceLevel: row.enhance_level, craftMaterial: row.craft_material, appraised: row.appraised,
+      combatReal: row.combat_real, combatBonus: row.combat_bonus, statBonus: row.stat_bonus,
+      passiveBonus: row.passive_bonus, maxHpBonus: row.max_hp_bonus, maxSpBonus: row.max_sp_bonus,
+      weight: row.weight, twoHanded: row.two_handed, setId: row.set_id, requiredJob: row.required_job,
+      statRealBonus: row.stat_real_bonus, patternSlotBonus: row.pattern_slot_bonus,
+      critMultiplier: row.crit_multiplier, conditionalPassiveMods: row.conditional_passive_mods,
+      grantsResource: row.grants_resource, equipmentType: row.equipment_type,
+      avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
+      consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+    };
+  }
+
+  // camelCase 스펙(개조 결과) → warehouse_items insert payload(snake_case).
+  function buildCraftedInsertPayload(spec, quantity) {
+    return {
+      user_id: session.user.id, name: spec.name, category: spec.category, quantity,
+      description: spec.description ?? null, slot: spec.slot ?? null,
+      craft_material: spec.craftMaterial ?? null,
+      combat_real: spec.combatReal ?? null, combat_bonus: spec.combatBonus ?? null,
+      stat_bonus: spec.statBonus ?? null, passive_bonus: spec.passiveBonus ?? null,
+      max_hp_bonus: spec.maxHpBonus ?? null, max_sp_bonus: spec.maxSpBonus ?? null,
+      weight: spec.weight ?? null, two_handed: spec.twoHanded ?? null, set_id: spec.setId ?? null,
+      required_job: spec.requiredJob ?? null, stat_real_bonus: spec.statRealBonus ?? null,
+      pattern_slot_bonus: spec.patternSlotBonus ?? null, crit_multiplier: spec.critMultiplier ?? null,
+      conditional_passive_mods: spec.conditionalPassiveMods ?? null, grants_resource: spec.grantsResource ?? null,
+      equipment_type: spec.equipmentType ?? null, avatar_portrait: spec.avatarPortrait ?? null,
+      grants_skill: spec.grantsSkill ?? null, consumable: spec.consumable ?? null,
+      uses_per_battle: spec.usesPerBattle ?? null, enhanceable: spec.enhanceable ?? null,
+    };
+  }
+
+  async function refreshWarehousePool() {
+    const { data, error } = await window.sbClient.from("warehouse_items").select("*")
+      .eq("user_id", session.user.id).is("held_by", null);
+    if (error) { alert(`창고 조회 실패: ${error.message}`); return; }
+    warehousePool = (data || []).map(mapItemRow);
+  }
+
+  function getGold() { return currentGold; }
 
   let tab = "craft";
-  let selectedEquipIdx = null;
+  let selectedEquipId = null;
   let selectedMatName = null;
 
   // 개조 대상 — 강화도 안 됐고 소재도 안 들어간 순정 장비만.
   // 강화품을 제외하는 건 "강화 배율 × 소재 보정"이 겹쳐 계산이 꼬이는 걸
   // 막기 위함이고, 이미 소재가 든 장비를 제외하는 건 소재 슬롯이 1개이기 때문.
   function craftableEquipment() {
-    return getWarehouse()
-      .map((w, i) => ({ ...w, _idx: i }))
-      .filter((w) => w.category === "equipment" && !w.heldBy && !w.enhanceLevel && !w.craftMaterial && (w.quantity || 0) > 0);
+    return warehousePool.filter((w) => w.category === "equipment" && !w.enhanceLevel && !w.craftMaterial && (w.quantity || 0) > 0);
   }
   function ownedMaterials() {
-    return getWarehouse()
-      .map((w, i) => ({ ...w, _idx: i }))
-      .filter((w) => w.category === "material" && (w.quantity || 0) > 0 && CRAFT_MATERIAL_TABLE[w.name]);
+    return warehousePool.filter((w) => w.category === "material" && (w.quantity || 0) > 0 && CRAFT_MATERIAL_TABLE[w.name]);
   }
 
   function describeSpec(item) {
@@ -154,24 +195,11 @@
   }
 
   // 창고 병합 — 이름/카테고리뿐 아니라 craftMaterial과 enhanceLevel까지 같아야
-  // 합침. 소재가 다르면 이름이 같아도 완전히 다른 물건이기 때문.
-  function findStackable(warehouse, item) {
-    return warehouse.find((w) =>
-      w.name === item.name && w.category === item.category &&
-      !w.heldBy && !w.enhanceLevel &&
-      (w.craftMaterial || null) === (item.craftMaterial || null));
-  }
-
-  function consumeOne(warehouse, idx) {
-    warehouse[idx].quantity -= 1;
-    if (warehouse[idx].quantity <= 0) warehouse.splice(idx, 1);
-  }
-
   // ── 개조 탭 ────────────────────────────────────────────────────────────
   function renderCraft() {
     const equips = craftableEquipment();
     const mats = ownedMaterials();
-    const eq = selectedEquipIdx != null ? equips.find((e) => e._idx === selectedEquipIdx) : null;
+    const eq = selectedEquipId != null ? equips.find((e) => e.id === selectedEquipId) : null;
     const matEntry = selectedMatName ? mats.find((m) => m.name === selectedMatName) : null;
     const matDef = selectedMatName ? CRAFT_MATERIAL_TABLE[selectedMatName] : null;
 
@@ -198,12 +226,12 @@
         <h2 class="section-title">개조할 장비 <span class="hint">강화하지 않은 순정 장비만 — 이미 소재가 들어갔거나 강화된 장비는 개조할 수 없어요</span></h2>
         <div class="list">
           ${equips.length ? equips.map((e) => `
-            <div class="row ${e._idx === selectedEquipIdx ? "selected" : ""}" data-equip="${e._idx}">
+            <div class="row ${e.id === selectedEquipId ? "selected" : ""}" data-equip="${e.id}">
               <div class="row-main">
                 <div class="row-name">${e.name}${e.quantity > 1 ? ` <span class="hint">×${e.quantity}</span>` : ""}</div>
                 <div class="row-sub">${describeSpec(e)}</div>
               </div>
-              <button class="act" data-equip-pick="${e._idx}">${e._idx === selectedEquipIdx ? "선택됨" : "선택"}</button>
+              <button class="act" data-equip-pick="${e.id}">${e.id === selectedEquipId ? "선택됨" : "선택"}</button>
             </div>`).join("") : `<div class="empty">개조할 수 있는 장비가 없어요. 전투에서 장비를 얻거나 상점에서 구매해 보세요.</div>`}
         </div>
       </div>
@@ -249,7 +277,7 @@
               </div>
               ${m.appraised
                 ? `<button class="act" disabled>완료</button>`
-                : `<button class="act primary" data-appraise="${m._idx}" ${cant ? "disabled title='골드가 부족해요'" : ""}>감정</button>`}
+                : `<button class="act primary" data-appraise="${m.id}" ${cant ? "disabled title='골드가 부족해요'" : ""}>감정</button>`}
             </div>`;
           }).join("") : `<div class="empty">감정할 소재가 없어요.</div>`}
         </div>
@@ -264,8 +292,8 @@
 
   function bind() {
     document.querySelectorAll("[data-equip-pick]").forEach((b) => b.addEventListener("click", () => {
-      const idx = Number(b.dataset.equipPick);
-      selectedEquipIdx = selectedEquipIdx === idx ? null : idx;
+      const id = b.dataset.equipPick;
+      selectedEquipId = selectedEquipId === id ? null : id;
       render();
     }));
     document.querySelectorAll("[data-mat-pick]").forEach((b) => b.addEventListener("click", () => {
@@ -275,55 +303,88 @@
     }));
 
     const craftBtn = $("#doCraft");
-    if (craftBtn) craftBtn.addEventListener("click", () => {
-      const warehouse = getWarehouse();
-      const eqIdx = selectedEquipIdx;
-      const matIdx = warehouse.findIndex((w) => w.name === selectedMatName && w.category === "material" && (w.quantity || 0) > 0);
-      if (eqIdx == null || matIdx < 0) return;
-
-      const base = { ...warehouse[eqIdx] };
+    if (craftBtn) craftBtn.addEventListener("click", async () => {
+      const base = craftableEquipment().find((e) => e.id === selectedEquipId);
+      const matEntry = ownedMaterials().find((m) => m.name === selectedMatName);
+      if (!base || !matEntry) return;
       const matName = selectedMatName;
       if (!confirm(`"${base.name}"에 "${matName}"을(를) 넣습니다.\n소재는 사라지고 되돌릴 수 없어요. 진행할까요?`)) return;
 
-      // 원본 1개와 소재 1개를 소모 — 인덱스가 밀리지 않도록 큰 쪽부터 지움
-      const [a, b] = eqIdx > matIdx ? [eqIdx, matIdx] : [matIdx, eqIdx];
-      consumeOne(warehouse, a);
-      consumeOne(warehouse, b);
+      craftBtn.disabled = true;
+
+      // 원본 1개, 소재 1개 소모 — 각각 수량이 1이면 행 삭제, 그 이상이면 감소.
+      for (const row of [base, matEntry]) {
+        if (row.quantity <= 1) {
+          const { error } = await window.sbClient.from("warehouse_items").delete().eq("id", row.id);
+          if (error) { alert(`개조 실패: ${error.message}`); craftBtn.disabled = false; return; }
+        } else {
+          const { error } = await window.sbClient.from("warehouse_items")
+            .update({ quantity: row.quantity - 1 }).eq("id", row.id);
+          if (error) { alert(`개조 실패: ${error.message}`); craftBtn.disabled = false; return; }
+        }
+      }
 
       const crafted = applyCraftMaterial(base, matName);
-      delete crafted._idx;
-      crafted.quantity = 1;
-      const stack = findStackable(warehouse, crafted);
-      if (stack) stack.quantity += 1;
-      else warehouse.push(crafted);
+      delete crafted.id; delete crafted.quantity;
+      // 병합 대상(이름+분류+craftMaterial까지 일치, 미장착·미강화)을 DB에서
+      // 다시 조회 — 소재가 다르면 이름이 같아도 완전히 다른 물건이라 반드시
+      // craft_material까지 봐야 함.
+      let stackQuery = window.sbClient.from("warehouse_items").select("id,quantity")
+        .eq("user_id", session.user.id).eq("name", crafted.name).eq("category", crafted.category)
+        .is("held_by", null).is("enhance_level", null);
+      stackQuery = crafted.craftMaterial ? stackQuery.eq("craft_material", crafted.craftMaterial) : stackQuery.is("craft_material", null);
+      const { data: stack, error: stackError } = await stackQuery.maybeSingle();
+      if (stackError) { alert(`개조 실패: ${stackError.message}`); craftBtn.disabled = false; return; }
 
-      saveWarehouse(warehouse);
-      selectedEquipIdx = null; selectedMatName = null;
+      if (stack) {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: stack.quantity + 1 }).eq("id", stack.id);
+        if (error) { alert(`개조 실패: ${error.message}`); craftBtn.disabled = false; return; }
+      } else {
+        const { error } = await window.sbClient.from("warehouse_items").insert(buildCraftedInsertPayload(crafted, 1));
+        if (error) { alert(`개조 실패: ${error.message}`); craftBtn.disabled = false; return; }
+      }
+
+      await refreshWarehousePool();
+      selectedEquipId = null; selectedMatName = null;
       alert(`"${base.name}" 개조 완료!`);
       render();
     });
 
-    document.querySelectorAll("[data-appraise]").forEach((b) => b.addEventListener("click", () => {
-      const idx = Number(b.dataset.appraise);
-      const warehouse = getWarehouse();
-      const entry = warehouse[idx];
+    document.querySelectorAll("[data-appraise]").forEach((b) => b.addEventListener("click", async () => {
+      const id = b.dataset.appraise;
+      const entry = warehousePool.find((w) => w.id === id);
       if (!entry) return;
       const def = CRAFT_MATERIAL_TABLE[entry.name];
-      if (!def || getGold() < def.appraisalCost) return;
-      setGold(getGold() - def.appraisalCost);
-      entry.appraised = true;
-      saveWarehouse(warehouse);
+      if (!def || currentGold < def.appraisalCost) return;
+      b.disabled = true;
+
+      const { error: goldError } = await window.sbClient.from("profiles")
+        .update({ gold: currentGold - def.appraisalCost }).eq("user_id", session.user.id);
+      if (goldError) { alert(`감정 실패: ${goldError.message}`); b.disabled = false; return; }
+      const { error: itemError } = await window.sbClient.from("warehouse_items")
+        .update({ appraised: true }).eq("id", id);
+      if (itemError) { alert(`감정 실패: ${itemError.message}`); b.disabled = false; return; }
+
+      currentGold -= def.appraisalCost;
+      await refreshWarehousePool();
       render();
     }));
 
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
       tab = t.dataset.tab;
       document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
-      selectedEquipIdx = null; selectedMatName = null;
+      selectedEquipId = null; selectedMatName = null;
       render();
     }));
   }
 
+  const { data: profile, error: profileError } = await window.sbClient
+    .from("profiles").select("gold").eq("user_id", session.user.id).single();
+  if (profileError) { alert(`골드 정보를 불러오지 못했습니다: ${profileError.message}`); return; }
+  currentGold = profile?.gold ?? 0;
+
+  await refreshWarehousePool();
   render();
 })();
 </script>
