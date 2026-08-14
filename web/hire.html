@@ -114,7 +114,7 @@
     </div>
   </div>
   <div class="desc">이름과 직업을 정해 새 용병을 고용하세요. 스탯 · HP · SP · 패턴 슬롯은 모두 동일한 초심자 기준으로 시작하고, 고용 비용은 직업마다 다릅니다.</div>
-  <div class="mock-badge">⚠ 정적 목업 — 고용 결과는 브라우저에만 저장됩니다(서버 연동 없음)</div>
+  <div class="mock-badge">⚠ 테스트 빌드 — 고용 결과는 계정에 저장됩니다</div>
 </header>
 
 <main>
@@ -159,43 +159,17 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
   // ============================================================================
-  // 저장소 헬퍼
+  // 세션/골드 상태 — characters.id는 DB가 gen_random_uuid()로 자동 생성하므로
+  // (예전 로컬스토리지 시절의 "유저이름_순번" 방식과 달리) 클라이언트가 다음
+  // id를 직접 계산할 필요가 없어짐.
   // ============================================================================
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
-  }
-  function saveRoster(roster) {
-    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
-  }
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
-  }
-  function setGold(amount) {
-    localStorage.setItem("battleSim_gold", String(amount));
-  }
-  function getUsername() {
-    // ⚠ 실제 로그인/계정 시스템이 아직 없어서 임시로 로컬스토리지에 저장된 값을 씀.
-    // 값이 없으면 데모 기본값으로 "2inkle"을 사용함 — 나중에 인증 시스템이 들어오면
-    // 이 함수만 실제 로그인 유저이름을 반환하도록 교체하면 됨.
-    return localStorage.getItem("battleSim_username") || "2inkle";
-  }
-  function nextCharacterId() {
-    // id 형식: "유저이름_생성순번" (예: 2inkle_32 = 2inkle의 32번째 생성 캐릭터)
-    const username = getUsername();
-    const prefix = username + "_";
-    const roster = getRoster();
-    const usedSeq = roster
-      .map(c => c.id)
-      .filter(id => typeof id === "string" && id.startsWith(prefix))
-      .map(id => Number(id.slice(prefix.length)))
-      .filter(n => Number.isInteger(n));
-    const nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
-    return `${prefix}${nextSeq}`;
-  }
+  let session = null;
+  let currentGold = 0;
 
   // ============================================================================
   // 직업 메타 — 스탯/HP/SP/패턴 슬롯은 전 직업 공통, 직업은 초상화 · 시작 스킬 ·
@@ -224,17 +198,21 @@
   const BASE_MAX_HP = JOB_BASE_HP + BASE_STATS.str * 20;
   const BASE_MAX_SP = JOB_BASE_SP + BASE_STATS.int * 10;
 
-  function buildCharacter(name, job, id) {
+  // characters 테이블 컬럼(snake_case)에 맞춘 신규 캐릭터 행. id/user_id는
+  // 여기서 안 채움 — id는 DB가 gen_random_uuid()로 자동 생성, user_id는
+  // insert 호출부에서 세션 기준으로 채움.
+  //
+  // equipment/inventory 필드는 만들지 않음 — characters 테이블에 equipment
+  // 컬럼이 없다(2026-08-14 결정: warehouse_items.held_by가 장비 장착의 유일한
+  // 진실 공급원, CLAUDE.md 참조). 새 캐릭터는 애초에 장착 중인 장비가 없으니
+  // warehouse_items에도 아무 것도 넣을 필요가 없다.
+  function buildCharacter(name, job) {
     const meta = JOB_META[job];
     return {
-      id,
       name,
       job,
       level: 1,
       exp: 0,
-      expToNext: window.ExpTable.expToNextForLevel(1),
-      portrait: meta.portrait,
-      realStats: { ...BASE_STATS },
       // unassignedPoints/skillPoints는 저장하지 않음 — character-sheet.html이
       // (레벨-1)*포인트/레벨 - 이미 투자한 양 으로 매번 계산함. Lv.1은 0포인트.
       // hp/sp/maxHp/maxSp는 저장하지 않음 — character-sheet.html이
@@ -242,18 +220,15 @@
       // (장비의 real형 스탯 보너스가 있으면 그것도 합산해서 반영).
       // maxPatternSlots/weightCapacity도 저장하지 않음 — character-sheet.html이
       // realStats.int/dex + 장착 장비(패턴슬롯/무게제한 옵션)로 매번 계산함.
-      // bonusStats/weightUsed는 저장하지 않음 — character-sheet.html이 실제 장착
-      // 아이템(data.equipment)에서 매번 계산함(장착/해제가 즉시 반영되도록).
-      // 장비 슬롯 12종(character-sheet.html의 EQUIPMENT_SLOT_TYPES와 동일한 키) —
-      // 전부 빈 상태로 시작. 이 목록이 바뀌면 이쪽도 같이 맞춰줘야 함(중복 관리 지점).
-      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
-      inventory: [],
-      learnedSkillNames: [ "공격", meta.startSkill.name ], // "공격"은 전 직업 공통 무료 스킬
+      exp_to_next: window.ExpTable.expToNextForLevel(1),
+      portrait: meta.portrait,
+      real_stats: { ...BASE_STATS },
+      learned_skill_names: [ "공격", meta.startSkill.name ], // "공격"은 전 직업 공통 무료 스킬
       // 개인 자원(화살/탄환/열정 등) — 기본은 빈 객체. 직업이나 장비에 따라
       // 어떤 자원을 얼마나 갖고 시작할지는 character-sheet.html에서 채워 넣을 수 있음.
-      personalResources: {},
-      row: "front", // 진형(전열/후열) — 기본은 전열, Sheet에서 전환 가능
-      guardAllies: false, // 아군 보호 — 전열일 때만 의미 있음, 기본 꺼짐
+      personal_resources: {},
+      row_position: "front", // 진형(전열/후열) — 기본은 전열, Sheet에서 전환 가능
+      guard_allies: false, // 아군 보호 — 전열일 때만 의미 있음, 기본 꺼짐
       presets: [
         { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
       ]
@@ -289,14 +264,16 @@
   }
 
   function refreshHireButton() {
-    const gold = getGold();
-    goldEl.textContent = gold.toLocaleString();
+    goldEl.textContent = currentGold.toLocaleString();
     const name = nameInput.value.trim();
     const cost = JOB_META[jobSelect.value].cost;
-    if (!name) {
+    if (!session) {
       hireBtn.disabled = true;
       fieldError.textContent = "";
-    } else if (gold < cost) {
+    } else if (!name) {
+      hireBtn.disabled = true;
+      fieldError.textContent = "";
+    } else if (currentGold < cost) {
       hireBtn.disabled = true;
       fieldError.textContent = "골드가 부족합니다.";
     } else {
@@ -315,25 +292,58 @@
     showToast._t = setTimeout(() => toastEl.classList.remove("show"), 2200);
   }
 
-  hireBtn.addEventListener("click", () => {
+  hireBtn.addEventListener("click", async () => {
     const name = nameInput.value.trim();
     const job = jobSelect.value;
     const cost = JOB_META[job].cost;
-    const gold = getGold();
     if (!name) { fieldError.textContent = "이름을 입력해주세요."; return; }
-    if (gold < cost) { fieldError.textContent = "골드가 부족합니다."; return; }
+    if (currentGold < cost) { fieldError.textContent = "골드가 부족합니다."; return; }
 
-    const id = nextCharacterId();
-    const character = buildCharacter(name, job, id);
-    const roster = getRoster();
-    roster.push(character);
-    saveRoster(roster);
-    setGold(gold - cost);
+    hireBtn.disabled = true;
+    const character = buildCharacter(name, job);
+    character.user_id = session.user.id;
 
+    // 골드 차감은 이 시점에 클라이언트가 들고 있는 currentGold 값 기준(원자적
+    // 갱신 아님) — 예전 localStorage 방식의 read-modify-write와 동일한 수준의
+    // 위험만 있음(단일 유저·단일 탭 사용을 전제로 한 테스트 빌드라 지금은
+    // 허용). 서버 검증/원자적 처리는 CLAUDE.md의 "API 단계에서 검증/방어가
+    // 필요한 지점"에 정리된 더 큰 과제와 함께 나중에 다룰 것.
+    const { error: insertError } = await window.sbClient.from("characters").insert(character);
+    if (insertError) {
+      fieldError.textContent = `고용 실패: ${insertError.message}`;
+      hireBtn.disabled = false;
+      return;
+    }
+    const { error: goldError } = await window.sbClient
+      .from("profiles")
+      .update({ gold: currentGold - cost })
+      .eq("user_id", session.user.id);
+    if (goldError) {
+      fieldError.textContent = `골드 차감 실패: ${goldError.message}`;
+      hireBtn.disabled = false;
+      return;
+    }
+
+    currentGold -= cost;
     showToast(`${name}(${job})이(가) 용병단에 합류했습니다.`);
     nameInput.value = "";
     updatePreview();
   });
+
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+    const { data: profile, error } = await window.sbClient
+      .from("profiles")
+      .select("gold")
+      .eq("user_id", session.user.id)
+      .single();
+    if (error) {
+      fieldError.textContent = `골드 조회 실패: ${error.message}`;
+      return;
+    }
+    currentGold = profile?.gold ?? 0;
+    updatePreview();
+  })();
 
   updatePreview();
 </script>
