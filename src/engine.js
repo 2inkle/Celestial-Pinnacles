@@ -135,7 +135,7 @@ class BattleEngine {
    *   루프 도중 값이 늘어나도 즉시 반영됨.
    * @param {string} username 승리 메시지("{유저명}의 파티는 승리했다!")에 씀.
    *   패배/무승부는 유저명을 안 붙이므로 그 경우엔 안 쓰임.
-   * @returns {{ outcome: "allyWin"|"enemyWin"|"draw", turnsElapsed: number }}
+   * @returns {{ outcome: "allyWin"|"enemyWin"|"draw", username: string, turnsElapsed: number }}
    */
   startBattle(maxTurns = 100, username = "플레이어") {
     this.maxTurns = maxTurns;
@@ -269,6 +269,8 @@ class BattleEngine {
 
     return {
       outcome,
+      username, // 결과 화면의 "{유저명}의 파티는 승리했다!" 배너용 — 예전엔 이 필드가
+                // 없어서 화면 쪽이 항상 폴백("플레이어")을 썼음(2026-08-15 발견·수정).
       turnsElapsed: this.currentTurn,
       goldGained: this.battleGoldGained,
       lootGained: this.battleLootGained,
