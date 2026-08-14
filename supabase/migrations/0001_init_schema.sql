@@ -39,6 +39,7 @@ create table public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   username text not null,
   gold integer not null default 500, -- 기존 코드가 500/0으로 갈렸던 기본값을 500으로 통일(hire.html 기준)
+                                       -- → 0002_new_account_defaults.sql에서 3000으로 재변경됨(사용자 결정)
   is_admin boolean not null default false,
   last_ticket_claim_at timestamptz not null default now(),
   created_at timestamptz not null default now()

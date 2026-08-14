@@ -442,14 +442,38 @@ Supabase 기본 보호기능(이메일 인증/CAPTCHA/rate limit)에 맡김. 디
 논의"에 정리된 대로, 로그인은 됐지만 그 뒤로 이어지는 실제 유저별 DB
 스키마·`localStorage` → 서버 이전은 아직 시작 전이다.
 
-## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 초안 작성됨·아직 미적용)
+## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
-**`supabase/migrations/0001_init_schema.sql`에 초기 스키마 SQL을 작성해뒀다**
-(Supabase Dashboard의 SQL Editor에 붙여넣거나 `supabase db push`로 적용하는
-용도, 아직 실제 프로젝트에는 적용 전 — 게임은 여전히 `localStorage` 단일
-저장소로만 동작함). 아래 문단들은 그 스키마를 설계하며 실제 코드(`web/*.html`)를
+**`supabase/migrations/0001_init_schema.sql`이 실제 Supabase 프로젝트(`pauhrbebgmukknbrofon`)에
+적용 완료됨** — Dashboard SQL Editor에서 실행, "Success. No rows returned"로
+성공 확인. 다만 **게임 자체는 아직 이 테이블들을 전혀 읽고 쓰지 않는다** —
+`web/*.html`은 여전히 `localStorage` 단일 저장소로만 동작하는 상태(연결은
+별도 작업). 아래 문단들은 그 스키마를 설계하며 실제 코드(`web/*.html`)를
 다시 훑어 확인한 최신 결론이고, 스키마 파일 자체에도 같은 근거가 주석으로
 남아있다. **README.md는 낡은 내용이라 참고하지 말 것.**
+
+**RLS 격리를 실제 데이터로 검증함**(2026-08-14): anon 키로 `characters`/
+`game_content`에 쓰기 시도 → 둘 다 `new row violates row-level security
+policy`로 정확히 거부됨. 실제 로그인 세션(Discord OAuth)으로 본인 `user_id`
+넣어 쓰기 → 성공, 조회에도 반영됨. 같은 세션으로 **남의 `user_id`를 사칭**해서
+쓰기 시도 → 정확히 RLS 위반으로 거부됨(가장 중요한 증거 — 로그인만 했다고
+아무 행이나 못 씀). 테스트로 만든 캐릭터 행은 확인 후 삭제해서 정리함.
+검증 중 발견: 이 스키마 적용 **이전에** 이미 존재하던 계정(트리거가 아직
+없던 시점에 가입)은 `on_auth_user_created` 트리거가 소급 적용되지 않아
+`profiles` 행이 비어있다 — 버그 아니고 트리거의 정상 동작 범위 밖. 필요시
+`auth.users`를 기준으로 백필하는 1회성 INSERT로 해결 가능(아직 미실행,
+지금은 테스트 계정 하나뿐이라 급하지 않음).
+
+**`supabase/migrations/0002_new_account_defaults.sql`도 작성·적용함**(신규
+계정 기본값, 2026-08-14 사용자 결정): 용병(캐릭터)은 보유하지 않음(자연스러운
+기본값, 변경 없음), 골드 3000G(0001의 500에서 변경), 파견 의뢰권 10장(신규
+지급 로직 추가 — `web/guild.html`의 `TICKET_NAME="파견 의뢰권"`/
+`category:"consumable"`과 동일한 이름·분류로 지급해야 게임 로직이 인식함).
+0001이 이미 적용된 뒤 나온 결정이라, 이미 적용된 마이그레이션 파일을
+고치는 대신 0002로 분리함(마이그레이션 불변성 원칙) — `profiles.gold`
+컬럼 기본값을 `alter column ... set default 3000`으로 바꾸고,
+`handle_new_user()` 트리거 함수를 `create or replace`로 갱신해서 파견
+의뢰권 지급 INSERT를 추가함.
 
 작성한 테이블: `profiles`(유저 프로필+골드+관리자 플래그, `battleSim_username`의
 `"2inkle"` 문자열 비교를 `is_admin` boolean으로 정식 대체), `characters`,
