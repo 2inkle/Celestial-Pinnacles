@@ -22,5 +22,21 @@
       }
       return data.session;
     },
+
+    // profiles.is_admin 조회. session이 없으면(또는 조회 실패 시) false —
+    // 관리자 여부는 실패 시 항상 안전한 쪽(=일반 유저 취급)으로 떨어져야 함.
+    // battleSim_username==="2inkle" 폴백 방식(로그인 흐름이 이 키를 아예
+    // set한 적이 없어서 사실상 항상 참으로 평가되던 문제, CLAUDE.md 참조)을
+    // 대체하는 정식 판별 경로.
+    async isAdmin(session) {
+      if (!session) return false;
+      const { data, error } = await window.sbClient
+        .from("profiles")
+        .select("is_admin")
+        .eq("user_id", session.user.id)
+        .single();
+      if (error || !data) return false;
+      return !!data.is_admin;
+    },
   };
 })();

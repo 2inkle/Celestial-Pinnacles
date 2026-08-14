@@ -18,11 +18,28 @@
 
   document.write(navHTML);
 
-  document.addEventListener("DOMContentLoaded", () => {
+  // 개발자도구 링크는 profiles.is_admin 기준으로만 노출한다. 예전엔
+  // localStorage.getItem("battleSim_username")==="2inkle" 방식이었는데,
+  // Discord OAuth 로그인 흐름이 이 키를 어디서도 set한 적이 없어서 항상
+  // 빈 값 → "2inkle" 폴백이 100% 발동 → 로그인한 사람 전원이 관리자로
+  // 보이던 실제 노출 문제가 있었다(2026-08-14 character-sheet.html 전환
+  // 작업 중 발견, CLAUDE.md 참조).
+  //
+  // window.sbClient/window.AuthGuard가 없는(=아직 Supabase로 전환 안 된)
+  // 페이지에서는 조용히 스킵한다 — "링크가 안 보임"이 "전원에게 보임"보다
+  // 안전한 방향이라 페일클로즈를 택함. 그런 페이지에서 실제 관리자가
+  // 개발자도구에 가려면 이미 전환된 페이지(예: roster-index.html)를 거치면
+  // 됨 — 나머지 페이지가 전환되면 이 제약도 자연히 사라짐.
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (!window.sbClient || !window.AuthGuard) return;
     const devSlot = document.getElementById("devToolsNavSlot");
-    const isDev = (localStorage.getItem("battleSim_username") || "2inkle") === "2inkle";
+    if (!devSlot) return;
 
-    if (devSlot && isDev) {
+    const { data } = await window.sbClient.auth.getSession();
+    if (!data.session) return;
+    const isDev = await window.AuthGuard.isAdmin(data.session);
+
+    if (isDev) {
       devSlot.innerHTML = `<a href="dev-tools.html" class="gnav-item ${isActive('dev-tools')}">🛠 개발자도구</a>`;
     }
   });
