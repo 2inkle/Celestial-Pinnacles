@@ -6,21 +6,27 @@
 // 재사용할 수 없었음.
 // ============================================================================
 (function () {
-  // 몬스터 로스터는 localStorage에 "배열"로 저장돼 있음(monster-roster.html이
-  // 심어둠). 반면 battle-adapter는 monsterTable[monsterId]로 조회하므로 id를
-  // 키로 갖는 객체가 필요함 — 그 변환을 여기서 한 번만 하고 공용으로 씀.
+  // 몬스터 로스터는 "배열"로 관리됨(game_content.monsterRoster). 반면
+  // battle-adapter는 monsterTable[monsterId]로 조회하므로 id를 키로 갖는 객체가
+  // 필요함 — 그 변환을 여기서 한 번만 하고 공용으로 씀.
   //
   // 예전엔 이 변환이 battle-view.html에만 있었고 dispatch.html과 이 파일은
   // 배열을 그대로 넘겨서, 파견에서는 모든 몬스터 조회가 undefined가 됐음
   // (적이 하나도 안 만들어져 매 전투가 1턴 부전승 → 2000턴 파견이 경험치 0 ·
   // 골드 0 · 전리품 0으로 끝남. 파견 기능 자체가 동작한 적이 없었음).
+  //
+  // ⚠ 이 파일은 저장소(DB)를 직접 모른다 — 로스터는 각 페이지(battle-view/
+  // dispatch)가 자기 부트스트랩에서 한 번 받아와 setMonsterRoster()로 주입함.
+  // getMonsterTable()이 동기여야 하는 이유: dispatch의 보상 시뮬레이션이
+  // spawnEnemies()를 2000턴 예산이 바닥날 때까지 수백 번 반복 호출하는데,
+  // 여기서 매번 네트워크를 타면 그 루프가 성립하지 않음.
+  let cachedMonsterRoster = [];
+  function setMonsterRoster(roster) {
+    cachedMonsterRoster = Array.isArray(roster) ? roster : [];
+  }
   function getMonsterTable() {
-    let roster = [];
-    try { roster = JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
-    catch { roster = []; }
-    if (!Array.isArray(roster)) return roster; // 이미 id 키 객체면 그대로 씀
     const table = {};
-    roster.forEach((m) => { if (m && m.id) table[m.id] = m; });
+    cachedMonsterRoster.forEach((m) => { if (m && m.id) table[m.id] = m; });
     return table;
   }
 
@@ -146,5 +152,6 @@
     spawnEnemies,
     computePoolProbabilities,
     getMonsterTable,
+    setMonsterRoster,
   };
 })();

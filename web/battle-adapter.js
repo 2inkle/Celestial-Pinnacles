@@ -31,20 +31,32 @@
   };
 
   // ==========================================================================
-  // 1) 스킬 등록 — 이제 character-sheet.html/monster-sheet.html과 완전히 같은
-  //    공용 소스(battleSim_skillTable, dev-tools의 skill-table-editor.html에서
-  //    관리)를 읽어옴. 예전엔 여기도 별도의 하드코딩 사본이 있어서 "메테오
+  // 1) 스킬 등록 — character-sheet.html/monster-sheet.html과 완전히 같은
+  //    공용 소스(game_content.skillTable, dev-tools의 skill-table-editor.html에서
+  //    관리)를 씀. 예전엔 여기도 별도의 하드코딩 사본이 있어서 "메테오
   //    낙하"(여기) vs "메테오"(스킬 테이블)처럼 이름이 어긋나는 문제가 실제로
   //    있었음. 엔진이 실전투에 쓰려면 필요한 필드(targetFaction/targetCount/
   //    skillType/preDelay/preDelayType/postDelay)가 전부 채워진 스킬만
   //    등록함 — 나머지(스탯/코스트만 있는 대다수)는 skill-table-editor에서
   //    마저 채워야 실전투에서 쓸 수 있음. 그런 스킬을 패턴에서 참조하면
   //    엔진이 조용히 무시함(크래시 안 남).
+  //
+  // 2026-08-15: localStorage(battleSim_skillTable) 동기 읽기를 없앰 — DB
+  // 전환 후 그 키를 채워주는 페이지가 하나도 안 남아서(character-sheet.html도
+  // 이제 game_content를 직접 조회함) 이 함수가 항상 빈 테이블을 돌려주고
+  // 있었다(모든 전투가 스킬 하나도 없이 맨주먹 ATTACK만 쓰는 상태였음 —
+  // dispatch.html/battle-view.html 전환 중 발견). battle-encounters.js의
+  // setMonsterRoster와 동일한 패턴으로, 페이지가 game_content를 직접 조회해서
+  // 이 캐시에 넣어주는 방식으로 바꿈(runBattle이 호출될 때마다 DB를 새로
+  // 묻지 않도록 — registerKnownSkills는 매 전투 시작마다 호출됨).
   // ==========================================================================
   const BATTLE_READY_SKILL_FIELDS = ["targetFaction", "targetCount", "skillType", "preDelay", "preDelayType", "postDelay"];
+  let cachedSkillTable = { commonSkills: [], jobSkills: {} };
+  function setSkillTable(table) {
+    cachedSkillTable = table && typeof table === "object" ? table : { commonSkills: [], jobSkills: {} };
+  }
   function getSkillTable() {
-    try { return JSON.parse(localStorage.getItem("battleSim_skillTable")) || { commonSkills: [], jobSkills: {} }; }
-    catch { return { commonSkills: [], jobSkills: {} }; }
+    return cachedSkillTable;
   }
   function allSkillsFromTable() {
     const t = getSkillTable();
@@ -477,5 +489,6 @@
     translatePatternRow,
     translatePatternSlots,
     registerKnownSkills,
+    setSkillTable,
   };
 })();

@@ -92,6 +92,9 @@
 <script src="battle-themes.js"></script>
 <script src="exp-table.js"></script>
 <script src="battle-adapter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
 // ============================================================================
 // 파견 실행
@@ -114,7 +117,7 @@
 // Lv10→15 필요량 13,210). 예전엔 100이었는데 그건 예산이 1만턴이던 시절의
 // 값이라, 2000턴으로 줄이면서 같이 조정함.
 // ============================================================================
-(function () {
+(async function () {
   const TURN_BUDGET = 2000;
   // 경험치·골드와 아이템의 나눗값을 따로 둠.
   //   EXP: 성장 속도 목표(파견 1.4장으로 Lv10→15)에 맞춘 값.
@@ -133,29 +136,119 @@
   const battleId = params.get("battle") || "";
   const themeId = params.get("theme") || "";
 
-  const getRoster = () => { try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; } catch { return []; } };
-  const getWarehouse = () => { try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; } catch { return []; } };
-  const saveWarehouse = (w) => localStorage.setItem("battleSim_warehouse", JSON.stringify(w));
   // 배열로 저장된 로스터를 id 키 객체로 바꿔주는 공용 헬퍼(battle-encounters.js).
   // 예전엔 여기서 배열을 그대로 넘겨 파견의 모든 몬스터 조회가 실패했음.
+  // 이제 몬스터 로스터 자체는 아래 부트스트랩이 game_content에서 한 번 받아와
+  // setMonsterRoster()로 주입함(시뮬 루프가 동기로 수백 번 조회하므로 필수).
   const getMonsterTable = () => window.BattleEncounters.getMonsterTable();
 
-  function ticketCount() {
-    const e = getWarehouse().find((w) => w.name === TICKET_NAME);
-    return e ? e.quantity : 0;
-  }
-  function consumeTicket() {
-    const w = getWarehouse();
-    const i = w.findIndex((x) => x.name === TICKET_NAME && x.quantity > 0);
-    if (i < 0) return false;
-    w[i].quantity -= 1;
-    if (w[i].quantity <= 0) w.splice(i, 1);
-    saveWarehouse(w);
-    return true;
+  // ── 부트스트랩이 채우는 캐시들 ─────────────────────────────────────────
+  // 렌더/시뮬 루프가 동기로 여러 번 읽는 값이라 매번 DB를 묻지 않고 여기서 읽음
+  // (roster-index.html/shop.html/refinery.html과 같은 컨벤션).
+  let session = null;
+  let roster = [];       // characters 행 → camelCase, equipment(held_by 조회분) 첨부
+  let currentGold = 0;   // profiles.gold
+  let ticketQty = 0;     // warehouse_items의 파견 의뢰권 수량
+  const selected = new Set();
+
+  // DB 행(snake_case) → battle-adapter/렌더 코드가 기대하는 camelCase.
+  // roster-index.html/character-sheet.html의 mapCharacterRow와 동일한 컨벤션.
+  function mapCharacterRow(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      job: row.job,
+      level: row.level,
+      exp: row.exp,
+      expToNext: row.exp_to_next,
+      portrait: row.portrait,
+      realStats: row.real_stats || {},
+      learnedSkillNames: row.learned_skill_names || [],
+      personalResources: row.personal_resources || {},
+      row: row.row_position,
+      guardAllies: row.guard_allies,
+      presets: row.presets || [],
+      keyItems: row.key_items || [],
+    };
   }
 
-  const roster = getRoster();
-  const selected = new Set();
+  // character-sheet.html의 mapItemRow와 동일(장비 스펙 필드 전량).
+  function mapItemRow(row) {
+    return {
+      id: row.id, name: row.name, category: row.category, quantity: row.quantity,
+      description: row.description, slot: row.slot, heldBy: row.held_by,
+      enhanceLevel: row.enhance_level, craftMaterial: row.craft_material, appraised: row.appraised,
+      combatReal: row.combat_real, combatBonus: row.combat_bonus, statBonus: row.stat_bonus,
+      passiveBonus: row.passive_bonus, maxHpBonus: row.max_hp_bonus, maxSpBonus: row.max_sp_bonus,
+      weight: row.weight, twoHanded: row.two_handed, setId: row.set_id, requiredJob: row.required_job,
+      statRealBonus: row.stat_real_bonus, patternSlotBonus: row.pattern_slot_bonus,
+      critMultiplier: row.crit_multiplier, conditionalPassiveMods: row.conditional_passive_mods,
+      grantsResource: row.grants_resource, equipmentType: row.equipment_type,
+      avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
+      consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+    };
+  }
+
+  // camelCase 전리품 스펙 → warehouse_items insert payload(snake_case).
+  // shop.html의 buildWarehouseInsertFromShopItem / refinery.html의
+  // buildEnhancedInsertPayload와 같은 필드 목록.
+  function buildWarehouseInsertFromLoot(loot, quantity) {
+    return {
+      user_id: session.user.id,
+      name: loot.name,
+      category: loot.category,
+      quantity,
+      description: loot.description ?? null,
+      slot: loot.slot ?? null,
+      combat_real: loot.combatReal ?? null,
+      combat_bonus: loot.combatBonus ?? null,
+      stat_bonus: loot.statBonus ?? null,
+      passive_bonus: loot.passiveBonus ?? null,
+      max_hp_bonus: loot.maxHpBonus ?? null,
+      max_sp_bonus: loot.maxSpBonus ?? null,
+      weight: loot.weight ?? null,
+      two_handed: loot.twoHanded ?? null,
+      set_id: loot.setId ?? null,
+      required_job: loot.requiredJob ?? null,
+      stat_real_bonus: loot.statRealBonus ?? null,
+      pattern_slot_bonus: loot.patternSlotBonus ?? null,
+      crit_multiplier: loot.critMultiplier ?? null,
+      conditional_passive_mods: loot.conditionalPassiveMods ?? null,
+      grants_resource: loot.grantsResource ?? null,
+      equipment_type: loot.equipmentType ?? null,
+      avatar_portrait: loot.avatarPortrait ?? null,
+      grants_skill: loot.grantsSkill ?? null,
+      consumable: loot.consumable ?? null,
+      uses_per_battle: loot.usesPerBattle ?? null,
+      enhanceable: loot.enhanceable ?? null,
+    };
+  }
+
+  function ticketCount() {
+    return ticketQty;
+  }
+  // 티켓 차감은 캐시를 믿지 않고 매번 DB에서 다시 읽음 — 캐시가 낡아 있으면
+  // 없는 의뢰권으로 파견을 보내게 됨(보상이 공짜로 나옴).
+  async function consumeTicket() {
+    const { data: row, error } = await window.sbClient
+      .from("warehouse_items").select("id,quantity")
+      .eq("user_id", session.user.id).eq("name", TICKET_NAME).maybeSingle();
+    if (error) { alert(`의뢰권 조회 실패: ${error.message}`); return false; }
+    if (!row || row.quantity <= 0) { ticketQty = 0; renderPre(); return false; }
+
+    if (row.quantity <= 1) {
+      const { error: delError } = await window.sbClient.from("warehouse_items").delete().eq("id", row.id);
+      if (delError) { alert(`의뢰권 차감 실패: ${delError.message}`); return false; }
+      ticketQty = 0;
+    } else {
+      const { error: updError } = await window.sbClient.from("warehouse_items")
+        .update({ quantity: row.quantity - 1 }).eq("id", row.id);
+      if (updError) { alert(`의뢰권 차감 실패: ${updError.message}`); return false; }
+      ticketQty = row.quantity - 1;
+    }
+    renderPre();
+    return true;
+  }
 
   function renderMembers() {
     $("#memberList").innerHTML = roster.length ? roster.map((c) => `
@@ -189,14 +282,14 @@
     $("#goBtn").disabled = problems.length > 0;
   }
 
-  $("#goBtn").addEventListener("click", () => {
-    if (!consumeTicket()) { renderPre(); return; }
+  $("#goBtn").addEventListener("click", async () => {
+    if (!await consumeTicket()) { renderPre(); return; }
     const btn = $("#goBtn");
     btn.disabled = true; btn.textContent = "파견 중…";
 
     // 예산이 바닥날 때까지 반복. 각 판은 실제 전투 엔진을 그대로 태우므로
     // 직접 도전과 완전히 같은 규칙으로 계산됨(별도 근사 공식 없음).
-    setTimeout(() => {
+    setTimeout(async () => {
       const monsterTable = getMonsterTable();
       const party = roster.filter((c) => selected.has(c.id));
       let spent = 0, runs = 0, wins = 0;
@@ -244,7 +337,7 @@
         })
         .filter((l) => l.quantity > 0);
 
-      applyRewards(party, finalExp, finalGold, finalLoot);
+      await applyRewards(party, finalExp, finalGold, finalLoot);
       renderResult({ runs, wins, spent, exp, gold, loot: [...loot.values()], finalExp, finalGold, finalLoot });
 
       btn.textContent = "파견 보내기";
@@ -252,29 +345,52 @@
     }, 30);
   });
 
-  function applyRewards(party, exp, gold, lootList) {
+  async function applyRewards(party, exp, gold, lootList) {
     // 경험치 — 파견에 나간 용병 전원에게 동일 지급(전투 결과와 같은 규칙).
     // exp-table.js의 grantExp를 거쳐야 레벨업까지 반영됨 — 예전엔 여기서 exp만
     // 더하고 레벨업 판정을 안 해서, 파견으로 쌓은 경험치가 레벨로 전환되지
     // 않고 숫자만 계속 불어났음.
-    const fresh = getRoster();
-    party.forEach((p) => {
-      const c = fresh.find((x) => x.id === p.id);
-      if (c) window.ExpTable.grantExp(c, exp);
-    });
-    localStorage.setItem("battleSim_roster", JSON.stringify(fresh));
+    //
+    // 예전엔 로스터 전체를 다시 읽어 통째로 저장했지만(부분 저장이 불가능한
+    // localStorage 구조 탓), 이제는 캐릭터별로 exp/level/exp_to_next 세 컬럼만
+    // update함 — 파티는 최대 5명이라 한 명씩 도는 걸로 충분(배치 RPC 불필요).
+    for (const p of party) {
+      window.ExpTable.grantExp(p, exp);
+      const { error } = await window.sbClient.from("characters")
+        .update({ exp: p.exp, level: p.level, exp_to_next: p.expToNext })
+        .eq("id", p.id);
+      if (error) alert(`경험치 저장 실패(${p.name}): ${error.message}`);
+    }
 
-    localStorage.setItem("battleSim_gold", String(Number(localStorage.getItem("battleSim_gold") || 0) + gold));
+    if (gold) {
+      const next = currentGold + gold;
+      const { error } = await window.sbClient.from("profiles")
+        .update({ gold: next }).eq("user_id", session.user.id);
+      if (error) alert(`골드 저장 실패: ${error.message}`);
+      else currentGold = next;
+    }
 
-    const w = getWarehouse();
-    lootList.forEach((l) => {
-      const { name, category, quantity, rawQuantity, ...spec } = l;
-      const stack = w.find((x) => x.name === name && x.category === category
-        && !x.heldBy && !x.enhanceLevel && !x.craftMaterial);
-      if (stack) stack.quantity += quantity;
-      else w.push({ name, category, quantity, ...spec });
-    });
-    saveWarehouse(w);
+    // 전리품 병합 — 병합 조건은 상점 구매/직접 전투와 동일. held_by(누군가
+    // 장착 중인 개별 인스턴스)나 enhance_level(강화품)과는 절대 안 섞임.
+    for (const l of lootList) {
+      const { data: existing, error: findError } = await window.sbClient
+        .from("warehouse_items").select("id,quantity")
+        .eq("user_id", session.user.id).eq("name", l.name).eq("category", l.category)
+        .is("held_by", null).is("enhance_level", null).maybeSingle();
+      if (findError) { alert(`전리품 저장 실패(${l.name}): ${findError.message}`); continue; }
+
+      if (existing) {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: existing.quantity + l.quantity }).eq("id", existing.id);
+        if (error) alert(`전리품 저장 실패(${l.name}): ${error.message}`);
+      } else {
+        // 장비 스펙(combatReal/weight/twoHanded 등)을 그대로 실어서 저장 —
+        // 이게 없으면 드랍 장비를 장착해도 스탯이 0이 됨.
+        const { error } = await window.sbClient.from("warehouse_items")
+          .insert(buildWarehouseInsertFromLoot(l, l.quantity));
+        if (error) alert(`전리품 저장 실패(${l.name}): ${error.message}`);
+      }
+    }
   }
 
   function renderResult(r) {
@@ -303,6 +419,54 @@
         : `<div class="empty">이번엔 가져온 전리품이 없어요.<br />
              희귀한 물건은 직접 다녀오시는 편이 확실합니다.</div>`}
       </div>`;
+  }
+
+  // ==========================================================================
+  // 부트스트랩 — 로그인 확인 → 캐릭터(+장착 장비) · 몬스터 로스터 · 골드 ·
+  // 의뢰권을 한 번에 받아온 뒤 첫 렌더. 렌더/시뮬 코드는 전부 위 캐시 변수를
+  // 동기로 읽으므로, 이게 끝나기 전에는 아무것도 그리지 않음.
+  // ==========================================================================
+  session = await window.AuthGuard.requireSession();
+
+  const [charRes, monsterRes, skillRes, profileRes, ticketRes] = await Promise.all([
+    window.sbClient.from("characters").select("*").eq("user_id", session.user.id),
+    window.sbClient.from("game_content").select("data").eq("key", "monsterRoster").single(),
+    window.sbClient.from("game_content").select("data").eq("key", "skillTable").single(),
+    window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single(),
+    window.sbClient.from("warehouse_items").select("id,quantity")
+      .eq("user_id", session.user.id).eq("name", TICKET_NAME).maybeSingle(),
+  ]);
+  if (charRes.error) { alert(`용병 목록을 불러오지 못했습니다: ${charRes.error.message}`); return; }
+  if (monsterRes.error) { alert(`몬스터 정보를 불러오지 못했습니다: ${monsterRes.error.message}`); return; }
+  if (skillRes.error) { alert(`스킬 정보를 불러오지 못했습니다: ${skillRes.error.message}`); return; }
+  if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
+  if (ticketRes.error) { alert(`의뢰권 정보를 불러오지 못했습니다: ${ticketRes.error.message}`); return; }
+
+  roster = (charRes.data || []).map(mapCharacterRow);
+  window.BattleEncounters.setMonsterRoster(monsterRes.data?.data || []);
+  // battle-adapter.js의 registerKnownSkills()가 매 전투 시작마다 동기로
+  // 읽으므로(파견은 이 함수가 수백 번 호출됨) 여기서 미리 주입해둠 —
+  // battle-encounters.js의 setMonsterRoster와 동일한 이유.
+  window.BattleAdapter.setSkillTable(skillRes.data?.data || { commonSkills: [], jobSkills: {} });
+  currentGold = profileRes.data?.gold ?? 0;
+  ticketQty = ticketRes.data?.quantity ?? 0;
+
+  // 장착 장비 — characters 테이블엔 equipment 컬럼이 없고(held_by가 유일한
+  // 진실 공급원), battle-adapter는 rosterChar.equipment(슬롯 키 객체)를 직접
+  // 읽는다(sumEquipmentCombatStats / 맨주먹 보정의 equipment?.mainhand). 그래서
+  // 여기서 held_by로 조회해 슬롯별로 꽂아준다 — 이게 없으면 파견 전투가
+  // 전원 맨주먹(ATK 5)으로 계산됨.
+  roster.forEach((c) => { c.equipment = {}; });
+  if (roster.length) {
+    const byId = {};
+    roster.forEach((c) => { byId[c.id] = c; });
+    const { data: itemRows, error: itemError } = await window.sbClient
+      .from("warehouse_items").select("*").in("held_by", roster.map((c) => c.id));
+    if (itemError) { alert(`장착 장비를 불러오지 못했습니다: ${itemError.message}`); return; }
+    (itemRows || []).forEach((row) => {
+      const owner = byId[row.held_by];
+      if (owner && row.slot) owner.equipment[row.slot] = mapItemRow(row);
+    });
   }
 
   $("#title").textContent = `파견 의뢰 — ${window.BattleThemes.battleNameById(battleId)}`;

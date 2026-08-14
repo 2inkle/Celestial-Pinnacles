@@ -275,39 +275,93 @@
 <script src="battle-themes.js"></script>
 <script src="exp-table.js"></script>
 <script src="battle-adapter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  // ============================================================================
+  // Supabase 연동 — 로스터는 characters, 골드는 profiles.gold, 전리품은
+  // warehouse_items, 클리어 기록은 battle_progress. 개발자 도구 네비게이션은
+  // 이제 nav.js가 profiles.is_admin으로 판별하므로 여기 사본은 제거함.
+  //
+  // 아래 값들은 전부 부트스트랩 IIFE가 비동기로 채운다. 렌더/전투/보상 함수는
+  // 이 캐시를 동기로 읽음(예전 getRoster()가 매번 localStorage를 다시 파싱하던
+  // 자리) — 이 페이지는 로스터 배열을 제자리에서 갈아끼우지 않으므로 로드
+  // 시점 1회 조회로 충분함(roster-index.html과 같은 패턴).
+  // ============================================================================
+  let session = null;
+  let cachedRoster = [];  // characters 행 → camelCase + equipment(held_by 조회분)
+  let currentGold = 0;    // profiles.gold
+  let username = "플레이어";
 
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
+  function mapCharacterRow(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      job: row.job,
+      level: row.level,
+      exp: row.exp,
+      expToNext: row.exp_to_next,
+      portrait: row.portrait,
+      realStats: row.real_stats || {},
+      learnedSkillNames: row.learned_skill_names || [],
+      personalResources: row.personal_resources || {},
+      row: row.row_position,
+      guardAllies: row.guard_allies,
+      presets: row.presets || [],
+      keyItems: row.key_items || [],
+    };
   }
-  function saveRoster(roster) {
-    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
+
+  // character-sheet.html의 mapItemRow와 동일(장비 스펙 필드 전량).
+  function mapItemRow(row) {
+    return {
+      id: row.id, name: row.name, category: row.category, quantity: row.quantity,
+      description: row.description, slot: row.slot, heldBy: row.held_by,
+      enhanceLevel: row.enhance_level, craftMaterial: row.craft_material, appraised: row.appraised,
+      combatReal: row.combat_real, combatBonus: row.combat_bonus, statBonus: row.stat_bonus,
+      passiveBonus: row.passive_bonus, maxHpBonus: row.max_hp_bonus, maxSpBonus: row.max_sp_bonus,
+      weight: row.weight, twoHanded: row.two_handed, setId: row.set_id, requiredJob: row.required_job,
+      statRealBonus: row.stat_real_bonus, patternSlotBonus: row.pattern_slot_bonus,
+      critMultiplier: row.crit_multiplier, conditionalPassiveMods: row.conditional_passive_mods,
+      grantsResource: row.grants_resource, equipmentType: row.equipment_type,
+      avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
+      consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+    };
   }
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
-  }
-  function setGold(amount) {
-    localStorage.setItem("battleSim_gold", String(amount));
-  }
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
-  function saveWarehouse(warehouse) {
-    localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
+
+  // camelCase 전리품 스펙 → warehouse_items insert payload(snake_case).
+  // shop.html의 buildWarehouseInsertFromShopItem과 같은 필드 목록.
+  function buildWarehouseInsertFromLoot(loot, quantity) {
+    return {
+      user_id: session.user.id,
+      name: loot.name,
+      category: loot.category,
+      quantity,
+      description: loot.description ?? null,
+      slot: loot.slot ?? null,
+      combat_real: loot.combatReal ?? null,
+      combat_bonus: loot.combatBonus ?? null,
+      stat_bonus: loot.statBonus ?? null,
+      passive_bonus: loot.passiveBonus ?? null,
+      max_hp_bonus: loot.maxHpBonus ?? null,
+      max_sp_bonus: loot.maxSpBonus ?? null,
+      weight: loot.weight ?? null,
+      two_handed: loot.twoHanded ?? null,
+      set_id: loot.setId ?? null,
+      required_job: loot.requiredJob ?? null,
+      stat_real_bonus: loot.statRealBonus ?? null,
+      pattern_slot_bonus: loot.patternSlotBonus ?? null,
+      crit_multiplier: loot.critMultiplier ?? null,
+      conditional_passive_mods: loot.conditionalPassiveMods ?? null,
+      grants_resource: loot.grantsResource ?? null,
+      equipment_type: loot.equipmentType ?? null,
+      avatar_portrait: loot.avatarPortrait ?? null,
+      grants_skill: loot.grantsSkill ?? null,
+      consumable: loot.consumable ?? null,
+      uses_per_battle: loot.usesPerBattle ?? null,
+      enhanceable: loot.enhanceable ?? null,
+    };
   }
 
   // ============================================================================
@@ -325,7 +379,7 @@
 
   // ============================================================================
   // 몬스터 마스터 테이블 — 이제 monster-sheet.html/monster-roster.html에서
-  // 만든 몬스터 로스터(battleSim_monsterRoster)에서 읽어옴. 예전엔 여기 직접
+  // 만든 몬스터 로스터(game_content.monsterRoster)에서 읽어옴. 예전엔 여기 직접
   // 하드코딩했었지만, 오타/누락을 검증하기 피곤하고 캐릭터 빌드와 같은 UI로
   // 만들면 어차피 문제가 없어서 로스터 기반으로 전환함. 로스터의 각 몬스터
   // 객체가 곧 이 테이블의 값(하나의 id 키에 대응하는 정의)이 됨.
@@ -335,7 +389,10 @@
   // 배열→id 키 객체 변환은 battle-encounters.js의 공용 헬퍼로 일원화함
   // (dispatch.html도 같은 함수를 씀 — 예전엔 이 변환이 여기에만 있어서
   // 파견 쪽 몬스터 조회가 전부 실패했음).
-  const MONSTER_TABLE = window.BattleEncounters.getMonsterTable();
+  // 예전엔 파싱 시점에 계산되는 const였지만, 이제 로스터 원본을 부트스트랩이
+  // game_content에서 받아와 setMonsterRoster()로 주입하므로 그 직후에 대입함
+  // (character-sheet.html의 SKILL_TABLE/COMMON_SKILLS와 같은 처리).
+  let MONSTER_TABLE = {};
 
   // ============================================================================
   // 전투별 몬스터 등장 풀 — 고정 편성이 아니라 "등장 가능성이 있는 몬스터 목록 +
@@ -412,7 +469,7 @@
   }
 
   function render() {
-    const roster = getRoster();
+    const roster = cachedRoster;
     const params = new URLSearchParams(location.search);
     const partyParam = params.get("party");
     const battleId = params.get("battle");
@@ -691,17 +748,17 @@
   // ============================================================================
   // 실제 전투 실행 — BattleAdapter.runBattle()에 지금 화면에 뜬 편성 그대로 넘김.
   // ============================================================================
+  // 표시용 이름 — 세션에서 가져옴(login.html/auth-callback.html과 같은 폴백 순서).
   function getUsername() {
-    try { return localStorage.getItem("battleSim_username") || "플레이어"; }
-    catch { return "플레이어"; }
+    return username;
   }
 
-  function runRealBattle() {
+  async function runRealBattle() {
     const btn = document.getElementById("runBattleBtn");
     btn.disabled = true;
     btn.textContent = "전투 진행 중...";
 
-    const roster = getRoster();
+    const roster = cachedRoster;
     const params = new URLSearchParams(location.search);
     const partyParam = params.get("party");
     const battleId = params.get("battle");
@@ -735,77 +792,141 @@
       notice.textContent = "🧪 연습 모드 — 경험치·아이템·골드가 지급되지 않았고, 클리어 기록과 재도전 대기시간에도 영향이 없어요.";
       wrap.parentNode.insertBefore(notice, wrap);
     } else {
-      applyBattleRewards(result, roster);
-      if (result.outcome === "allyWin") markCleared(battleId);
+      await applyBattleRewards(result, roster);
+      if (result.outcome === "allyWin") await markCleared(battleId);
     }
     btn.textContent = "⚔️ 다시 전투하기";
     btn.disabled = false;
   }
 
   // ============================================================================
-  // 전투 결과를 실제로 저장함. 경험치는 로스터(캐릭터별 exp/level/expToNext)에,
-  // 골드는 계정 단위 키(battleSim_gold)에 직접, 아이템은 계정에 귀속된 창고
-  // 테이블(battleSim_warehouse)에 — 이 셋을 서로 다른 곳에 나눠 저장하는 이유:
-  // 골드가 창고 테이블 안에 있으면 골드를 참조할 때마다 창고 테이블을 거쳐야
-  // 해서(참조 -> 재참조) 비효율적이고 매번 그림이 지저분해짐. 골드는 여러 곳에서
-  // 자주, 직접 참조되는 값이라 최상위에 독립적으로 둠.
+  // 전투 결과를 실제로 저장함. 경험치는 characters 행(캐릭터별 exp/level/
+  // exp_to_next)에, 골드는 profiles.gold에, 아이템은 warehouse_items에 —
+  // 이 셋을 서로 다른 테이블에 나눠 두는 이유: 골드가 창고 테이블 안에 있으면
+  // 골드를 참조할 때마다 창고를 거쳐야 해서(참조 -> 재참조) 비효율적이고 매번
+  // 그림이 지저분해짐. 골드는 여러 곳에서 자주, 직접 참조되는 값이라 프로필에
+  // 독립적으로 둠.
   // ============================================================================
-  // 승리 시 클리어 기록 + 클리어 시각 저장.
+  // 승리 시 클리어 기록 + 클리어 시각 저장(battle_progress 한 행에 통합됨 —
+  // 예전엔 clearedBattles 배열과 battleClearTimes 맵으로 갈라져 있었음).
   // 예전엔 실제 전투 승리가 해금에 전혀 반영되지 않아서(개발자 버튼으로만
   // 해금됐음) 전투를 이겨도 다음 전투가 안 열렸음. 시각은 특수의뢰의
   // 재도전 대기(cooldownHours) 판정에 쓰임.
-  function markCleared(battleId) {
+  async function markCleared(battleId) {
     if (!battleId) return;
-    try {
-      const cleared = JSON.parse(localStorage.getItem("battleSim_clearedBattles")) || [];
-      if (!cleared.includes(battleId)) {
-        cleared.push(battleId);
-        localStorage.setItem("battleSim_clearedBattles", JSON.stringify(cleared));
-      }
-    } catch { /* 저장 실패는 무시 — 전투 결과 표시를 막지 않음 */ }
-    try {
-      const times = JSON.parse(localStorage.getItem("battleSim_battleClearTimes")) || {};
-      times[battleId] = Date.now();
-      localStorage.setItem("battleSim_battleClearTimes", JSON.stringify(times));
-    } catch { /* 위와 동일 */ }
+    const { error } = await window.sbClient.from("battle_progress").upsert(
+      { user_id: session.user.id, battle_id: battleId, cleared: true, cleared_at: new Date().toISOString() },
+      { onConflict: "user_id,battle_id" }
+    );
+    if (error) console.error("[battle-view] 클리어 기록 실패", error); // 결과 표시 자체는 막지 않음
   }
 
-  function applyBattleRewards(result, roster) {
-    result.expByCharacter.forEach(({ id, gainExp }) => {
-      if (!gainExp) return;
+  async function applyBattleRewards(result, roster) {
+    // 경험치 — grantExp가 메모리 객체의 exp/level/expToNext를 제자리에서
+    // 갱신하고, 그 결과 세 컬럼만 캐릭터별로 update함(예전의 로스터 통짜
+    // 저장이 필요 없어짐). 파티는 최대 5명이라 한 명씩 도는 걸로 충분.
+    for (const { id, gainExp } of result.expByCharacter) {
+      if (!gainExp) continue;
       const character = roster.find((r) => String(r.id) === String(id));
-      if (character) grantExp(character, gainExp);
-    });
-    saveRoster(roster);
+      if (!character) continue;
+      grantExp(character, gainExp);
+      const { error } = await window.sbClient.from("characters")
+        .update({ exp: character.exp, level: character.level, exp_to_next: character.expToNext })
+        .eq("id", character.id);
+      if (error) alert(`경험치 저장 실패(${character.name}): ${error.message}`);
+    }
 
-    if (result.goldGained) setGold(getGold() + result.goldGained);
+    if (result.goldGained) {
+      const next = currentGold + result.goldGained;
+      const { error } = await window.sbClient.from("profiles")
+        .update({ gold: next }).eq("user_id", session.user.id);
+      if (error) alert(`골드 저장 실패: ${error.message}`);
+      else currentGold = next;
+    }
 
-    if (result.lootGained.length) {
-      const warehouse = getWarehouse();
-      result.lootGained.forEach((loot) => {
-        // 병합 조건은 상점 구매와 동일하게 맞춤 — heldBy(누군가 장착 중인
-        // 개별 인스턴스)나 enhanceLevel(강화품)과는 절대 안 섞여야 함.
-        // 예전엔 이 조건이 없어서 드랍품이 강화된 같은 이름 장비에 합쳐지면서
-        // 강화 수치가 공짜로 늘어나는 문제가 있었음.
-        const existing = warehouse.find((w) =>
-          w.name === loot.name && w.category === loot.category && !w.heldBy && !w.enhanceLevel);
-        if (existing) {
-          existing.quantity += loot.quantity;
-        } else {
-          // 장비 스펙(combatReal/weight/twoHanded 등)을 그대로 실어서 저장 —
-          // 상점 구매와 같은 방식. 이게 없으면 드랍 장비를 장착해도 스탯이 0이 됨.
-          const { name, category, quantity, ...spec } = loot;
-          warehouse.push({ name, category, quantity, ...spec });
-        }
-      });
-      saveWarehouse(warehouse);
+    for (const loot of result.lootGained) {
+      // 병합 조건은 상점 구매와 동일하게 맞춤 — held_by(누군가 장착 중인
+      // 개별 인스턴스)나 enhance_level(강화품)과는 절대 안 섞여야 함.
+      // 예전엔 이 조건이 없어서 드랍품이 강화된 같은 이름 장비에 합쳐지면서
+      // 강화 수치가 공짜로 늘어나는 문제가 있었음.
+      const { data: existing, error: findError } = await window.sbClient
+        .from("warehouse_items").select("id,quantity")
+        .eq("user_id", session.user.id).eq("name", loot.name).eq("category", loot.category)
+        .is("held_by", null).is("enhance_level", null).maybeSingle();
+      if (findError) { alert(`전리품 저장 실패(${loot.name}): ${findError.message}`); continue; }
+
+      if (existing) {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: existing.quantity + loot.quantity }).eq("id", existing.id);
+        if (error) alert(`전리품 저장 실패(${loot.name}): ${error.message}`);
+      } else {
+        // 장비 스펙(combatReal/weight/twoHanded 등)을 그대로 실어서 저장 —
+        // 상점 구매와 같은 방식. 이게 없으면 드랍 장비를 장착해도 스탯이 0이 됨.
+        const { error } = await window.sbClient.from("warehouse_items")
+          .insert(buildWarehouseInsertFromLoot(loot, loot.quantity));
+        if (error) alert(`전리품 저장 실패(${loot.name}): ${error.message}`);
+      }
     }
   }
 
-  document.getElementById("runBattleBtn").addEventListener("click", runRealBattle);
+  // 리스너는 즉시 등록하되 버튼은 부트스트랩이 끝날 때까지 비활성 상태로 둠
+  // (hire.html의 고용 버튼과 같은 방식) — runRealBattle이 session/cachedRoster/
+  // MONSTER_TABLE이 이미 채워졌다고 가정할 수 있어야 하기 때문.
+  const runBattleBtn = document.getElementById("runBattleBtn");
+  runBattleBtn.disabled = true;
+  runBattleBtn.addEventListener("click", runRealBattle);
 
-  applyBattleCaption();
-  render();
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 캐릭터(+장착 장비) · 몬스터 로스터 · 골드를
+  // 받아온 뒤 첫 렌더. 렌더/전투 코드는 전부 위 캐시를 동기로 읽으므로 이게
+  // 끝나기 전에는 아무것도 그리지 않고 전투 버튼도 열지 않음.
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+    username = session.user.user_metadata?.full_name || session.user.email || "플레이어";
+
+    const [charRes, monsterRes, skillRes, profileRes] = await Promise.all([
+      window.sbClient.from("characters").select("*").eq("user_id", session.user.id),
+      window.sbClient.from("game_content").select("data").eq("key", "monsterRoster").single(),
+      window.sbClient.from("game_content").select("data").eq("key", "skillTable").single(),
+      window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single(),
+    ]);
+    if (charRes.error) { alert(`용병 목록을 불러오지 못했습니다: ${charRes.error.message}`); return; }
+    if (monsterRes.error) { alert(`몬스터 정보를 불러오지 못했습니다: ${monsterRes.error.message}`); return; }
+    if (skillRes.error) { alert(`스킬 정보를 불러오지 못했습니다: ${skillRes.error.message}`); return; }
+    if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
+
+    cachedRoster = (charRes.data || []).map(mapCharacterRow);
+    window.BattleEncounters.setMonsterRoster(monsterRes.data?.data || []);
+    MONSTER_TABLE = window.BattleEncounters.getMonsterTable();
+    // battle-adapter.js의 registerKnownSkills()가 전투 시작마다 동기로
+    // 읽으므로 여기서 미리 주입해둠(battle-encounters.js의 setMonsterRoster와
+    // 동일한 이유 — DB를 매번 다시 묻지 않기 위함).
+    window.BattleAdapter.setSkillTable(skillRes.data?.data || { commonSkills: [], jobSkills: {} });
+    currentGold = profileRes.data?.gold ?? 0;
+
+    // 장착 장비 — characters 테이블엔 equipment 컬럼이 없고(warehouse_items.
+    // held_by가 유일한 진실 공급원), battle-adapter는 rosterChar.equipment(슬롯
+    // 키 객체)를 직접 읽는다(sumEquipmentCombatStats / 맨주먹 보정의
+    // equipment?.mainhand). 그래서 여기서 held_by로 조회해 슬롯별로 꽂아줌 —
+    // 이게 없으면 전투가 전원 맨주먹(ATK 5)으로 계산됨.
+    cachedRoster.forEach((c) => { c.equipment = {}; });
+    if (cachedRoster.length) {
+      const byId = {};
+      cachedRoster.forEach((c) => { byId[c.id] = c; });
+      const { data: itemRows, error: itemError } = await window.sbClient
+        .from("warehouse_items").select("*").in("held_by", cachedRoster.map((c) => c.id));
+      if (itemError) { alert(`장착 장비를 불러오지 못했습니다: ${itemError.message}`); return; }
+      (itemRows || []).forEach((row) => {
+        const owner = byId[row.held_by];
+        if (owner && row.slot) owner.equipment[row.slot] = mapItemRow(row);
+      });
+    }
+
+    applyBattleCaption();
+    render();
+    runBattleBtn.disabled = false;
+  })();
 </script>
 
 </body>
