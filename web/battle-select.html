@@ -146,49 +146,66 @@
 </main>
 
 <script src="battle-themes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
   const { BATTLE_THEMES, findBattleById, battleNameById } = window.BattleThemes;
 
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
+  let session = null;
+  // battle_progress 캐시 — { battleId: { cleared, clearedAt, attemptedAt } }.
+  // 렌더 루프가 전투마다 isBattleUnlocked/battleCooldownRemaining을 반복
+  // 호출하므로(shop.html/refinery.html과 동일한 이유로) DB를 매번 다시 안 묻고
+  // 이 캐시를 동기로 읽는다.
+  let battleProgress = {};
+  // warehouse 캐시 — 이름만/수량만 필요한 조회(hasItem류)는 이 배열로,
+  // 실제 차감은 DB에 바로 반영 후 이 캐시도 같이 갱신.
+  let warehouseItems = [];
+
+  async function refreshBattleProgress() {
+    const { data, error } = await window.sbClient.from("battle_progress").select("*").eq("user_id", session.user.id);
+    if (error) { alert(`진행 기록 조회 실패: ${error.message}`); return; }
+    battleProgress = {};
+    (data || []).forEach((row) => {
+      battleProgress[row.battle_id] = { cleared: row.cleared, clearedAt: row.cleared_at, attemptedAt: row.attempted_at };
+    });
   }
+  async function refreshWarehouseItems() {
+    const { data, error } = await window.sbClient.from("warehouse_items").select("id,name,category,quantity").eq("user_id", session.user.id);
+    if (error) { alert(`창고 조회 실패: ${error.message}`); return; }
+    warehouseItems = data || [];
+  }
+
   function getClearedBattles() {
-    try { return JSON.parse(localStorage.getItem("battleSim_clearedBattles")) || []; }
-    catch { return []; }
+    return Object.keys(battleProgress).filter((id) => battleProgress[id].cleared);
   }
-  function markBattleCleared(battleId) {
-    const cleared = getClearedBattles();
-    if (!cleared.includes(battleId)) cleared.push(battleId);
-    localStorage.setItem("battleSim_clearedBattles", JSON.stringify(cleared));
+  async function markBattleCleared(battleId) {
+    const { error } = await window.sbClient.from("battle_progress")
+      .upsert({ user_id: session.user.id, battle_id: battleId, cleared: true, cleared_at: new Date().toISOString() }, { onConflict: "user_id,battle_id" });
+    if (error) { alert(`기록 실패: ${error.message}`); return; }
+    battleProgress[battleId] = { ...(battleProgress[battleId] || {}), cleared: true, clearedAt: new Date().toISOString() };
   }
   // ============================================================================
   // 용병단 공용 창고 — 장비가 아닌 아이템(소재/열쇠 아이템 등)은 특정 캐릭터가
-  // 아니라 여기 저장됨. 형태: [{ name, category, quantity, description }]
-  // category는 item.html의 ITEM_CATEGORY_TYPES 키("material"/"keyItem" 등).
+  // 아니라 여기 저장됨(warehouse_items, held_by 없음). 캐릭터의 equipment는
+  // 이제 warehouse_items.held_by로 표현되고 c.inventory는 애초에 죽은
+  // 필드였으므로(character-sheet.html 전환 참고), "아이템을 갖고 있는가"는
+  // warehouse_items 하나만 보면 됨 — 예전처럼 로스터까지 따로 훑을 필요가
+  // 없어짐(스키마가 코드를 단순화하는 반복되는 패턴).
   // ============================================================================
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
-  function saveWarehouse(items) {
-    localStorage.setItem("battleSim_warehouse", JSON.stringify(items));
-  }
-  function addToWarehouse(name, category, amount = 1, description = "") {
-    const warehouse = getWarehouse();
-    const existing = warehouse.find((it) => it.name === name);
-    if (existing) existing.quantity += amount;
-    else warehouse.push({ name, category, quantity: amount, description });
-    saveWarehouse(warehouse);
+  async function addToWarehouse(name, category, amount, description) {
+    const existing = warehouseItems.find((it) => it.name === name);
+    if (existing) {
+      const { error } = await window.sbClient.from("warehouse_items").update({ quantity: existing.quantity + amount }).eq("id", existing.id);
+      if (error) { alert(`지급 실패: ${error.message}`); return; }
+    } else {
+      const { error } = await window.sbClient.from("warehouse_items").insert({ name, category, quantity: amount, description, user_id: session.user.id });
+      if (error) { alert(`지급 실패: ${error.message}`); return; }
+    }
+    await refreshWarehouseItems();
   }
   function rosterHasItem(itemName) {
-    const inWarehouse = getWarehouse().some((it) => it.name === itemName && it.quantity > 0);
-    const inRoster = getRoster().some((c) => {
-      const inInventory = (c.inventory || []).some((it) => it.name === itemName);
-      const inEquipment = Object.values(c.equipment || {}).some((it) => it && it.name === itemName);
-      return inInventory || inEquipment;
-    });
-    return inWarehouse || inRoster;
+    return warehouseItems.some((it) => it.name === itemName && it.quantity > 0);
   }
 
   // ============================================================================
@@ -247,30 +264,25 @@
 
   const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-  // 전투별 마지막 클리어 시각 — { battleId: timestamp }
-  function getClearTimes() {
-    try { return JSON.parse(localStorage.getItem("battleSim_battleClearTimes")) || {}; }
-    catch { return {}; }
-  }
+  // 전투별 마지막 클리어/도전 시각은 이제 battleProgress 캐시(battle_progress
+  // 테이블)에서 바로 읽음 — clearedBattles/battleClearTimes/battleAttemptTimes
+  // 세 localStorage 키가 원래도 "언젠가 한 테이블로 합치는 게 자연스럽다"고
+  // CLAUDE.md에 적혀 있던 그대로 하나가 됨.
   function remainingCooldownMs(battleId, hours) {
-    const last = getClearTimes()[battleId];
+    const last = battleProgress[battleId]?.clearedAt;
     if (!last) return 0;
-    return Math.max(0, last + hours * 3600 * 1000 - Date.now());
+    return Math.max(0, new Date(last).getTime() + hours * 3600 * 1000 - Date.now());
   }
-  // 전투별 마지막 "도전 시각"(승패 무관) — { battleId: timestamp }
-  function getAttemptTimes() {
-    try { return JSON.parse(localStorage.getItem("battleSim_battleAttemptTimes")) || {}; }
-    catch { return {}; }
-  }
-  function markAttempt(battleId) {
-    const t = getAttemptTimes();
-    t[battleId] = Date.now();
-    localStorage.setItem("battleSim_battleAttemptTimes", JSON.stringify(t));
+  async function markAttempt(battleId) {
+    const { error } = await window.sbClient.from("battle_progress")
+      .upsert({ user_id: session.user.id, battle_id: battleId, attempted_at: new Date().toISOString() }, { onConflict: "user_id,battle_id" });
+    if (error) { alert(`기록 실패: ${error.message}`); return; }
+    battleProgress[battleId] = { ...(battleProgress[battleId] || {}), attemptedAt: new Date().toISOString() };
   }
   function remainingAttemptCooldownMs(battleId, hours) {
-    const last = getAttemptTimes()[battleId];
+    const last = battleProgress[battleId]?.attemptedAt;
     if (!last) return 0;
-    return Math.max(0, last + hours * 3600 * 1000 - Date.now());
+    return Math.max(0, new Date(last).getTime() + hours * 3600 * 1000 - Date.now());
   }
   function formatHours(h) {
     return h >= 1 ? `${h}시간` : `${Math.round(h * 60)}분`;
@@ -281,22 +293,33 @@
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }
   // 입장 시 consumesItem 조건에 걸린 아이템을 창고에서 1개씩 실제로 차감함.
-  // 창고에만 적용되고(파밍 아이템은 창고로 들어오므로), 수량이 0이 되면 항목
-  // 자체를 지움. 차감에 성공했는지를 반환 — 실패하면 입장을 막아야 함.
-  function consumeEntryItems(battle) {
+  // 수량이 0이 되면 행 자체를 지움. 차감에 성공했는지를 반환 — 실패하면
+  // 입장을 막아야 함. DB에 바로 반영하되, 지금 이 순간의 상태를 다시
+  // 조회해서 확인(캐시가 살짝 낡았을 가능성 대비).
+  async function consumeEntryItems(battle) {
     const needed = (battle.requirements || [])
       .filter((r) => r.type === "consumesItem")
       .map((r) => r.value);
     if (needed.length === 0) return true;
 
-    const warehouse = getWarehouse();
+    const { data: rows, error } = await window.sbClient.from("warehouse_items")
+      .select("id,name,quantity").eq("user_id", session.user.id).in("name", needed);
+    if (error) { alert(`창고 조회 실패: ${error.message}`); return false; }
     for (const itemName of needed) {
-      const entry = warehouse.find((it) => it.name === itemName && it.quantity > 0);
+      const entry = rows.find((it) => it.name === itemName && it.quantity > 0);
       if (!entry) return false; // 창고에 없음 — 입장 불가
-      entry.quantity -= 1;
     }
-    const remaining = warehouse.filter((it) => it.quantity > 0);
-    localStorage.setItem("battleSim_warehouse", JSON.stringify(remaining));
+    for (const itemName of needed) {
+      const entry = rows.find((it) => it.name === itemName);
+      if (entry.quantity <= 1) {
+        const { error: delError } = await window.sbClient.from("warehouse_items").delete().eq("id", entry.id);
+        if (delError) { alert(`차감 실패: ${delError.message}`); return false; }
+      } else {
+        const { error: updError } = await window.sbClient.from("warehouse_items").update({ quantity: entry.quantity - 1 }).eq("id", entry.id);
+        if (updError) { alert(`차감 실패: ${updError.message}`); return false; }
+      }
+    }
+    await refreshWarehouseItems();
     return true;
   }
 
@@ -400,9 +423,11 @@
     });
 
     // consumesItem 조건이 붙은 전투는 링크 이동 전에 아이템을 실제로 차감함.
-    // 차감에 실패하면(그 사이 아이템이 없어졌다면) 이동 자체를 막음.
+    // 차감에 실패하면(그 사이 아이템이 없어졌다면) 이동 자체를 막음. 비동기
+    // 작업이 끼어들어야 해서 항상 preventDefault 후 성공 시에만 수동으로 이동.
     el.querySelectorAll(".battle-item[data-consumes], .battle-item[data-attempt-cd]").forEach((link) => {
-      link.addEventListener("click", (e) => {
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
         const battleId = link.dataset.battleId;
         const battle = findBattleById(battleId);
         if (!battle) return;
@@ -412,38 +437,51 @@
         if (names.length) lines.push(`${names.map(n => `"${n}"`).join(", ")} 1개가 소모돼요.`);
         if (attemptReq) lines.push(`성패와 관계없이 ${formatHours(attemptReq.value)} 동안 재도전할 수 없어요.`);
         if (lines.length && !confirm(`이 전투에 입장합니다.\n\n${lines.join("\n")}\n\n진행할까요?`)) {
-          e.preventDefault();
           return;
         }
-        if (!consumeEntryItems(battle)) {
-          e.preventDefault();
+        if (!(await consumeEntryItems(battle))) {
           alert("필요한 아이템이 부족해요.");
           render();
           return;
         }
         // 소모재 차감에 성공했으면 이 시점이 곧 "도전 시작" — 성패를 기다리지
         // 않고 여기서 시계를 돌림(실패해도 대가를 치르게 하기 위함).
-        if ((battle.requirements || []).some((r) => r.type === "attemptCooldownHours")) markAttempt(battleId);
+        if ((battle.requirements || []).some((r) => r.type === "attemptCooldownHours")) await markAttempt(battleId);
+        location.href = link.href;
       });
     });
   }
 
-  render();
+  document.getElementById("devClearPlayBtn").addEventListener("click", async () => { await markBattleCleared("goblin-play"); render(); });
+  document.getElementById("devClearStrongBtn").addEventListener("click", async () => { await markBattleCleared("slightly-strong-goblin"); render(); });
+  document.getElementById("devClearWarriorsBtn").addEventListener("click", async () => { await markBattleCleared("goblin-warriors"); render(); });
+  document.getElementById("devClearNobleBtn").addEventListener("click", async () => { await markBattleCleared("noble-goblins"); render(); });
 
-  document.getElementById("devClearPlayBtn").addEventListener("click", () => { markBattleCleared("goblin-play"); render(); });
-  document.getElementById("devClearStrongBtn").addEventListener("click", () => { markBattleCleared("slightly-strong-goblin"); render(); });
-  document.getElementById("devClearWarriorsBtn").addEventListener("click", () => { markBattleCleared("goblin-warriors"); render(); });
-  document.getElementById("devClearNobleBtn").addEventListener("click", () => { markBattleCleared("noble-goblins"); render(); });
-
-  document.getElementById("devGrantPassBtn").addEventListener("click", () => {
-    addToWarehouse("고블린 왕국 통행증", "keyItem", 1, "고블린 왕국 진입에 필요한 열쇠 아이템");
+  document.getElementById("devGrantPassBtn").addEventListener("click", async () => {
+    await addToWarehouse("고블린 왕국 통행증", "keyItem", 1, "고블린 왕국 진입에 필요한 열쇠 아이템");
     render();
   });
 
-  document.getElementById("devResetClearedBtn").addEventListener("click", () => {
-    localStorage.removeItem("battleSim_clearedBattles");
+  document.getElementById("devResetClearedBtn").addEventListener("click", async () => {
+    // 예전엔 clearedBattles 목록만 지웠고 clearTimes/attemptTimes(쿨다운
+    // 계산용)는 안 건드렸음 — battle_progress 통합 후에도 같은 범위 유지:
+    // cleared만 false로, cleared_at/attempted_at은 그대로 둠.
+    const { error } = await window.sbClient.from("battle_progress")
+      .update({ cleared: false }).eq("user_id", session.user.id);
+    if (error) { alert(`초기화 실패: ${error.message}`); return; }
+    Object.keys(battleProgress).forEach((id) => { battleProgress[id].cleared = false; });
     render();
   });
+
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 진행 기록(battle_progress) + 창고를 받아온 뒤
+  // 첫 렌더. BATTLE_THEMES는 정적 JS라 DB 조회 필요 없음(battle-themes.js).
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+    await Promise.all([refreshBattleProgress(), refreshWarehouseItems()]);
+    render();
+  })();
 </script>
 
 </body>
