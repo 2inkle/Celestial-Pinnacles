@@ -109,27 +109,15 @@
 
 <main id="mainArea"></main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  // 개발자도구 네비 링크는 nav.js가 profiles.is_admin 기준으로 이미 처리함.
 
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
-  }
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
+  let session = null;
+  let warehouseItems = []; // 이 유저가 가진 warehouse_items 전체(held_by 유무 무관), camelCase 매핑
+  let characterNames = {}; // characterId -> name (held_by 소유자 표시용)
 
   // ============================================================================
   // 아이템 카테고리 레지스트리 — 새 카테고리가 필요하면 이 객체에 한 줄만
@@ -195,18 +183,17 @@
     return parts.join(" · ") || "옵션 없음";
   }
 
-  // 로스터 전체(인벤토리 + 장착 중)를 훑어서 장비 아이템을 이름별로 집계.
-  // 같은 이름의 장비를 여러 명이 갖고 있으면 수량·보유자 목록으로 합쳐짐.
+  // warehouse_items 중 held_by가 있는(=누군가 장착 중인) 장비만 골라 이름별로
+  // 집계. 같은 이름의 장비를 여러 명이 갖고 있으면 수량·보유자 목록으로 합쳐짐.
+  // (2026-08-15: characters.equipment/inventory 필드는 스키마에 없음 —
+  // warehouse_items.held_by가 장착 여부의 유일한 진실 공급원이라 이 페이지도
+  // 그 기준으로 다시 씀. character-sheet.html의 equipment 로딩과 같은 원리.)
   function collectEquipmentItems() {
-    const roster = getRoster();
     const byName = new Map();
-
-    roster.forEach((c) => {
-      const owned = [...(c.inventory || []), ...Object.values(c.equipment || {}).filter(Boolean)];
-      owned.forEach((item) => {
-        if (!byName.has(item.name)) byName.set(item.name, { item, owners: [] });
-        byName.get(item.name).owners.push(c.name);
-      });
+    warehouseItems.filter((it) => it.heldBy).forEach((item) => {
+      const ownerName = characterNames[item.heldBy] || "알 수 없음";
+      if (!byName.has(item.name)) byName.set(item.name, { item, owners: [] });
+      byName.get(item.name).owners.push(ownerName);
     });
 
     return [...byName.values()].map(({ item, owners }) => ({
@@ -219,8 +206,12 @@
     }));
   }
 
+  // held_by가 없는(=누구도 장착 안 한, 공용 창고 풀에 있는) 나머지 전부 —
+  // 소재/열쇠 아이템뿐 아니라 미장착 여분 장비도 여기 포함됨(예전
+  // localStorage 시절엔 battleSim_warehouse가 애초에 그런 것만 담고 있었지만,
+  // 지금은 held_by 유무로 갈라야 같은 뜻이 됨).
   function collectWarehouseItems() {
-    return getWarehouse().map((it) => ({
+    return warehouseItems.filter((it) => !it.heldBy).map((it) => ({
       name: it.name,
       category: it.category,
       slot: null,
@@ -334,10 +325,42 @@
     }).join("");
   }
 
-  renderCategoryOptions();
-  renderSlotOptions();
-  syncSlotFilterAvailability();
-  renderMain();
+  // DB 행(snake_case) → describeEquipmentItem()이 기대하는 camelCase.
+  function mapItemRow(row) {
+    return {
+      name: row.name, category: row.category, quantity: row.quantity,
+      description: row.description, slot: row.slot, heldBy: row.held_by,
+      combatReal: row.combat_real, combatBonus: row.combat_bonus,
+      statBonus: row.stat_bonus, statRealBonus: row.stat_real_bonus,
+      patternSlotBonus: row.pattern_slot_bonus, weight: row.weight,
+      requiredJob: row.required_job, twoHanded: row.two_handed,
+      grantsSkill: row.grants_skill,
+    };
+  }
+
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 창고 전체 + 캐릭터 이름(보유자 표시용)을 받아온
+  // 뒤 첫 렌더.
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+
+    const [itemRes, charRes] = await Promise.all([
+      window.sbClient.from("warehouse_items").select("*").eq("user_id", session.user.id),
+      window.sbClient.from("characters").select("id,name").eq("user_id", session.user.id),
+    ]);
+    if (itemRes.error) { alert(`아이템 목록을 불러오지 못했습니다: ${itemRes.error.message}`); return; }
+    if (charRes.error) { alert(`용병 목록을 불러오지 못했습니다: ${charRes.error.message}`); return; }
+
+    warehouseItems = (itemRes.data || []).map(mapItemRow);
+    characterNames = {};
+    (charRes.data || []).forEach((c) => { characterNames[c.id] = c.name; });
+
+    renderCategoryOptions();
+    renderSlotOptions();
+    syncSlotFilterAvailability();
+    renderMain();
+  })();
 </script>
 
 </body>
