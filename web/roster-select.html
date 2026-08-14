@@ -130,82 +130,24 @@
 
 <div id="monsterPreviewArea"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
+<script src="battle-themes.js"></script>
+<script src="battle-encounters.js"></script>
 <script>
-  function getRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-    catch { return []; }
-  }
+  // battle-select.html/battle-view.html/dispatch.html과 같은 공용 소스
+  // (battle-themes.js/battle-encounters.js)를 씀 — 예전엔 이 파일만 따로
+  // BATTLE_NAMES/BATTLE_MONSTER_POOLS 사본을 갖고 있어서 다른 세 곳(2026-08-14
+  // 정리됨)과 다르게 여기만 낡은 채로 남아 있었음(실측: 존재하지 않는
+  // "gate-ambush"가 있고 실제 전투 "goblin-cart-raid"는 빠져 있었음 — 같은
+  // 종류의 버그가 이 파일엔 그대로 있었던 것). getMonsterTable()로 몬스터
+  // 이름/초상화도 game_content 기준으로 가져옴.
+  const { BATTLE_MONSTER_POOLS, RARE_THRESHOLD, computePoolProbabilities, getMonsterTable, setMonsterRoster } = window.BattleEncounters;
+  const { battleNameById } = window.BattleThemes;
 
-  const BATTLE_NAMES = {
-    "goblin-play": "고블린과 놀기",
-    "slightly-strong-goblin": "조금 강한 고블린",
-    "goblin-warriors": "고블린 전사들",
-    "noble-goblins": "고귀한 고블린들",
-    "goblin-fortress": "고블린 성채",
-    "goblin-king": "고블린의 왕",
-    "gate-ambush": "섭정과의 조우",
-  };
-
-  // ============================================================================
-  // battle-view.html의 MONSTER_TABLE/BATTLE_MONSTER_POOLS와 같은 데이터(중복 관리
-  // 지점). 여기서는 "등장 가능한 몬스터 목록"만 미리 보여주면 되니 이름/초상화만
-  // 있으면 충분해서 경량화함(스탯·패턴·드랍테이블은 battle-view.html에만 있음).
-  // ============================================================================
-  const MONSTER_PREVIEW = {
-    goblin_scout: { name: "고블린 척후병", portrait: "👺" },
-    goblin_warrior: { name: "고블린 전사", portrait: "👹" },
-    goblin_shaman: { name: "고블린 주술사", portrait: "🧙" },
-    goblin_noble: { name: "고귀한 고블린", portrait: "🎩" },
-    goblin_elite_guard: { name: "성채 수문장", portrait: "🛡️" },
-    goblin_king: { name: "고블린의 왕", portrait: "👑" },
-    goblin_cart: { name: "고블린 마차", portrait: "🛒" },
-    goblin_regent: { name: "섭정", portrait: "🧑‍⚖️" },
-  };
-
-  const BATTLE_MONSTER_POOLS = {
-    "goblin-play": { maxCount: 2, pool: [
-      { monsterId: "goblin_scout", weight: 80, maxAppearances: 2 },
-      { monsterId: "goblin_warrior", weight: 20, maxAppearances: 1 },
-    ]},
-    "slightly-strong-goblin": { maxCount: 2, pool: [
-      { monsterId: "goblin_scout", weight: 40, maxAppearances: 1 },
-      { monsterId: "goblin_warrior", weight: 60, maxAppearances: 2 },
-    ]},
-    "goblin-warriors": { maxCount: 3, pool: [
-      { monsterId: "goblin_warrior", weight: 60, maxAppearances: 3 },
-      { monsterId: "goblin_shaman", weight: 40, maxAppearances: 1 },
-    ]},
-    "noble-goblins": { maxCount: 3, pool: [
-      { monsterId: "goblin_noble", weight: 60, maxAppearances: 2 },
-      { monsterId: "goblin_shaman", weight: 40, maxAppearances: 1 },
-    ]},
-    "goblin-fortress": { maxCount: 3, pool: [
-      { monsterId: "goblin_elite_guard", weight: 65, maxAppearances: 2 },
-      { monsterId: "goblin_shaman", weight: 35, maxAppearances: 1 },
-    ]},
-    "goblin-king": { maxCount: 3, pool: [
-      { monsterId: "goblin_king", weight: 0, maxAppearances: 1, guaranteed: true },
-      { monsterId: "goblin_elite_guard", weight: 50, maxAppearances: 1 },
-      { monsterId: "goblin_shaman", weight: 50, maxAppearances: 1 },
-    ]},
-    "gate-ambush": { maxCount: 1, pool: [
-      { monsterId: "goblin_cart", weight: 5, maxAppearances: 1 },
-      { monsterId: "goblin_elite_guard", weight: 47.5, maxAppearances: 1 },
-      { monsterId: "goblin_regent", weight: 47.5, maxAppearances: 1 },
-    ]},
-  };
-
-  const RARE_THRESHOLD = 0.10; // battle-view.html과 동일 기준
-
-  function computePoolProbabilities(config) {
-    if (!config) return [];
-    const rollable = config.pool.filter((p) => !p.guaranteed);
-    const totalWeight = rollable.reduce((sum, p) => sum + p.weight, 0);
-    return config.pool.map((p) => {
-      const probability = p.guaranteed ? 1 : (totalWeight ? p.weight / totalWeight : 0);
-      return { ...p, probability, isRare: !p.guaranteed && probability < RARE_THRESHOLD };
-    });
-  }
+  let session = null;
+  let roster = [];
 
   const params = new URLSearchParams(location.search);
   const themeId = params.get("theme") || "";
@@ -216,7 +158,7 @@
   const AFTERMATH_THEMES = ["goblinAftermath"];
   const isAftermath = AFTERMATH_THEMES.includes(themeId);
   const battleId = params.get("battle") || "";
-  const battleName = BATTLE_NAMES[battleId] || "이름 없는 전투";
+  const battleName = battleNameById(battleId) || "이름 없는 전투";
 
   const MAX_PARTY = 5;
   const selected = new Set();
@@ -226,7 +168,6 @@
   }
 
   function renderMain() {
-    const roster = getRoster();
     const main = document.getElementById("mainArea");
 
     if (!roster.length) {
@@ -315,12 +256,13 @@
     if (!config) { el.innerHTML = ""; return; }
 
     const entries = computePoolProbabilities(config);
+    const monsterTable = getMonsterTable();
     el.innerHTML = `
       <div class="monster-preview-wrap">
         <div class="monster-preview-title">⚔️ 등장 가능한 몬스터 (최대 ${config.maxCount}체)</div>
         <div class="monster-chip-row">
           ${entries.map((e) => {
-            const monster = MONSTER_PREVIEW[e.monsterId];
+            const monster = monsterTable[e.monsterId] || { name: e.monsterId, portrait: "❓" };
             const probLabel = e.guaranteed ? "확정 등장" : `${(e.probability * 100).toFixed(1)}%`;
             return `
               <div class="monster-chip ${e.isRare ? "rare" : ""}">
@@ -335,9 +277,29 @@
     `;
   }
 
-  renderContext();
-  renderMonsterPreview();
-  renderMain();
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 캐릭터 · 몬스터 로스터를 받아온 뒤 첫 렌더.
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+
+    const [charRes, monsterRes] = await Promise.all([
+      window.sbClient.from("characters").select("*").eq("user_id", session.user.id),
+      window.sbClient.from("game_content").select("data").eq("key", "monsterRoster").single(),
+    ]);
+    if (charRes.error) { alert(`용병 목록을 불러오지 못했습니다: ${charRes.error.message}`); return; }
+    if (monsterRes.error) { alert(`몬스터 정보를 불러오지 못했습니다: ${monsterRes.error.message}`); return; }
+
+    roster = (charRes.data || []).map((row) => ({
+      id: row.id, name: row.name, job: row.job, level: row.level,
+      portrait: row.portrait, row: row.row_position,
+    }));
+    setMonsterRoster(monsterRes.data?.data || []);
+
+    renderContext();
+    renderMonsterPreview();
+    renderMain();
+  })();
 </script>
 
 </body>
