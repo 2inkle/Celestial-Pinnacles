@@ -438,9 +438,74 @@ Supabase 기본 보호기능(이메일 인증/CAPTCHA/rate limit)에 맡김. 디
 - 2026-08-14에 실제 Discord 계정으로 로그인 → 세션 생성 → 콜백 리다이렉트까지
   브라우저에서 end-to-end 검증 완료.
 
-**아직 안 된 것**: 아래 "API 단계에서 검증/방어가 필요한 지점"과 "API 설계
-논의"에 정리된 대로, 로그인은 됐지만 그 뒤로 이어지는 실제 유저별 DB
-스키마·`localStorage` → 서버 이전은 아직 시작 전이다.
+**아직 안 된 것**: 로그인/스키마는 됐지만, 게임 페이지 대부분은 아직
+`localStorage`로만 동작한다 — 아래 "게임 페이지의 Supabase 전환" 섹션 참조.
+
+## 게임 페이지의 Supabase 전환 (진행 중 — `roster-index.html` 1차 완료, 2026-08-14)
+
+로그인과 DB 스키마가 준비된 뒤에도, 실제로 `web/*.html`이 그 스키마를 읽고
+쓰게 만드는 건 완전히 별도 작업이다. "복잡한 페이지부터 손대면 중간에 연결
+문제가 생겼을 때 바꿀 게 많아진다"는 사용자 판단에 따라, 쓰기 동작이 없는
+가장 단순한 페이지(`roster-index.html` — 로스터/골드를 읽어서 카드로
+보여주기만 함)부터 전환해서 패턴을 확립하기로 함.
+
+**확립된 패턴** (앞으로 다른 페이지 전환 시 그대로 재사용):
+- **인증 가드**: `web/auth-guard.js`(신규, `exp-table.js`와 동일한 로드/노출
+  컨벤션 — IIFE + `window.AuthGuard`). `window.AuthGuard.requireSession()`을
+  데이터 조회 전에 호출 — 세션 없으면 `login.html`로 리다이렉트하고 이후
+  코드가 실행되지 않도록 영구 pending Promise 반환. 지금까지 **어떤 페이지에도
+  인증 가드가 없었다**(`battleSim_username`은 전부 관리자 판별용이었지 로그인
+  여부 체크가 아니었음, 조사로 확인함) — 이 페이지가 최초 적용 사례.
+- **DB row → 렌더링 코드 매핑**: DB 컬럼은 snake_case(`real_stats`/
+  `exp_to_next`/`learned_skill_names` 등)인데 기존 렌더링 코드는 camelCase
+  로컬스토리지 형태를 기대하므로, `mapCharacterRow()` 같은 작은 어댑터 함수로
+  변환만 하고 렌더링/추정 로직 자체는 최대한 안 건드림(변경 범위를 좁게
+  유지하는 게 목적).
+- **장비 데이터 조회**: `characters.equipment` 컬럼이 없으므로(2026-08-14
+  결정, 위 스키마 섹션 참조), 캐릭터 목록을 가져온 뒤 그 id들로
+  `warehouse_items`를 `held_by in (...)`로 한 번 더 조회해서 `held_by`
+  기준으로 그룹핑 — `Object.values(character.equipment)`가 하던 일을 이
+  배열이 그대로 대신함(오히려 코드가 단순해짐).
+- **관리자 네비 중복 제거**: `roster-index.html`이 갖고 있던 `devToolsNavSlot`
+  인라인 체크는 `nav.js`가 이미 하는 일과 완전히 중복이라(조사로 확인 —
+  `nav.js`가 `DOMContentLoaded`에서 같은 슬롯을 이미 채움) 삭제함. `nav.js`
+  자체의 `battleSim_username` 기반 관리자 판정은 이번 스코프 밖 — 여러
+  관리자 전용 페이지(`dev-tools.html`/`feature-requests.html`/각 에디터)를
+  `profiles.is_admin` 기반으로 옮기는 건 훨씬 큰 별도 작업으로 남겨둠.
+
+**전환 중 발견한 스키마 누락**: 카드의 Max HP/SP·패턴 슬롯 수 추정에 쓰이는
+장비 필드(`patternSlotBonus`/`statRealBonus`/`critMultiplier`/
+`conditionalPassiveMods`/`grantsResource`/`equipmentType`/`avatarPortrait`/
+`grantsSkill`/`consumable`/`usesPerBattle`/`enhanceable`)가 0001의
+`warehouse_items` 컬럼 목록에 빠져 있었다. `battle-adapter.js`(실전투 계산의
+유일한 다리)를 다시 확인해서 `statRealBonus`/`critMultiplier`/
+`conditionalPassiveMods`/`grantsResource`가 실제 전투 수치에 쓰이는 걸
+확인함 — `shop.html`의 구매 확정 로직이 아이템 정의 **전체**를 스프레드로
+저장하는 방식(`const { name, category, price, ...spec } = it;
+warehouse.push({ ..., ...spec })`)이라 컬럼 하나만 빠져도 그 필드가 조용히
+유실되는 구조였다. 이건 CLAUDE.md에 이미 기록된 과거 버그("예전엔 name/
+category/quantity만 저장돼서 장착해도 스탯이 0이 되는 문제")와 정확히 같은
+패턴이 스키마 레벨에서 재발할 뻔한 것 — `supabase/migrations/
+0004_warehouse_item_fields.sql`로 nullable 컬럼을 추가해서 막음(저장 방식은
+JSONB 통합 대신 타입 컬럼 전부 추가 쪽으로 사용자와 상의해서 결정 — Postgres
+컬럼이 기본 NULL 허용이라 "필드가 있어도 안 채워도 됨"이 이미 컬럼 방식으로도
+만족되기 때문). **앞으로 다른 페이지를 전환하다 또 빠진 필드가 나오면 같은
+방식(작은 nullable-column 추가 마이그레이션)으로 잡으면 됨.**
+
+**실측 검증**(2026-08-14): 인증된 세션으로 테스트 캐릭터(STR 20) +
+`pattern_slot_bonus:2`/`stat_real_bonus:{str:15}`를 가진 장착 장비를 임시로
+insert → 카드에 Max HP 900(=200+35×20, 장비 보너스 포함)/Max SP 150/패턴
+슬롯 0/4(=기본 2+장비 보너스 2)로 정확히 계산돼서 렌더링되는 것 확인 → 정리
+삭제함. 세션 없는 상태로 접속 시 `login.html`로 정상 리다이렉트되는 것도
+확인함.
+
+**다음 전환 후보**: 나머지 페이지들(`village.html`/`hire.html`/
+`character-sheet.html`/`shop.html`/`refinery.html`/`workshop.html`/
+`dispatch.html`/`guild.html`/`battle-select.html`/`battle-view.html`)은 전부
+쓰기 동작이 있어서 `roster-index.html`보다 복잡함 — 이 페이지에서 확립한
+패턴(auth-guard/DB row 매핑/warehouse_items join)을 그대로 재사용하되, 쓰기
+경로(캐릭터 생성/골드 차감/아이템 장착 등)는 각 페이지 전환 시 별도로
+설계해야 함.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
