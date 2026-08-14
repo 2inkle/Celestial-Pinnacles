@@ -581,11 +581,26 @@ DB에서 65분 전으로 임시 조정 → 페이지가 정확히 "2장 대기"�
 (2×30분)만 이동하고 남은 5분은 이월되는 것까지 확인(즉시 `now()`로
 리셋되지 않음 = 절삭 로직이 정확히 포팅됨) → 테스트 후 원상 복구.
 
-**다음 전환 후보**: 남은 페이지들(`shop.html`/`refinery.html`/
-`workshop.html`/`battle-select.html`)은 이 네 페이지에서 확립한 패턴
-(auth-guard/DB row 매핑/warehouse_items의 `held_by` 직접 조작)을
-재사용하면 됨. `dispatch.html`/`battle-view.html`(보상 지급 — 서버 검증
-이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로 남겨둠.
+**`shop.html` 전환 완료**(2026-08-14): 상점 카탈로그는 이제
+`game_content.shopTable`에서 조회(`SHOP_SEED_VERSION` 재시딩 로직은
+클라이언트 단일 저장소 시절 전용 개념이라 완전히 제거 — DB가 유일한
+진실 공급원이므로 재시딩 자체가 개념적으로 무의미해짐, `character-sheet.html`이
+`getSkillTable`/`getJobTable`을 없앤 것과 같은 패턴). 골드/창고/
+구매이력(`shop_purchased`)을 `profiles`/`warehouse_items`/`shop_purchased`
+기준으로 교체. 상점 아이템(camelCase)을 창고 insert(snake_case)로 변환할
+때 **카탈로그 전용 필드(price/stock/saleStart/saleEnd/saleDays)는 의도적으로
+제외**하고 실제 `warehouse_items` 컬럼만 매핑(예전 스프레드 방식은 이
+필드들도 같이 넘어갔는데 그건 의도가 아니라 부수 효과였음 — 이번에 바로잡음).
+**실측 검증**: 실제 UI로 "모자" 2개 구매 → 골드 3000→2400, 창고에 정확한
+필드(`combat_bonus.mdef:5`/`equipment_type:cap`/`enhanceable:true` 등,
+카탈로그 전용 필드는 확인 결과 안 새어 들어감)로 아이템 생성, `shop_purchased`
+기록까지 확인 → 정리.
+
+**다음 전환 후보**: 남은 페이지들(`refinery.html`/`workshop.html`/
+`battle-select.html`)은 이 다섯 페이지에서 확립한 패턴(auth-guard/DB row
+매핑/warehouse_items의 `held_by` 직접 조작)을 재사용하면 됨.
+`dispatch.html`/`battle-view.html`(보상 지급 — 서버 검증 이슈와 얽혀 있음)은
+연결점이 많아 가장 마지막으로 남겨둠.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
