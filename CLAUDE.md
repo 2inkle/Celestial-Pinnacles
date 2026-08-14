@@ -621,10 +621,31 @@ DB에서 65분 전으로 임시 조정 → 페이지가 정확히 "2장 대기"�
 감정도 별도로 검증: 골드 3000→2950(50G), `appraised:true` 반영 확인 →
 정리.
 
-**다음 전환 후보**: 남은 페이지는 `battle-select.html` 하나. 이 일곱
-페이지에서 확립한 패턴(auth-guard/DB row 매핑/warehouse_items의 `held_by`
-직접 조작)을 재사용하면 됨. `dispatch.html`/`battle-view.html`(보상 지급 —
-서버 검증 이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로 남겨둠.
+**`battle-select.html` 전환 완료**(2026-08-15) — 이걸로 "연결점 적은
+페이지부터" 순서로 잡았던 독립 페이지 전환이 전부 끝남. `clearedBattles`/
+`battleClearTimes`/`battleAttemptTimes` 세 localStorage 키를 `battle_progress`
+테이블 하나로 통합(CLAUDE.md에 애초에 "한 테이블로 합치는 게 자연스럽다"고
+적어뒀던 설계가 그대로 실현됨). `rosterHasItem()`은 캐릭터의 inventory/
+equipment 필드가 이제 없어져서(equipment는 `warehouse_items.held_by`로
+이관, inventory는 원래 죽은 필드) 창고 하나만 보면 되도록 단순화됨.
+**실측 검증**: dev 버튼으로 "고블린과 놀기" 클리어 처리 → DB에 `cleared:true`
++ `cleared_at` 기록, 다음 전투("조금 강한 고블린")와 파견 버튼까지 정상
+해금 확인 → "고블린 왕국 통행증" 지급 → 창고에 정확한 필드로 생성 확인 →
+"승리 기록 초기화" → `cleared`만 false로 돌아가고 `cleared_at`은 그대로
+유지되는 것까지 확인(예전 동작과 정확히 동일한 범위) → 전부 정리.
+
+**여기까지 전환 완료 페이지(8개)**: `roster-index.html`/`hire.html`/
+`village.html`/`character-sheet.html`/`guild.html`/`shop.html`/
+`refinery.html`/`workshop.html`/`battle-select.html`. 확립된 공용 패턴:
+`auth-guard.js`(세션 가드+관리자 판별), DB row(snake_case) ↔ camelCase
+어댑터, `warehouse_items.held_by` 직접 조작, 렌더 루프에서 반복 조회되는
+데이터는 부트스트랩에서 캐시 후 동기로 읽기, DB 재조회 기반 트랜잭션
+(캐시가 낡았을 가능성을 항상 실행 직전 재확인).
+
+**남은 것**: `dispatch.html`/`battle-view.html` — 보상 지급이 서버 검증
+이슈(CLAUDE.md의 "API 단계에서 검증/방어가 필요한 지점")와 얽혀 있어서
+단순 데이터 계층 교체를 넘어서는 설계가 필요함. 남은 페이지 중 유일하게
+연결점이 많은 것들이라 가장 마지막으로 남겨둠.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
