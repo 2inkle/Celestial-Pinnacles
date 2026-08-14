@@ -608,11 +608,23 @@ DB에서 65분 전으로 임시 조정 → 페이지가 정확히 "2장 대기"�
 카드가 "모자 +1"로 재렌더링되고 다음 목표 옵션이 2부터 시작하는 것까지
 확인(재강화 연쇄 시작점 정상) → 정리.
 
-**다음 전환 후보**: 남은 페이지들(`workshop.html`/`battle-select.html`)은
-이 여섯 페이지에서 확립한 패턴(auth-guard/DB row 매핑/warehouse_items의
-`held_by` 직접 조작)을 재사용하면 됨. `dispatch.html`/`battle-view.html`
-(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로
-남겨둠.
+**`workshop.html` 전환 완료**(2026-08-14): 개조/감정을 `warehouse_items`
+기준으로 교체. 선택 상태를 배열 인덱스(`_idx`) 대신 DB 행 `id`로 관리하도록
+바꿔서, 예전에 "삭제 시 인덱스가 밀리지 않도록 큰 쪽부터 지운다"는 방어
+코드가 필요했던 문제 자체가 사라짐(DB 행은 고유 id를 이미 갖고 있음 —
+`refinery.html`의 재강화 포팅과 함께, 스키마 전환이 코드를 단순화하는
+반복되는 패턴). `craft-materials.js`의 `applyCraftMaterial()`은 camelCase
+아이템 객체에 대한 순수 함수라 전혀 안 건드림. **실측 검증**: 실제 UI로
+"테스트단검"(ATK 10) + "고블린의 이빨" 개조 → 미리보기 ATK 13 정확히 표시
+→ 확정 → 원본 소모, 소재 소모, 결과물에 `combat_real.atk:13`/
+`passive_bonus.accuracyBonusPct:-3`/`craft_material` 정확히 반영 확인.
+감정도 별도로 검증: 골드 3000→2950(50G), `appraised:true` 반영 확인 →
+정리.
+
+**다음 전환 후보**: 남은 페이지는 `battle-select.html` 하나. 이 일곱
+페이지에서 확립한 패턴(auth-guard/DB row 매핑/warehouse_items의 `held_by`
+직접 조작)을 재사용하면 됨. `dispatch.html`/`battle-view.html`(보상 지급 —
+서버 검증 이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로 남겨둠.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
