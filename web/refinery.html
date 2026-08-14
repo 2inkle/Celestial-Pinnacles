@@ -88,36 +88,67 @@
 <main id="mainArea"></main>
 <div id="modalWrap"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임.
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  // 개발자도구 네비 링크는 nav.js가 profiles.is_admin 기준으로 이미 처리함.
 
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
+  // SHOP_TABLE/MONSTER_ROSTER/warehousePool은 부트스트랩(파일 맨 아래)에서
+  // 채움. findItemDef/poolEquipmentBase 등은 이 캐시를 동기로 읽음 —
+  // 렌더 루프마다 DB를 다시 조회하지 않기 위함(shop.html과 동일한 패턴).
+  let session = null;
+  let currentGold = 0;
+  let SHOP_TABLE = [];
+  let MONSTER_ROSTER = [];
+  let warehousePool = []; // { id, name, category, quantity, enhanceLevel, ...camelCase spec }
+
+  // DB 행(snake_case) → 기존 로직이 기대하는 camelCase. character-sheet.html의
+  // mapItemRow와 동일한 컨벤션.
+  function mapItemRow(row) {
+    return {
+      id: row.id, name: row.name, category: row.category, quantity: row.quantity,
+      description: row.description, slot: row.slot, heldBy: row.held_by,
+      enhanceLevel: row.enhance_level, craftMaterial: row.craft_material, appraised: row.appraised,
+      combatReal: row.combat_real, combatBonus: row.combat_bonus, statBonus: row.stat_bonus,
+      passiveBonus: row.passive_bonus, maxHpBonus: row.max_hp_bonus, maxSpBonus: row.max_sp_bonus,
+      weight: row.weight, twoHanded: row.two_handed, setId: row.set_id, requiredJob: row.required_job,
+      statRealBonus: row.stat_real_bonus, patternSlotBonus: row.pattern_slot_bonus,
+      critMultiplier: row.crit_multiplier, conditionalPassiveMods: row.conditional_passive_mods,
+      grantsResource: row.grants_resource, equipmentType: row.equipment_type,
+      avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
+      consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+    };
   }
-  function setGold(amount) { localStorage.setItem("battleSim_gold", String(amount)); }
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
+
+  // camelCase 스펙(강화 계산 결과) → warehouse_items insert payload(snake_case).
+  function buildEnhancedInsertPayload(spec, quantity, enhanceLevel) {
+    return {
+      user_id: session.user.id, name: spec.name, category: "equipment", quantity,
+      description: spec.description ?? null, slot: spec.slot ?? null, enhance_level: enhanceLevel,
+      combat_real: spec.combatReal ?? null, combat_bonus: spec.combatBonus ?? null,
+      stat_bonus: spec.statBonus ?? null, passive_bonus: spec.passiveBonus ?? null,
+      max_hp_bonus: spec.maxHpBonus ?? null, max_sp_bonus: spec.maxSpBonus ?? null,
+      weight: spec.weight ?? null, two_handed: spec.twoHanded ?? null, set_id: spec.setId ?? null,
+      required_job: spec.requiredJob ?? null, stat_real_bonus: spec.statRealBonus ?? null,
+      pattern_slot_bonus: spec.patternSlotBonus ?? null, crit_multiplier: spec.critMultiplier ?? null,
+      conditional_passive_mods: spec.conditionalPassiveMods ?? null, grants_resource: spec.grantsResource ?? null,
+      equipment_type: spec.equipmentType ?? null, avatar_portrait: spec.avatarPortrait ?? null,
+      grants_skill: spec.grantsSkill ?? null, consumable: spec.consumable ?? null,
+      uses_per_battle: spec.usesPerBattle ?? null, enhanceable: spec.enhanceable ?? null,
+    };
   }
-  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
-  function getShopTable() {
-    try { return JSON.parse(localStorage.getItem("battleSim_shopTable")) || []; }
-    catch { return []; }
+
+  async function refreshWarehousePool() {
+    const { data, error } = await window.sbClient.from("warehouse_items").select("*")
+      .eq("user_id", session.user.id).eq("category", "equipment").is("held_by", null);
+    if (error) { alert(`창고 조회 실패: ${error.message}`); return; }
+    warehousePool = (data || []).map(mapItemRow);
   }
-  function getMonsterRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
-    catch { return []; }
-  }
+
+  function getGold() { return currentGold; }
+  function getShopTable() { return SHOP_TABLE; }
+  function getMonsterRoster() { return MONSTER_ROSTER; }
 
   // ============================================================================
   // 제련 공식 — 확정된 값 그대로.
@@ -221,11 +252,12 @@
 
   const MAX_ENHANCE_LEVEL = 20;
   function poolEquipmentBase() {
-    // 강화 대상 — 미장착(!heldBy) 장비 전부. 이미 강화된 것도 재강화
-    // 후보에 포함(2026-08-14 — 예전엔 !enhanceLevel로 걸러서 재강화가 아예
-    // 불가능했음). 이미 최고 레벨(20)이면 더 올릴 데가 없으니 제외.
-    return getWarehouse().filter((w) =>
-      w.category === "equipment" && !w.heldBy && (w.enhanceLevel || 0) < MAX_ENHANCE_LEVEL);
+    // 강화 대상 — 미장착(!heldBy) 장비 전부(warehousePool은 이미 category='equipment'
+    // + held_by IS NULL 조건으로 조회된 캐시라 그 두 조건은 다시 안 걸러도 됨).
+    // 이미 강화된 것도 재강화 후보에 포함(2026-08-14 — 예전엔 !enhanceLevel로
+    // 걸러서 재강화가 아예 불가능했음). 이미 최고 레벨(20)이면 더 올릴 데가
+    // 없으니 제외.
+    return warehousePool.filter((w) => (w.enhanceLevel || 0) < MAX_ENHANCE_LEVEL);
   }
 
   function render() {
@@ -341,7 +373,10 @@
     if (confirmBtn) confirmBtn.addEventListener("click", () => runEnhancement(name, fromLevel, qty, targetLevel, perAttempt));
   }
 
-  function runEnhancement(name, fromLevel, qty, targetLevel, perAttempt) {
+  async function runEnhancement(name, fromLevel, qty, targetLevel, perAttempt) {
+    const confirmBtn = document.getElementById("confirmBtn");
+    if (confirmBtn) confirmBtn.disabled = true;
+
     let totalAttempts = 0;
     let survivedCount = 0;
     for (let i = 0; i < qty; i++) {
@@ -350,27 +385,55 @@
       if (r.survived) survivedCount++;
     }
     const totalCost = totalAttempts * perAttempt;
-    setGold(getGold() - totalCost);
 
-    const warehouse = getWarehouse();
-    // 시도한 수량만큼 "지금 이 등급"의 풀에서 뺌(이름만이 아니라 등급까지
-    // 일치해야 함 — 같은 이름이라도 다른 등급 스택과 섞이면 안 됨).
-    const baseIdx = warehouse.findIndex((w) =>
-      w.name === name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel || 0) === fromLevel);
-    if (baseIdx !== -1) {
-      warehouse[baseIdx].quantity -= qty;
-      if (warehouse[baseIdx].quantity <= 0) warehouse.splice(baseIdx, 1);
+    // 시행 직전 캐시가 아니라 지금 이 순간의 DB 상태를 다시 조회해서 사용 —
+    // 이름만이 아니라 등급까지 일치해야 함(같은 이름이라도 다른 등급 스택과
+    // 섞이면 안 됨). fromLevel 0은 enhance_level이 NULL로 저장돼 있음.
+    let baseQuery = window.sbClient.from("warehouse_items").select("*")
+      .eq("user_id", session.user.id).eq("name", name).eq("category", "equipment").is("held_by", null);
+    baseQuery = fromLevel > 0 ? baseQuery.eq("enhance_level", fromLevel) : baseQuery.is("enhance_level", null);
+    const { data: baseRow, error: baseError } = await baseQuery.maybeSingle();
+    if (baseError) { alert(`제련 실패: ${baseError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+    if (!baseRow || baseRow.quantity < qty) {
+      alert("수량이 부족해요(창고 상태가 바뀌었을 수 있어요) — 새로고침 후 다시 시도해주세요.");
+      if (confirmBtn) confirmBtn.disabled = false; return;
     }
+
+    if (baseRow.quantity === qty) {
+      const { error } = await window.sbClient.from("warehouse_items").delete().eq("id", baseRow.id);
+      if (error) { alert(`제련 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+    } else {
+      const { error } = await window.sbClient.from("warehouse_items")
+        .update({ quantity: baseRow.quantity - qty }).eq("id", baseRow.id);
+      if (error) { alert(`제련 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+    }
+
     // 살아남은 만큼 목표 레벨 풀에 추가(이미 같은 레벨의 풀이 있으면 병합).
     // 배율은 항상 원본(+0) 정의 기준으로 다시 계산함(pristineSpecFor).
     if (survivedCount > 0) {
-      const pristine = pristineSpecFor(name, baseIdx !== -1 ? warehouse[baseIdx] : null);
+      const pristine = pristineSpecFor(name, mapItemRow(baseRow));
       const enhancedSpec = computeEnhancedSpec(pristine, targetLevel);
-      const existing = warehouse.find((w) => w.name === name && w.category === "equipment" && !w.heldBy && w.enhanceLevel === targetLevel);
-      if (existing) existing.quantity += survivedCount;
-      else warehouse.push({ ...enhancedSpec, quantity: survivedCount });
+      let existingQuery = window.sbClient.from("warehouse_items").select("id,quantity")
+        .eq("user_id", session.user.id).eq("name", name).eq("category", "equipment").is("held_by", null);
+      existingQuery = targetLevel > 0 ? existingQuery.eq("enhance_level", targetLevel) : existingQuery.is("enhance_level", null);
+      const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+      if (existingError) { alert(`제련 실패: ${existingError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+      if (existing) {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: existing.quantity + survivedCount }).eq("id", existing.id);
+        if (error) { alert(`제련 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+      } else {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .insert(buildEnhancedInsertPayload(enhancedSpec, survivedCount, targetLevel > 0 ? targetLevel : null));
+        if (error) { alert(`제련 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+      }
     }
-    saveWarehouse(warehouse);
+
+    const { error: goldError } = await window.sbClient.from("profiles")
+      .update({ gold: currentGold - totalCost }).eq("user_id", session.user.id);
+    if (goldError) { alert(`제련 실패: ${goldError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+    currentGold -= totalCost;
+    await refreshWarehousePool();
 
     document.getElementById("modalWrap").innerHTML = `
       <div class="modal-overlay" id="modalOverlay2">
@@ -393,7 +456,29 @@
     });
   }
 
-  render();
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 상점/몬스터 테이블(game_content, 가격·강화가능
+  // 여부 조회용) + 골드(profiles) + 창고 풀(warehouse_items)을 받아온 뒤 첫 렌더.
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+
+    const [shopRes, monsterRes, profileRes] = await Promise.all([
+      window.sbClient.from("game_content").select("data").eq("key", "shopTable").single(),
+      window.sbClient.from("game_content").select("data").eq("key", "monsterRoster").single(),
+      window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single(),
+    ]);
+    if (shopRes.error) { alert(`상점 정보를 불러오지 못했습니다: ${shopRes.error.message}`); return; }
+    if (monsterRes.error) { alert(`몬스터 정보를 불러오지 못했습니다: ${monsterRes.error.message}`); return; }
+    if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
+
+    SHOP_TABLE = shopRes.data?.data || [];
+    MONSTER_ROSTER = monsterRes.data?.data || [];
+    currentGold = profileRes.data?.gold ?? 0;
+
+    await refreshWarehousePool();
+    render();
+  })();
 </script>
 </body>
 </html>
