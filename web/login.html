@@ -49,11 +49,16 @@
   const btn = document.getElementById("discordLoginBtn");
 
   // 이미 로그인된 세션이 있으면(예: 뒤로가기로 이 페이지에 다시 온 경우)
-  // 바로 콜백 처리 없이도 로그인 상태임을 알려줌 — 굳이 다시 로그인시키지 않음.
+  // 로그인 성공 시와 동일하게 용병단 화면으로 바로 넘김 — 굳이 로그인
+  // 페이지에 머무르게 둘 이유가 없음.
   (async () => {
     const { data } = await window.sbClient.auth.getSession();
     if (data.session) {
-      statusEl.textContent = `이미 로그인됨: ${data.session.user.user_metadata?.full_name || data.session.user.email}`;
+      statusEl.textContent = `이미 로그인됨: ${data.session.user.user_metadata?.full_name || data.session.user.email}\n용병단으로 이동합니다...`;
+      btn.disabled = true;
+      setTimeout(() => {
+        location.href = new URL("roster-index.html", location.href).toString();
+      }, 600);
     }
   })();
 
