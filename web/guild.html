@@ -90,6 +90,9 @@
   </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
 // ============================================================================
 // 모험가 길드 — 파견 의뢰권 발행/수주
@@ -105,8 +108,14 @@
 //   lastClaimAt(마지막 수주 시각)부터 지금까지 경과분을 30분 단위로 절삭해
 //   장수를 계산하고, 절삭하고 남은 시간은 버리지 않고 lastClaimAt에 더해서
 //   다음 수주로 이월함(예: 1시간 20분 → 2장 수주, 20분은 그대로 남음).
+//
+// battleSim_warehouse/battleSim_lastTicketClaimAt(localStorage) →
+// warehouse_items("파견 의뢰권" 행)/profiles.last_ticket_claim_at(DB)로 전환.
+// last_ticket_claim_at은 계정 생성 트리거가 이미 now()로 채워두므로(신규
+// 계정 기본값, 0002 마이그레이션), "기록 없으면 지금으로 초기화" 로직이
+// 필요 없어짐 — 컬럼이 항상 값을 갖고 있음.
 // ============================================================================
-(function () {
+(async function () {
   const ISSUE_INTERVAL_MIN = 30;                       // 30분마다 1장
   const MAX_HELD_BY_GUILD = 48;                        // 길드 보관 상한(하루치)
   const TICKET_NAME = "파견 의뢰권";
@@ -116,27 +125,25 @@
   const now = () => Date.now();
   const intervalMs = ISSUE_INTERVAL_MIN * 60 * 1000;
 
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
-  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
+  const session = await window.AuthGuard.requireSession();
 
-  // 마지막 수주 시각. 기록이 없으면(최초 방문) 지금으로 잡아서, 계정을 만들자마자
-  // 하루치를 몰아 받는 일이 없게 함.
-  function getLastClaimAt() {
-    const raw = localStorage.getItem("battleSim_lastTicketClaimAt");
-    if (raw) return Number(raw);
-    const t = now();
-    localStorage.setItem("battleSim_lastTicketClaimAt", String(t));
-    return t;
+  // 페이지 로드 시 한 번만 DB에서 읽어와서 이후엔 로컬 변수로 시간 계산만
+  // 반복(30초마다 render()가 다시 도는데, 그때마다 DB를 다시 조회할 필요는
+  // 없음 — lastClaimAt/heldQty는 "수주하기" 클릭 시에만 실제로 바뀜).
+  let lastClaimAt;
+  let heldQty = 0;
+  {
+    const [{ data: profile, error: profileError }, { data: ticketRow, error: ticketError }] = await Promise.all([
+      window.sbClient.from("profiles").select("last_ticket_claim_at").eq("user_id", session.user.id).single(),
+      window.sbClient.from("warehouse_items").select("id,quantity").eq("user_id", session.user.id).eq("name", TICKET_NAME).maybeSingle(),
+    ]);
+    if (profileError) { alert(`불러오기 실패: ${profileError.message}`); return; }
+    if (ticketError) { alert(`불러오기 실패: ${ticketError.message}`); return; }
+    lastClaimAt = new Date(profile.last_ticket_claim_at).getTime();
+    heldQty = ticketRow?.quantity || 0;
   }
-  function setLastClaimAt(t) { localStorage.setItem("battleSim_lastTicketClaimAt", String(t)); }
-
-  function heldTickets() {
-    const e = getWarehouse().find((w) => w.name === TICKET_NAME);
-    return e ? e.quantity : 0;
-  }
+  function getLastClaimAt() { return lastClaimAt; }
+  function heldTickets() { return heldQty; }
 
   // 지금 수주 가능한 장수 — 경과 시간을 30분으로 나눈 몫, 길드 보관 상한에서 컷.
   function pendingInfo() {
@@ -211,22 +218,40 @@
     btn.textContent = info.count > 0 ? `${info.count}장 수주하기` : "수주하기";
   }
 
-  $("#claimBtn").addEventListener("click", () => {
+  $("#claimBtn").addEventListener("click", async () => {
     const info = pendingInfo();
     if (info.count <= 0) return;
 
-    const warehouse = getWarehouse();
-    const entry = warehouse.find((w) => w.name === TICKET_NAME);
-    if (entry) entry.quantity += info.count;
-    else warehouse.push({ name: TICKET_NAME, category: "consumable", quantity: info.count });
-    saveWarehouse(warehouse);
+    const btn = $("#claimBtn");
+    btn.disabled = true;
+
+    const { data: ticketRow, error: findError } = await window.sbClient
+      .from("warehouse_items").select("id,quantity")
+      .eq("user_id", session.user.id).eq("name", TICKET_NAME).maybeSingle();
+    if (findError) { alert(`수주 실패: ${findError.message}`); render(); return; }
+
+    if (ticketRow) {
+      const { error } = await window.sbClient.from("warehouse_items")
+        .update({ quantity: ticketRow.quantity + info.count }).eq("id", ticketRow.id);
+      if (error) { alert(`수주 실패: ${error.message}`); render(); return; }
+    } else {
+      const { error } = await window.sbClient.from("warehouse_items")
+        .insert({ name: TICKET_NAME, category: "consumable", quantity: info.count, user_id: session.user.id });
+      if (error) { alert(`수주 실패: ${error.message}`); render(); return; }
+    }
 
     // 30분 단위로 절삭하고 남은 시간은 버리지 않고 이월. 상한에 걸려 잘린
     // 경우에는 "지금"부터 다시 세기 시작함(넘친 만큼은 이미 흘러간 것).
     const last = getLastClaimAt();
     const consumed = info.count * intervalMs;
-    setLastClaimAt(info.capped ? now() : last + consumed);
+    const newLastClaimAt = info.capped ? now() : last + consumed;
+    const { error: claimError } = await window.sbClient.from("profiles")
+      .update({ last_ticket_claim_at: new Date(newLastClaimAt).toISOString() })
+      .eq("user_id", session.user.id);
+    if (claimError) { alert(`수주 실패: ${claimError.message}`); render(); return; }
 
+    lastClaimAt = newLastClaimAt;
+    heldQty += info.count;
     render();
   });
 
