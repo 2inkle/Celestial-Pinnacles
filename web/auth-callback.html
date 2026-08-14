@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>로그인 처리 중...</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+  .card {
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:36px 32px; max-width:400px; width:100%; text-align:center;
+  }
+  .title { font-family:'Cinzel',serif; font-weight:700; font-size:20px; color:#f2efe8; margin:0 0 16px; }
+  .status { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--mist-dim); line-height:1.7; white-space:pre-wrap; }
+  .status.error { color:var(--danger); }
+  .spinner {
+    width:28px; height:28px; margin:0 auto 18px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:#5865F2;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .retry-btn {
+    margin-top:18px; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600;
+    background:transparent; color:var(--mist); border:1px solid var(--line); border-radius:8px;
+    padding:9px 16px; cursor:pointer;
+  }
+  .retry-btn:hover { border-color:var(--mist-dim); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <div class="card">
+    <div class="spinner" id="spinner"></div>
+    <div class="title">로그인 처리 중</div>
+    <div class="status" id="statusMsg">세션 확인 중...</div>
+    <button class="retry-btn" id="retryBtn" style="display:none">로그인 페이지로 돌아가기</button>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script>
+  const statusEl = document.getElementById("statusMsg");
+  const spinnerEl = document.getElementById("spinner");
+  const retryBtn = document.getElementById("retryBtn");
+
+  function showError(msg) {
+    spinnerEl.style.display = "none";
+    statusEl.className = "status error";
+    statusEl.textContent = msg;
+    retryBtn.style.display = "inline-block";
+  }
+
+  retryBtn.addEventListener("click", () => {
+    location.href = new URL("login.html", location.href).toString();
+  });
+
+  (async () => {
+    // supabase-js는 URL의 access_token/refresh_token 프래그먼트(#...)를
+    // 라이브러리 로드 시점에 자동으로 감지해 세션을 만든다(detectSessionInUrl
+    // 기본값 true) — 별도로 파싱할 필요 없이 onAuthStateChange/getSession으로
+    // 결과만 받으면 됨.
+    const {
+      data: { subscription },
+    } = window.sbClient.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        statusEl.textContent = `로그인 성공: ${session.user.user_metadata?.full_name || session.user.email}\n게임 화면으로 이동합니다...`;
+        subscription.unsubscribe();
+        setTimeout(() => {
+          location.href = new URL("roster-index.html", location.href).toString();
+        }, 800);
+      }
+    });
+
+    // 이미 세션이 감지돼 있는 경우(onAuthStateChange 이벤트를 놓쳤을 수 있는
+    // 타이밍 대비) 직접 한 번 더 확인.
+    const { data, error } = await window.sbClient.auth.getSession();
+    if (error) {
+      showError(`세션 확인 실패: ${error.message}`);
+      return;
+    }
+    if (data.session) {
+      statusEl.textContent = `로그인 성공: ${data.session.user.user_metadata?.full_name || data.session.user.email}\n게임 화면으로 이동합니다...`;
+      subscription.unsubscribe();
+      setTimeout(() => {
+        location.href = new URL("roster-index.html", location.href).toString();
+      }, 800);
+      return;
+    }
+
+    // 5초 내에 아무 세션도 안 잡히면 콜백 URL이 잘못됐거나 OAuth가 실패한 것으로 판단.
+    setTimeout(() => {
+      window.sbClient.auth.getSession().then(({ data }) => {
+        if (!data.session) {
+          showError("로그인 세션을 확인할 수 없습니다.\nDiscord 인증이 취소되었거나 리다이렉트 설정이 올바르지 않을 수 있습니다.");
+        }
+      });
+    }, 5000);
+  })();
+</script>
+</body>
+</html>
