@@ -161,18 +161,12 @@
 <div id="cartBarWrap"></div>
 <div id="modalWrap"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  // 개발자도구 네비 링크는 nav.js가 profiles.is_admin 기준으로 이미 처리함
+  // (2026-08-14, CLAUDE.md "관리자 판별을 profiles.is_admin 기준으로 교체" 참조).
 
   // ============================================================================
   // 상점 데이터 — 아이템 마스터 테이블은 일부러 안 둠(강화/조합으로 파생되는
@@ -195,16 +189,12 @@
   //     head만 필요하고, jItem(이미 requiredJob으로 걸러짐)·uItem(전 직업 공용)·
   //     cloak/accessory/item(직업 제한 없는 범용 슬롯)은 안 붙여도 됨.
   // ============================================================================
-  function getShopTable() {
-    try { return JSON.parse(localStorage.getItem("battleSim_shopTable")) || []; }
-    catch { return []; }
-  }
-  function saveShopTable(table) {
-    localStorage.setItem("battleSim_shopTable", JSON.stringify(table));
-  }
-  // 최초 1회만 예전에 여기 하드코딩돼있던 값으로 시딩(로스터가 비어있고 아직
-  // 마이그레이션 안 했을 때만) — 이후로는 dev-tools의 상점 테이블 편집기에서
-  // 직접 관리함.
+  // LEGACY_SHOP_SEED는 이제 판매 목록 실시간 소스가 아니라 game_content
+  // 테이블의 최초 시딩 원본(supabase/migrations/0005_seed_game_content.sql)
+  // 일 뿐이다 — 판매 목록은 아래 부트스트랩에서 game_content.shopTable을
+  // 직접 조회해서 채운다(SHOP_SEED_VERSION 재시딩 로직은 클라이언트 단일
+  // 저장소 시절 전용 개념이라 통째로 제거함 — DB가 이제 유일한 진실
+  // 공급원이라 "버전이 다르면 다시 심는다"는 이 페이지가 할 일이 아님).
   const LEGACY_SHOP_SEED = [
     {
       "name": "아밍 소드",
@@ -725,16 +715,12 @@
       "price": 10000
     }
   ];
-  // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
-  const SHOP_SEED_VERSION = "2026-08-14a";
-  if (localStorage.getItem("battleSim_shopSeedVersion") !== SHOP_SEED_VERSION) {
-    // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — shop-table-editor.html에서
-    // 직접 손본 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함.
-    try { localStorage.setItem("battleSim_shopSeedVersionBackup", JSON.stringify(getShopTable())); } catch {}
-    saveShopTable(LEGACY_SHOP_SEED);
-    localStorage.setItem("battleSim_shopSeedVersion", SHOP_SEED_VERSION);
-  }
-  const SHOP_TABLE = getShopTable();
+  // SHOP_TABLE/currentGold/shopPurchasedMap은 이제 부트스트랩(파일 맨 아래)의
+  // 비동기 조회 결과로 채워짐 — 최상단 동기 로드가 없어져서 let으로 선언.
+  let SHOP_TABLE = [];
+  let session = null;
+  let currentGold = 0;
+  let shopPurchasedMap = {}; // itemName -> 누적 구매수량(shop_purchased 테이블)
 
   const CATEGORY_LABELS = {
     equipment: { label: "장비", icon: "⚔️" },
@@ -743,34 +729,15 @@
     stash:     { label: "보물상자", icon: "🎁" },
   };
 
-  // ── 저장 헬퍼(다른 페이지들과 동일한 규칙) ──────────────────────────────
-  function getGold() {
-    const raw = localStorage.getItem("battleSim_gold");
-    return raw === null ? 500 : Number(raw);
-  }
-  function setGold(amount) {
-    localStorage.setItem("battleSim_gold", String(amount));
-  }
-  function getWarehouse() {
-    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-    catch { return []; }
-  }
-  function saveWarehouse(warehouse) {
-    localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
-  }
-  // 개인 계정 기준 "이 아이템을 지금까지 몇 개 샀는지" — 재고 계산용.
-  function getShopPurchased() {
-    try { return JSON.parse(localStorage.getItem("battleSim_shopPurchased")) || {}; }
-    catch { return {}; }
-  }
-  function saveShopPurchased(purchased) {
-    localStorage.setItem("battleSim_shopPurchased", JSON.stringify(purchased));
-  }
+  // ── 저장 헬퍼 — getGold는 이제 캐시된 currentGold만 반환(동기 함수 형태를
+  // 유지해서 아래 렌더 함수들을 안 건드림). 실제 값 변경은 confirmPurchase의
+  // Supabase 호출로만 일어남.
+  function getGold() { return currentGold; }
 
   // ── 판매 조건 판정 ──────────────────────────────────────────────────────
   function remainingStock(item) {
     if (item.stock === undefined) return Infinity;
-    const bought = getShopPurchased()[item.name] || 0;
+    const bought = shopPurchasedMap[item.name] || 0;
     return Math.max(0, item.stock - bought);
   }
   function isOnSaleNow(item) {
@@ -1000,37 +967,86 @@
     });
   }
 
+  // 상점 아이템(camelCase, price/stock/saleStart/saleEnd/saleDays 등 상점
+  // 카탈로그 전용 필드 포함)을 warehouse_items insert payload(snake_case,
+  // 실제 컬럼만)로 변환. 카탈로그 전용 필드는 소유 인스턴스에 의미가 없어서
+  // 일부러 뺌(예전 localStorage 방식은 스프레드로 다 같이 넘어갔지만 그건
+  // 그냥 부수 효과였지 의도가 아니었음).
+  function buildWarehouseInsertFromShopItem(it, quantity, userId) {
+    return {
+      user_id: userId,
+      name: it.name,
+      category: it.category,
+      quantity,
+      description: it.description ?? null,
+      slot: it.slot ?? null,
+      combat_real: it.combatReal ?? null,
+      combat_bonus: it.combatBonus ?? null,
+      stat_bonus: it.statBonus ?? null,
+      passive_bonus: it.passiveBonus ?? null,
+      max_hp_bonus: it.maxHpBonus ?? null,
+      max_sp_bonus: it.maxSpBonus ?? null,
+      weight: it.weight ?? null,
+      two_handed: it.twoHanded ?? null,
+      set_id: it.setId ?? null,
+      required_job: it.requiredJob ?? null,
+      stat_real_bonus: it.statRealBonus ?? null,
+      pattern_slot_bonus: it.patternSlotBonus ?? null,
+      crit_multiplier: it.critMultiplier ?? null,
+      conditional_passive_mods: it.conditionalPassiveMods ?? null,
+      grants_resource: it.grantsResource ?? null,
+      equipment_type: it.equipmentType ?? null,
+      avatar_portrait: it.avatarPortrait ?? null,
+      grants_skill: it.grantsSkill ?? null,
+      consumable: it.consumable ?? null,
+      uses_per_battle: it.usesPerBattle ?? null,
+      enhanceable: it.enhanceable ?? null,
+    };
+  }
+
   // ── 실제 구매 확정 — 여기 남아있는 cart 데이터 중 수량 1 이상인 것만 반영 ─
-  function confirmPurchase() {
+  async function confirmPurchase() {
     const entries = cartEntries(); // 이 시점 cart는 모달에서 조절한 최종 상태
     const total = cartTotal();
     if (total > getGold()) return; // 이중 방어(버튼은 이미 비활성화되어 있음)
 
-    setGold(getGold() - total);
+    const confirmBtn = document.getElementById("modalConfirmBtn");
+    if (confirmBtn) confirmBtn.disabled = true;
 
-    const warehouse = getWarehouse();
-    const purchased = getShopPurchased();
-    entries.forEach((it) => {
+    // heldBy가 없는(=아직 아무도 안 가져간 "풀") 항목만 병합 대상으로 삼음 —
+    // heldBy가 붙은 항목(누군가 이미 장착한 개별 인스턴스)과는 절대 안 섞임.
+    // enhanceLevel도 같이 봐야 함 — 상점 구매품은 항상 +0(강화 안 됨)인데,
+    // 창고에 이미 강화된 같은 이름의 장비가 있으면 절대 같이 섞이면 안 됨.
+    const names = entries.map((it) => it.name);
+    const { data: poolRows, error: poolError } = await window.sbClient
+      .from("warehouse_items").select("id,name,category,quantity")
+      .eq("user_id", session.user.id).in("name", names)
+      .is("held_by", null).is("enhance_level", null);
+    if (poolError) { alert(`구매 실패: ${poolError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+
+    for (const it of entries) {
       const qty = cart[it.name];
-      // heldBy가 없는(=아직 아무도 안 가져간 "풀") 항목만 병합 대상으로 삼음 —
-      // heldBy가 붙은 항목(누군가 이미 장착한 개별 인스턴스)과는 절대 안 섞임.
-      // enhanceLevel도 같이 봐야 함 — 상점 구매품은 항상 +0(강화 안 됨)인데,
-      // 창고에 이미 강화된 같은 이름의 장비가 있으면 절대 같이 섞이면 안 됨.
-      const existing = warehouse.find((w) => w.name === it.name && w.category === it.category && !w.heldBy && !w.enhanceLevel);
+      const existing = poolRows.find((w) => w.name === it.name && w.category === it.category);
       if (existing) {
-        existing.quantity += qty;
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: existing.quantity + qty }).eq("id", existing.id);
+        if (error) { alert(`구매 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
       } else {
-        // 장비는 combatReal/combatBonus/slot 등 스탯 전체를 그대로 실어서 저장
-        // 해야 나중에 장착했을 때 실제 능력치가 살아남음(예전엔 name/category/
-        // quantity만 저장돼서 장착해도 스탯이 0이 되는 문제가 있었음).
-        const { name, category, price, ...spec } = it;
-        warehouse.push({ name, category, quantity: qty, ...spec });
+        const { error } = await window.sbClient.from("warehouse_items")
+          .insert(buildWarehouseInsertFromShopItem(it, qty, session.user.id));
+        if (error) { alert(`구매 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
       }
-      purchased[it.name] = (purchased[it.name] || 0) + qty;
+      shopPurchasedMap[it.name] = (shopPurchasedMap[it.name] || 0) + qty;
+      const { error: purchasedError } = await window.sbClient.from("shop_purchased")
+        .upsert({ user_id: session.user.id, item_name: it.name, quantity: shopPurchasedMap[it.name] }, { onConflict: "user_id,item_name" });
+      if (purchasedError) { alert(`구매 실패: ${purchasedError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
       cart[it.name] = 0; // 구매 완료했으니 장바구니에서 비움
-    });
-    saveWarehouse(warehouse);
-    saveShopPurchased(purchased);
+    }
+
+    const { error: goldError } = await window.sbClient.from("profiles")
+      .update({ gold: currentGold - total }).eq("user_id", session.user.id);
+    if (goldError) { alert(`구매 실패: ${goldError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
+    currentGold -= total;
 
     closeModal();
     document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
@@ -1045,10 +1061,32 @@
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   });
 
-  document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
-  renderCatTabs();
-  renderList();
-  renderCartBar();
+  // ============================================================================
+  // 부트스트랩 — 로그인 확인 → 상점 카탈로그(game_content) + 골드(profiles) +
+  // 누적 구매수량(shop_purchased)을 받아온 뒤 첫 렌더.
+  // ============================================================================
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+
+    const [shopRes, profileRes, purchasedRes] = await Promise.all([
+      window.sbClient.from("game_content").select("data").eq("key", "shopTable").single(),
+      window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single(),
+      window.sbClient.from("shop_purchased").select("item_name,quantity").eq("user_id", session.user.id),
+    ]);
+    if (shopRes.error) { alert(`상점 정보를 불러오지 못했습니다: ${shopRes.error.message}`); return; }
+    if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
+    if (purchasedRes.error) { alert(`구매 이력을 불러오지 못했습니다: ${purchasedRes.error.message}`); return; }
+
+    SHOP_TABLE = shopRes.data?.data || [];
+    currentGold = profileRes.data?.gold ?? 0;
+    shopPurchasedMap = {};
+    (purchasedRes.data || []).forEach((row) => { shopPurchasedMap[row.item_name] = row.quantity; });
+
+    document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    renderCatTabs();
+    renderList();
+    renderCartBar();
+  })();
 </script>
 </body>
 </html>
