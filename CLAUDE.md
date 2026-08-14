@@ -411,18 +411,32 @@ skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
 - 로그 접기/요약 UI는 아직 없음(우선순위 낮음으로 보류 중).
 - 티어(장비 등급) 개념은 데이터 필드로 존재하지 않음 — "같은 handle 대비
   성능"이라는 설계자 머릿속 개념일 뿐, 코드가 참조하는 값이 아님.
-- **(요청됨, 미착수, 2026-08-14)** 전투 중 버프/디버프로 오르내릴 수 있는
-  스탯 변동폭(`statUpPercent`/`statDownPercent`/`combatStatUpPercent`)을
-  현재 범위에서 50~500%로 축소하고 싶다는 요청. 실측 확인 결과: 지금 183개
-  스킬의 실제 데이터 상 이 세 effect type의 `value`는 **-70~+100% 범위**뿐이라
-  (`Disarm`의 -70%가 최소, `Justice Craft`의 +100%가 최대 — 20만 스킬 순회
-  실측), 사용자가 언급한 "50~2000%"에 해당하는 하드코딩된 값이나 UI 제한을
-  코드에서 찾지 못함. CLAUDE.md의 "SPD는... 극단 스탯 20배 버프 환경에서"
-  문구(STAT_DAMPING 설계 근거 섹션)에 나오는 "20배"가 실제 게임 밸런스 수치가
-  아니라 감쇠 공식을 스트레스 테스트하기 위한 가상의 극단 시나리오였을
-  가능성이 있음 — 사용자가 말한 2000%가 정확히 어떤 필드/메커니즘을 가리키는
-  것인지(스킬 effect.value인지, 장비 statBonus/statUpPercent인지, 다른
-  계산인지) 다음 작업 시작 전에 먼저 확인 필요.
+- **(요청됨, 미착수 — 다음 세션 밸런싱 작업 1순위, 2026-08-15 위치 특정됨)**
+  전투 중 버프/디버프가 아무리 복리로 무한히 중첩돼도 최종 `effective` 값이
+  넘지 못하는 상/하한을 50~500%로 축소(현재 50~2000%)하고 싶다는 요청.
+  사용자가 말한 "50~2000%"는 스킬 `effect.value`(그건 -70~+100% 범위뿐임,
+  20만 스킬 순회 실측 완료)가 아니라 **`src/character.js`의
+  `calculateEffectiveStat(realVal, bonusVal)`**이었음 — STR/INT/DEX/SPD/LUK/
+  ATK/MATK/DEF/MDEF 전부 이 공식을 그대로 씀:
+  ```js
+  calculateEffectiveStat(realVal, bonusVal) {
+    const maxCap = realVal * 20;    // 2000%
+    const minFloor = realVal * 0.5; // 50%
+    return Math.max(minFloor, Math.min(maxCap, realVal + bonusVal));
+  }
+  ```
+  500%로 낮추려면 `realVal * 20` → `realVal * 5`.
+  **주의 — 이 캡을 전제로 역산된 다른 공식이 최소 하나 있음**:
+  `src/registries.js`의 `LUK_GROWTH_MAX_RATIO = 20`(LUK 크리티컬 성장 로그
+  곡선)이 "2000% 캡(ratio=20)에 도달했을 때 정확히 3배(`LUK_GROWTH_AT_MAX_RATIO`)"가
+  되도록 `LUK_LOG_SCALE`을 역산해 고정해둔 값 — 캡을 5배로 낮추면 이 상수도
+  같이 5로 맞춰야 함(그러면 `LUK_LOG_SCALE`은 기존 수식 그대로 자동 재계산됨,
+  "ratio=5 도달 시 3배"라는 의도가 유지되는 셈 — 다만 "2.5~3배 정도"라는 원래
+  설계 의도 자체를 그대로 유지할지는 사용자와 확인 필요, 캡 자체가 좁아지면
+  같은 배율 목표가 너무 쉽게/빨리 도달돼서 다르게 느껴질 수 있음).
+  다른 곳에서 20배/0.5배를 전제로 한 계산이 더 있는지는 아직 전수 조사
+  안 함 — 실제 작업 시작 시 `calculateEffectiveStat`/`realVal \* 20`/
+  `MAX_RATIO` 등을 다시 한번 grep해서 확인할 것.
 
 ## 로그인 (2026-08-14, Discord OAuth 실제 동작 확인함)
 
