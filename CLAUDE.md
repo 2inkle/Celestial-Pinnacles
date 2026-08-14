@@ -634,18 +634,61 @@ equipment 필드가 이제 없어져서(equipment는 `warehouse_items.held_by`�
 "승리 기록 초기화" → `cleared`만 false로 돌아가고 `cleared_at`은 그대로
 유지되는 것까지 확인(예전 동작과 정확히 동일한 범위) → 전부 정리.
 
-**여기까지 전환 완료 페이지(8개)**: `roster-index.html`/`hire.html`/
-`village.html`/`character-sheet.html`/`guild.html`/`shop.html`/
-`refinery.html`/`workshop.html`/`battle-select.html`. 확립된 공용 패턴:
-`auth-guard.js`(세션 가드+관리자 판별), DB row(snake_case) ↔ camelCase
-어댑터, `warehouse_items.held_by` 직접 조작, 렌더 루프에서 반복 조회되는
-데이터는 부트스트랩에서 캐시 후 동기로 읽기, DB 재조회 기반 트랜잭션
-(캐시가 낡았을 가능성을 항상 실행 직전 재확인).
+**`dispatch.html`/`battle-view.html`/`battle-encounters.js`/`battle-adapter.js`
+전환 완료**(2026-08-15) — **이걸로 모든 페이지의 localStorage → Supabase
+전환이 끝났다.** 서버 측 보상 검증(클라이언트가 계산한 exp/gold/loot를
+그대로 믿고 커밋하는 구조)은 명시적으로 이번 범위 밖으로 남김 — 기존과
+동일한 클라이언트-신뢰 모델을 그대로 포팅했고, 이 잔여 위험은 이 문서
+아래 "API 단계에서 검증/방어가 필요한 지점"에 계속 남아있음.
 
-**남은 것**: `dispatch.html`/`battle-view.html` — 보상 지급이 서버 검증
-이슈(CLAUDE.md의 "API 단계에서 검증/방어가 필요한 지점")와 얽혀 있어서
-단순 데이터 계층 교체를 넘어서는 설계가 필요함. 남은 페이지 중 유일하게
-연결점이 많은 것들이라 가장 마지막으로 남겨둠.
+- 캐릭터 장착 장비: `characters` 테이블에 `equipment` 컬럼이 없으므로
+  `warehouse_items`를 `held_by`로 조회해서 슬롯별로 조립한 뒤
+  `battle-adapter.js`에 넘김(`sumEquipmentCombatStats`/맨주먹 판정이
+  `rosterChar.equipment`를 직접 읽는 걸 확인하고 반영 — 안 하면 전원
+  맨주먹(ATK 5)으로 계산됨).
+- **`battle-encounters.js`/`battle-adapter.js`는 DB 쿼리 대신 "주입 캐시"
+  패턴으로 바꿈** — `setMonsterRoster()`/`setSkillTable()`을 각 페이지가
+  부트스트랩에서 한 번만 호출해 값을 넣어두고, `getMonsterTable()`/
+  `registerKnownSkills()`는 그 캐시를 동기로 읽기만 함. 이유: 파견
+  시뮬레이션이 `while (spent < TURN_BUDGET)` 루프 안에서 전투마다
+  `spawnEnemies()`(⊃`getMonsterTable()`)와 `registerKnownSkills()`를
+  호출하는데(2000턴 예산이면 실측 500회 이상), 매번 비동기 DB 쿼리를
+  걸면 수백 번의 왕복이 생겨 감당이 안 됨.
+- **이번에 새로 발견해서 같이 고친 심각한 버그**: `battle-adapter.js`의
+  `getSkillTable()`이 여전히 `localStorage.getItem("battleSim_skillTable")`을
+  동기로 읽고 있었는데, DB 전환이 진행되면서 그 키를 채워주는 페이지가
+  하나도 안 남았다(`character-sheet.html`도 이미 `game_content`를 직접
+  조회하도록 바뀌어서 더 이상 그 키에 쓰지 않음). 즉 **모든 전투가
+  스킬을 하나도 등록하지 못한 채 돌고 있었다**(맨주먹 `ATTACK`만 동작,
+  나머지 스킬은 패턴에서 참조해도 조용히 무시됨 — 크래시가 안 나서
+  겉으로 티가 안 남). `setSkillTable()` 주입으로 고침.
+- **실측 검증**(둘 다 실제 UI로): 직접 전투 — 스킬 레지스트리에
+  165개 스킬이 정상 등록됨을 확인(수정 전이었다면 1개도 안 등록됐을
+  것), 패배 시 보상 없음 확인, 스탯을 임시로 올려 승리 유도 후
+  exp 100→116/골드 3000→3006/`battle_progress` cleared:true 정확히
+  반영 확인. 파견 — 티켓 10→9, 506회 전투 100% 승률, 화면 표시 결과
+  (경험치 1,154/골드 427/전리품 11개)가 DB에 저장된 값과 정확히 일치
+  확인. 전부 테스트 후 정리함.
+- **오늘 범위 밖에서 발견한 별개 버그(수정 안 함, 다음 세션용)**:
+  `battle-view.html`의 결과 배너("OOO의 파티는 승리했다!")가 항상
+  "플레이어"로 뜬다 — `src/engine.js`의 `startBattle(maxTurns, username)`이
+  `username` 인자를 내부 로그 문구에만 쓰고 반환 객체(`result`)에는 안
+  담아서, `result.username`이 항상 `undefined`라 폴백 문구가 항상 뜸.
+  **이번 세션 이전부터 있던 버그**(첫 커밋부터 동일 코드, `git show`로
+  확인함) — 오늘 DB 전환과 무관. 고치려면 `startBattle`의 반환 객체에
+  `username`을 포함시키면 됨.
+
+**정리 — Supabase 전환 완료된 전체 페이지(10개)**: `roster-index.html`/
+`hire.html`/`village.html`/`character-sheet.html`/`guild.html`/`shop.html`/
+`refinery.html`/`workshop.html`/`battle-select.html`/`dispatch.html`/
+`battle-view.html`(+ 공유 스크립트 `battle-encounters.js`/`battle-adapter.js`).
+**아직 안 옮긴 것**: 관리자 전용 편집기 4개(`skill-table-editor.html`/
+`job-table-editor.html`/`shop-table-editor.html`/`monster-roster.html`/
+`monster-sheet.html`)와 `dev-tools.html`/`feature-requests.html` — 전부
+`battleSim_username==="2inkle"` 기반 접근 제어를 그대로 쓰고 있어서
+`profiles.is_admin`으로 옮기는 작업과 함께 별도로 처리해야 함(nav.js는
+이미 옮겼지만 이 페이지들 자체의 내부 로직은 아직 손 안 댐). 게임 플레이
+경험과는 무관한 관리자 도구라 우선순위가 낮음.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
