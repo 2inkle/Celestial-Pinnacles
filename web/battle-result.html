@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>전투 결과 · Result</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  main { flex:1; max-width:760px; margin:0 auto; width:100%; padding:36px 24px 60px; }
+
+  .outcome-banner { text-align:center; padding:28px 20px 22px; border-bottom:1px solid var(--line); margin-bottom:26px; }
+  .outcome-eyebrow { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.22em; text-transform:uppercase; color:var(--mist-dim); }
+  .outcome-title { font-family:'Cinzel',serif; font-weight:700; font-size:34px; margin:10px 0 4px; }
+  .outcome-title.win { color:var(--gold); }
+  .outcome-title.lose { color:var(--danger); }
+  .outcome-title.draw { color:var(--mist); }
+  .outcome-turns { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
+  .outcome-turns b { color:var(--mist); font-weight:600; }
+
+  .section { margin-bottom:26px; }
+  .section-label {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--cyan); display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;
+  }
+
+  .sides { display:flex; gap:14px; margin-bottom:26px; }
+  .side-box {
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 18px 16px; text-align:center;
+  }
+  .side-box.ally { border-top:2px solid var(--cyan); }
+  .side-box.enemy { border-top:2px solid var(--danger); }
+  .side-label {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--mist-dim); margin-bottom:12px;
+  }
+  .side-box.ally .side-label { color:var(--cyan); }
+  .side-box.enemy .side-label { color:var(--danger); }
+  .side-survivors { font-family:'Cinzel',serif; font-weight:700; font-size:26px; color:#f2efe8; }
+  .side-survivors .of { font-family:'JetBrains Mono',monospace; font-weight:400; font-size:15px; color:var(--mist-dim); }
+  .side-sub { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); margin-top:4px; }
+
+  .side-hp-block { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .side-hp-figure { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--mist); }
+  .side-hp-figure b { color:#f2efe8; font-weight:600; }
+  .side-hp-bar-wrap { height:7px; background:var(--panel-raised); border-radius:4px; overflow:hidden; margin-top:8px; }
+  .side-hp-bar { height:100%; border-radius:4px; background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
+  .side-box.enemy .side-hp-bar { background:linear-gradient(90deg, var(--danger-dim), var(--danger)); }
+
+  .side-dmg-block { margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+  .side-dmg-figure { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); }
+  .side-dmg-figure b { color:var(--ember); font-weight:600; }
+
+  .loot-panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px 20px; }
+  .loot-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); }
+  .loot-row:last-child { border-bottom:none; }
+  .loot-label { font-size:13px; color:var(--mist); display:flex; align-items:center; gap:8px; }
+  .loot-value { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--gold); font-weight:600; }
+  .loot-value.exp { color:var(--cyan); }
+  .item-list { margin-top:4px; }
+  .item-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; }
+  .item-name { font-size:12.5px; color:var(--mist); }
+  .item-qty { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
+  .loot-empty { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); padding:6px 0; }
+
+  .actions { display:flex; gap:10px; margin-top:32px; }
+  .action-btn {
+    flex:1; text-align:center; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.04em;
+    text-decoration:none; padding:13px; border-radius:8px; border:1px solid var(--line); color:var(--mist);
+    transition:border-color 0.15s ease, color 0.15s ease;
+  }
+  .action-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .action-btn.primary { background:var(--ember); border-color:var(--ember); color:#1a1108; font-weight:600; }
+  .action-btn.primary:hover { background:var(--ember); color:#1a1108; opacity:0.9; }
+
+  .draft-note {
+    max-width:760px; margin:0 auto; padding:10px 24px; font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    color:var(--mist-dim); border-top:1px dashed var(--line);
+  }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<main id="main"></main>
+
+<script>
+// ============================================================================
+// 이 페이지는 BattleAdapter.runBattle()이 반환하는 result 객체를 그대로 받아
+// 그린다. 실제 연결(battle-view.html이 전투를 돌리고 이 페이지로 result를
+// 넘기는 것)은 아직 안 돼있어서, sessionStorage("battleSim_lastResult")에 값이
+// 있으면 그걸 쓰고, 없으면 아래 EXAMPLE_RESULT(초안 검토용 예시)로 대체한다.
+// 연결되면 battle-view.html 쪽에서:
+//   sessionStorage.setItem("battleSim_lastResult", JSON.stringify(result));
+//   location.href = "battle-result.html";
+// 만 해주면 이 페이지는 수정 없이 그대로 동작한다.
+// ============================================================================
+const EXAMPLE_RESULT = {
+  outcome: "allyWin",
+  turnsElapsed: 6,
+  username: "2inkle",
+  goldGained: 10,
+  lootGained: [{ name: "고블린의 이빨", category: "material", quantity: 1 }],
+  expGained: 28,
+  expByCharacter: [{ id: "2inkle_1", name: "용사", gainExp: 28 }],
+  participants: {
+    ally: [{ name: "용사", currentHp: 900, maxHp: 900, isAlive: true }],
+    enemy: [
+      { name: "Goblin", currentHp: 0, maxHp: 360, isAlive: false },
+      { name: "Goblin warrior", currentHp: 0, maxHp: 480, isAlive: false },
+      { name: "Goblin kiddo", currentHp: 0, maxHp: 300, isAlive: false },
+      { name: "Goblin kiddo", currentHp: 0, maxHp: 300, isAlive: false },
+      { name: "Goblin", currentHp: 0, maxHp: 360, isAlive: false },
+    ],
+  },
+  survivorCounts: { ally: { alive: 1, total: 1 }, enemy: { alive: 0, total: 5 } },
+  damageDealt: { ally: 1800, enemy: 300 },
+};
+
+function loadResult() {
+  try {
+    const raw = sessionStorage.getItem("battleSim_lastResult");
+    if (raw) return { data: JSON.parse(raw), isExample: false };
+  } catch {}
+  return { data: EXAMPLE_RESULT, isExample: true };
+}
+
+const OUTCOME_META = {
+  allyWin: { cls: "win",  eyebrow: "VICTORY", title: (u) => `${u}의 파티는 승리했다!` },
+  enemyWin:{ cls: "lose", eyebrow: "DEFEAT",  title: () => `패배했다...` },
+  draw:    { cls: "draw", eyebrow: "STALEMATE", title: () => `비겼다.` },
+};
+
+function renderSideBox(label, side, counts, participants, damageDealt) {
+  const totalCurrentHp = participants.reduce((sum, p) => sum + p.currentHp, 0);
+  const totalMaxHp = participants.reduce((sum, p) => sum + p.maxHp, 0);
+  const hpPct = totalMaxHp > 0 ? Math.max(0, Math.min(100, (totalCurrentHp / totalMaxHp) * 100)) : 0;
+
+  return `
+    <div class="side-box ${side}">
+      <div class="side-label">${label}</div>
+      <div class="side-survivors">${counts.alive} <span class="of">/ ${counts.total}</span></div>
+      <div class="side-sub">생존</div>
+
+      <div class="side-hp-block">
+        <div class="side-hp-figure"><b>${totalCurrentHp}</b> / ${totalMaxHp} HP</div>
+        <div class="side-hp-bar-wrap"><div class="side-hp-bar" style="width:${hpPct}%"></div></div>
+      </div>
+
+      <div class="side-dmg-block">
+        <div class="side-dmg-figure">상대에게 입힌 피해 <b>${damageDealt}</b></div>
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  const { data: result, isExample } = loadResult();
+  const meta = OUTCOME_META[result.outcome] || OUTCOME_META.draw;
+
+  document.getElementById("main").innerHTML = `
+    <div class="outcome-banner">
+      <div class="outcome-eyebrow">${meta.eyebrow}</div>
+      <div class="outcome-title ${meta.cls}">${meta.title(result.username || "플레이어")}</div>
+      <div class="outcome-turns">진행 턴수 <b>${result.turnsElapsed}</b></div>
+    </div>
+
+    <div class="sides">
+      ${renderSideBox("🛡️ 아군", "ally", result.survivorCounts.ally, result.participants.ally, result.damageDealt.ally)}
+      ${renderSideBox("💀 적군", "enemy", result.survivorCounts.enemy, result.participants.enemy, result.damageDealt.enemy)}
+    </div>
+
+    <div class="section">
+      <div class="section-label"><span>🎁 획득</span></div>
+      <div class="loot-panel">
+        <div class="loot-row">
+          <span class="loot-label">✨ 경험치</span>
+          <span class="loot-value exp">+${result.expGained}</span>
+        </div>
+        <div class="loot-row">
+          <span class="loot-label">💰 골드</span>
+          <span class="loot-value">+${result.goldGained}</span>
+        </div>
+        ${result.lootGained.length ? `
+        <div class="item-list">
+          ${result.lootGained.map((it) => `
+            <div class="item-row">
+              <span class="item-name">${it.name}</span>
+              <span class="item-qty">×${it.quantity}</span>
+            </div>
+          `).join("")}
+        </div>` : `<div class="loot-empty">획득한 아이템 없음</div>`}
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="village.html" class="action-btn">마을로</a>
+      <a href="battle-select.html" class="action-btn primary">다시 전투하기</a>
+    </div>
+  `;
+
+  if (isExample) {
+    const note = document.createElement("div");
+    note.className = "draft-note";
+    note.textContent = "⚠ 초안 미리보기 — 실제 전투 결과가 아니라 예시 데이터(EXAMPLE_RESULT)로 렌더링 중입니다. battle-view.html과 연결되면 자동으로 실제 결과가 표시됩니다.";
+    document.getElementById("main").appendChild(note);
+  }
+}
+
+render();
+</script>
+</body>
+</html>

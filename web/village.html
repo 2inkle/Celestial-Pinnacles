@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>마을 · Village</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:32px 40px 22px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:560px; line-height:1.6; margin-top:10px; }
+
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .header-actions { display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .gold-display { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .roster-link {
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em; color:var(--mist-dim);
+    text-decoration:none; border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
+  }
+  .roster-link:hover { border-color:var(--gold); color:var(--gold); }
+
+  main { flex:1; padding:28px 40px 48px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:18px; }
+
+  .facility { position:relative; border-radius:12px; padding:22px 20px; display:flex; flex-direction:column; gap:10px; }
+
+  .facility.open {
+    background:var(--panel); border:1px solid var(--line); text-decoration:none; color:inherit;
+    transition:border-color 0.15s ease, transform 0.1s ease;
+  }
+  .facility.open:hover { border-color:var(--gold); transform:translateY(-2px); }
+
+  .facility.soon {
+    background:var(--panel); border:1px dashed var(--line); opacity:0.6; cursor:default;
+  }
+
+  .f-icon {
+    width:48px; height:48px; border-radius:9px; background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:22px;
+  }
+  .f-name { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; }
+  .f-desc { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); line-height:1.6; }
+  .f-hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); opacity:0; transition:opacity 0.15s ease; margin-top:2px; }
+  .facility.open:hover .f-hint { opacity:1; }
+
+  .soon-badge {
+    position:absolute; top:16px; right:16px; font-family:'JetBrains Mono',monospace; font-size:9px;
+    letter-spacing:0.08em; color:var(--mist-dim); border:1px dashed var(--line); border-radius:20px; padding:3px 9px;
+  }
+
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:14px;
+  }
+
+  footer { padding:16px 40px 28px; border-top:1px solid var(--line); }
+  .reset-btn {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); background:transparent;
+    border:1px dashed var(--line); border-radius:20px; padding:6px 14px; cursor:pointer;
+  }
+  .reset-btn:hover { border-color:var(--danger); color:var(--danger); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  <script src="exp-table.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Mercenary Guild · Village</div>
+      <h1>마을</h1>
+    </div>
+    <div class="header-actions">
+      <div class="gold-display">💰 <span id="goldVal">0</span> G</div>
+      <a class="roster-link" href="roster-index.html">← 용병단으로</a>
+    </div>
+  </div>
+  <div class="desc">전투로 얻은 재화와 소재를 소모하는 곳입니다. 시설을 골라 입장하세요.</div>
+  <div class="mock-badge">⚠ 정적 목업 — 고용소·상점·제련공방 동작, 조합소는 추후 구현 예정</div>
+</header>
+
+<main>
+  <div class="grid">
+    <a class="facility open" href="hire.html">
+      <div class="f-icon">🚩</div>
+      <div class="f-name">고용소</div>
+      <div class="f-desc">떠돌이 용병을 골드로 영입해 용병단에 합류시킵니다.</div>
+      <div class="f-hint">입장하기 →</div>
+    </a>
+
+    <a class="facility open" href="battle-view.html">
+      <div class="f-icon">⚔️</div>
+      <div class="f-name">전투 (초안)</div>
+      <div class="f-desc">진형(전열/후열) 배치 구조만 확인해보는 러프한 시각화입니다.</div>
+      <div class="f-hint">입장하기 →</div>
+    </a>
+
+    <a class="facility open" href="shop.html">
+      <div class="f-icon">🛒</div>
+      <div class="f-name">상점</div>
+      <div class="f-desc">전투 보수로 얻은 재화로 장비와 소모품을 구매합니다.</div>
+      <div class="f-hint">입장하기 →</div>
+    </a>
+
+    <a class="facility open" href="refinery.html">
+      <div class="f-icon">⚒️</div>
+      <div class="f-name">제련공방</div>
+      <div class="f-desc">미장착 장비를 강화합니다. 실패하면 완전히 파괴돼요.</div>
+      <div class="f-hint">입장하기 →</div>
+    </a>
+
+    <div class="facility soon">
+      <span class="soon-badge">준비 중</span>
+      <div class="f-icon">🧪</div>
+      <div class="f-name">조합소</div>
+      <div class="f-desc">전투에서 얻은 소재를 조합해 새로운 장비를 제작합니다.</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <button class="reset-btn" id="resetBtn">🔄 데모 데이터 초기화 (로스터 · 골드 리셋)</button>
+  <button class="reset-btn" id="seedExampleBtn" style="margin-left:8px;">🧪 예제 캐릭터 추가 (사제 Lv.30) → Sheet로 이동</button>
+  <button class="reset-btn" id="randomTenBtn" style="margin-left:8px;">🧪 무작위 용병 10명 생성</button>
+</footer>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+  document.getElementById("goldVal").textContent = getGold().toLocaleString();
+
+  // ============================================================================
+  // 로스터 공용 헬퍼 (hire.html과 동일한 규칙) — 이 버튼들에서 같이 씀
+  // ============================================================================
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+  function saveRoster(roster) {
+    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
+  }
+  function getUsername() {
+    return localStorage.getItem("battleSim_username") || "2inkle";
+  }
+  function nextCharacterId(roster) {
+    const username = getUsername();
+    const prefix = username + "_";
+    const usedSeq = roster
+      .map(c => c.id)
+      .filter(id => typeof id === "string" && id.startsWith(prefix))
+      .map(id => Number(id.slice(prefix.length)))
+      .filter(n => Number.isInteger(n));
+    const nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
+    return `${prefix}${nextSeq}`;
+  }
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if (!confirm("로스터와 골드를 초기 상태로 되돌릴까요? 고용했던 용병이 모두 사라집니다.")) return;
+    localStorage.removeItem("battleSim_roster");
+    localStorage.removeItem("battleSim_gold");
+    localStorage.removeItem("battleSim_hiredPoolIds");
+    location.reload();
+  });
+
+  // ============================================================================
+  // 🧪 예제 캐릭터 주입 — hire.html과 동일한 id 규칙(유저이름_순번)을 그대로 따름.
+  // Sheet 화면의 필드/기능(스탯 포인트, 스킬, 전직, 장비)이 실제로 동작하는지
+  // 확인하기 위한 테스트 데이터를 즉시 로스터에 넣고 Sheet로 이동시켜줌.
+  // ============================================================================
+  document.getElementById("seedExampleBtn").addEventListener("click", () => {
+    const id = nextCharacterId(getRoster());
+    const exampleCharacter = {
+      id,
+      name: "1",
+      job: "사제",
+      level: 30,
+      exp: 0,
+      expToNext: window.ExpTable.expToNextForLevel(30), // 만렙 — 사실상 도달 불가값
+      portrait: "✨",
+      realStats: { str:10, int:10, dex:10, spd:10, luk:10 },
+      // unassignedPoints/skillPoints는 저장 안 함 — Sheet가 레벨 공식으로 계산함.
+      // Lv.30이면 (30-1)*5=145 스탯 포인트, (30-1)*2=58 스킬 포인트가 자동으로 뜸.
+      // hp/maxHp/sp/maxSp는 저장 안 함 — Sheet가 JOB_BASE_HP+STR×20 공식으로 계산함.
+      // Lv.30, STR/INT 10(투자 안 함)이면 Max HP 400, Max SP 150이 자동으로 뜸.
+      // maxPatternSlots/weightCapacity는 저장 안 함 — Sheet가 INT/DEX + 장비로 계산함.
+      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
+      inventory: [],
+      learnedSkillNames: ["공격", "치유"], // "공격"은 전 직업 공통 무료 스킬, "치유"는 사제 Lv.1 무료 시작 스킬
+      personalResources: {},
+      row: "front",
+      guardAllies: false,
+      presets: [
+        { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
+      ]
+    };
+
+    const roster = getRoster();
+    roster.push(exampleCharacter);
+    saveRoster(roster);
+
+    location.href = `character-sheet.html?id=${encodeURIComponent(id)}`;
+  });
+
+  // ============================================================================
+  // 🧪 무작위 용병 10명 생성 — Roster select(다음 단계)에서 "5명 이내 선택" 같은
+  // 흐름을 테스트해볼 수 있게 로스터를 채워주는 용도. 직업/이름만 무작위로
+  // 고르고, 나머지는 hire.html의 buildCharacter()와 동일한 형태로 만듦.
+  // ============================================================================
+  // hire.html의 JOB_META와 동일한 이유로 job-table의 실제 최하위 4개
+  // 직업(사제·전사·마법사·헌터)만 씀 — 예전 7개 중 5개는 job-table/skill-table
+  // 어디에도 없는 더미데이터였음(CLAUDE.md 참조).
+  const RANDOM_JOB_META = {
+    "사제":   { portrait:"✨", startSkill:"Healing" },
+    "전사":   { portrait:"🪓", startSkill:"Bash" },
+    "마법사": { portrait:"📖", startSkill:"Fire Ball" },
+    "헌터":   { portrait:"🏹", startSkill:"Shoot" },
+  };
+  const RANDOM_NAMES = ["아렌","벨라","카심","도린","엘윈","파이라","그레이스","할둔","이졸데","유리안","제피르","클라라","루안","미라벨","니코","세라핀","오윈","타린"];
+
+  function buildRandomCharacter(id) {
+    const jobs = Object.keys(RANDOM_JOB_META);
+    const job = jobs[Math.floor(Math.random() * jobs.length)];
+    const meta = RANDOM_JOB_META[job];
+    const name = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
+    return {
+      id, name, job,
+      level: 1, exp: 0, expToNext: window.ExpTable.expToNextForLevel(1),
+      portrait: meta.portrait,
+      realStats: { str:10, int:10, dex:10, spd:10, luk:10 },
+      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
+      inventory: [],
+      learnedSkillNames: ["공격", meta.startSkill],
+      personalResources: {},
+      row: "front",
+      guardAllies: false,
+      presets: [
+        { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
+      ]
+    };
+  }
+
+  document.getElementById("randomTenBtn").addEventListener("click", () => {
+    const roster = getRoster();
+    const username = getUsername();
+    const prefix = username + "_";
+    const usedSeq = roster
+      .map(c => c.id)
+      .filter(id => typeof id === "string" && id.startsWith(prefix))
+      .map(id => Number(id.slice(prefix.length)))
+      .filter(n => Number.isInteger(n));
+    let nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
+
+    for (let i = 0; i < 10; i++) {
+      roster.push(buildRandomCharacter(`${prefix}${nextSeq++}`));
+    }
+    saveRoster(roster);
+    alert("무작위 용병 10명을 로스터에 추가했어요. Home에서 확인해보세요!");
+    location.href = "roster-index.html";
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>제련공방 · Refinery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item { font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim); text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:28px 40px 18px; border-bottom:1px solid var(--line); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  .gold-badge { font-family:'JetBrains Mono',monospace; font-size:15px; color:var(--gold); font-weight:600; background:var(--panel); border:1px solid var(--gold-dim); border-radius:20px; padding:8px 16px; }
+  .mock-badge { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:12px; }
+
+  main { flex:1; padding:24px 40px 60px; max-width:820px; margin:0 auto; width:100%; }
+
+  .item-card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .item-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .item-icon { width:38px; height:38px; border-radius:8px; background:var(--panel-raised); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .item-name { font-family:'Cinzel',serif; font-size:14px; color:#f2efe8; }
+  .item-sub { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:2px; }
+  .item-spec { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-bottom:10px; }
+
+  .control-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .ctrl { display:flex; flex-direction:column; gap:4px; }
+  .ctrl label { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); }
+  .ctrl select {
+    font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:7px 10px;
+  }
+  .preview { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); flex:1; min-width:180px; }
+  .preview .cost { color:var(--gold); }
+  .try-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--ember); color:#1a1108; border:none;
+    border-radius:8px; padding:9px 18px; cursor:pointer; font-weight:600;
+  }
+  .try-btn:hover { opacity:0.9; }
+  .try-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+  .no-price { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); }
+
+  .empty-wrap { text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(10,9,14,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .modal-box { background:var(--panel); border:1px solid var(--line); border-radius:14px; max-width:440px; width:100%; }
+  .modal-head { padding:20px 22px 14px; border-bottom:1px solid var(--line); }
+  .modal-head h2 { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; margin:0; }
+  .modal-body { padding:16px 22px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.9; }
+  .modal-body .row { display:flex; justify-content:space-between; }
+  .modal-body .row .v { color:var(--gold); font-weight:600; }
+  .modal-body .row .v.danger { color:var(--danger); }
+  .modal-foot { padding:16px 22px 20px; border-top:1px solid var(--line); display:flex; gap:10px; }
+  .modal-btn { font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:11px 18px; border-radius:8px; cursor:pointer; flex:1; }
+  .modal-btn.cancel { background:transparent; border:1px solid var(--line); color:var(--mist-dim); }
+  .modal-btn.confirm { background:var(--ember); border:none; color:#1a1108; font-weight:600; }
+  .modal-btn.confirm:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Refinery</div>
+      <h1>제련공방</h1>
+    </div>
+    <div class="gold-badge" id="goldBadge">💰 0 G</div>
+  </div>
+  <div class="mock-badge">⚠ 미장착 장비만 강화 가능 · 실패 시 완전 파괴 · 각 개체마다 독립 시행</div>
+</header>
+
+<main id="mainArea"></main>
+<div id="modalWrap"></div>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임.
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+  function setGold(amount) { localStorage.setItem("battleSim_gold", String(amount)); }
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
+  function getShopTable() {
+    try { return JSON.parse(localStorage.getItem("battleSim_shopTable")) || []; }
+    catch { return []; }
+  }
+  function getMonsterRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
+    catch { return []; }
+  }
+
+  // ============================================================================
+  // 제련 공식 — 확정된 값 그대로.
+  //   성공확률: +1~6 확정, +7부터 50%×0.8^(N-7)
+  //   스탯배율: 1+0.004×N² (천장 없음, +10에서 정확히 1.4배)
+  //   +8 이상 추가효과: 3단계마다 증가폭 자체가 커지는 누적 statBonus
+  //     (+8~10: 매단계+1, +11~13: 매단계+2, +14~16: 매단계+3, ...)
+  //   비용: 상점 판매가의 1/10 × 실제 시행 횟수(계획한 목표치가 아니라 진짜
+  //     소모된 시도 수 기준 — 중간에 파괴돼서 멈추면 그만큼만 냄)
+  // ============================================================================
+  function successRate(level) {
+    if (level <= 6) return 1.0;
+    return 0.5 * Math.pow(0.8, level - 7);
+  }
+  function statMultiplier(level) {
+    return 1 + 0.004 * level * level;
+  }
+  function statBonusPerStat(level) {
+    if (level < 8) return 0;
+    let total = 0;
+    for (let n = 8; n <= level; n++) {
+      const tier = Math.floor((n - 8) / 3);
+      total += tier + 1;
+    }
+    return total;
+  }
+  function costPerAttempt(shopPrice) {
+    return Math.max(1, Math.round(shopPrice / 10));
+  }
+
+  // 아이템 1개를 (현재 등급+1)부터 목표 레벨까지 독립 시행 — 도중에 실패하면
+  // 그 자리에서 파괴(중단). fromLevel이 0보다 크면(이미 강화된 아이템의
+  // 재강화) 실패 시 지금까지 쌓아둔 등급까지 통째로 사라짐 — "실패하면
+  // 완전 파괴"라는 기존 원칙을 그대로 확장 적용함(2026-08-14, 재강화 허용과
+  // 함께 결정).
+  function attemptOne(fromLevel, targetLevel) {
+    let attempts = 0;
+    let reached = fromLevel;
+    for (let lvl = fromLevel + 1; lvl <= targetLevel; lvl++) {
+      attempts++;
+      if (Math.random() < successRate(lvl)) reached = lvl;
+      else break;
+    }
+    return { attempts, reached, survived: reached === targetLevel };
+  }
+
+  function computeEnhancedSpec(baseItem, level) {
+    const mult = statMultiplier(level);
+    const bonus = statBonusPerStat(level);
+    const enhanced = JSON.parse(JSON.stringify(baseItem));
+    delete enhanced.quantity; delete enhanced.heldBy;
+    enhanced.enhanceLevel = level;
+    if (enhanced.combatReal) Object.keys(enhanced.combatReal).forEach(k => { enhanced.combatReal[k] = Math.round((enhanced.combatReal[k]||0) * mult); });
+    if (enhanced.combatBonus) Object.keys(enhanced.combatBonus).forEach(k => { enhanced.combatBonus[k] = Math.round((enhanced.combatBonus[k]||0) * mult); });
+    if (bonus > 0) {
+      enhanced.statBonus = enhanced.statBonus || {};
+      ["str","int","dex","spd","luk"].forEach(k => { enhanced.statBonus[k] = (enhanced.statBonus[k]||0) + bonus; });
+    }
+    return enhanced;
+  }
+
+  // 강화 가능 여부·기준 가격을 상점 테이블 + 모든 몬스터의 드랍 테이블에서
+  // 찾음(2026-08-14 — 상점/드랍/창고 세 테이블이 name 기준으로 같은 스키마를
+  // 쓰도록 통일한 김에 같이 고침). 예전엔 상점 테이블에서만 name으로 찾아서,
+  // 드랍 전용 장비는 상점에 대응 항목이 없으니 무조건 "상점가 정보 없음 —
+  // 강화 불가"로 막혔음 — 강화 가능 여부가 "상점에서 파는가"에 우연히
+  // 종속돼 있었던 셈. 이제 enhanceable 필드로 강화 가능 여부를 직접
+  // 표시하고, price는 있으면 그 값을 쓰고 없으면(드랍 전용 장비의 기본
+  // 상태) 100골드로 정액 처리한다 — 나중에 드랍 테이블 쪽 항목에 price를
+  // 채워 넣으면 그 즉시 그 값으로 세밀 조정됨(개별 항목 하드코딩 불필요).
+  const FALLBACK_REFINE_PRICE = 100;
+  function findItemDef(name) {
+    const shopHit = getShopTable().find((it) => it.name === name);
+    if (shopHit) return shopHit;
+    for (const mon of getMonsterRoster()) {
+      const dropHit = (mon.dropTable || []).find((d) => d.name === name);
+      if (dropHit) return dropHit;
+    }
+    return null;
+  }
+  // 강화 불가(enhanceable !== true, 정의를 아예 못 찾은 경우 포함)면 null —
+  // 기존 findShopPrice()가 "상점에 없으면 null"이던 것과 같은 자리에서 쓰임.
+  function refineCostBasis(name) {
+    const def = findItemDef(name);
+    if (!def || !def.enhanceable) return null;
+    return def.price > 0 ? def.price : FALLBACK_REFINE_PRICE;
+  }
+
+  // 강화 배율(statMultiplier)은 항상 "원본(+0)" 수치 기준의 절대값이라, 이미
+  // 강화된 인스턴스의 현재 스탯을 base로 다시 곱하면 중첩 배율이 걸려버림.
+  // 그래서 재강화 시에도 매번 상점/드랍 테이블의 원본 정의에서 순수 +0
+  // 스탯을 새로 가져옴 — 인스턴스 자신의 combatReal은 절대 base로 안 씀.
+  // 정의를 못 찾으면(예: 나중에 테이블에서 삭제된 경우) 최후 수단으로 인스턴스
+  // 자신을 그대로 씀(부정확할 수 있지만 크래시보다는 나음).
+  function pristineSpecFor(name, instanceFallback) {
+    const def = findItemDef(name);
+    if (!def) return instanceFallback || { name, category: "equipment" };
+    const { chance, quantity, price, enhanceable, ...spec } = def;
+    return { ...spec, name, category: "equipment" };
+  }
+
+  const MAX_ENHANCE_LEVEL = 20;
+  function poolEquipmentBase() {
+    // 강화 대상 — 미장착(!heldBy) 장비 전부. 이미 강화된 것도 재강화
+    // 후보에 포함(2026-08-14 — 예전엔 !enhanceLevel로 걸러서 재강화가 아예
+    // 불가능했음). 이미 최고 레벨(20)이면 더 올릴 데가 없으니 제외.
+    return getWarehouse().filter((w) =>
+      w.category === "equipment" && !w.heldBy && (w.enhanceLevel || 0) < MAX_ENHANCE_LEVEL);
+  }
+
+  function render() {
+    document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    const el = document.getElementById("mainArea");
+    const items = poolEquipmentBase();
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty-wrap">창고에 강화할 수 있는 장비가 없어요(미장착 · 이미 최고 등급인 것 제외).</div>`;
+      return;
+    }
+    // 같은 이름이라도 등급(enhanceLevel)이 다르면 완전히 다른 강화 대상이라
+    // (예: +0 재고와 +3 재고가 동시에 있을 수 있음) name만으로는 카드/조회를
+    // 구분할 수 없음 — data-level까지 같이 키로 씀(2026-08-14, 재강화 허용
+    // 하면서 추가).
+    el.innerHTML = items.map((it, idx) => {
+      const curLevel = it.enhanceLevel || 0;
+      const price = refineCostBasis(it.name);
+      const maxQty = Math.min(it.quantity, 100);
+      const qtyOptions = Array.from({ length: maxQty }, (_, i) => i + 1);
+      const lvlOptions = Array.from({ length: MAX_ENHANCE_LEVEL - curLevel }, (_, i) => curLevel + 1 + i);
+      const defaultLvl = lvlOptions[Math.min(9, lvlOptions.length - 1)];
+      const levelBadge = curLevel > 0 ? ` <span style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:11px;">+${curLevel}</span>` : "";
+      return `
+        <div class="item-card" data-idx="${idx}" data-name="${it.name}" data-level="${curLevel}">
+          <div class="item-head">
+            <div class="item-icon">⚒️</div>
+            <div>
+              <div class="item-name">${it.name}${levelBadge} <span style="color:var(--mist-dim);font-family:'JetBrains Mono',monospace;font-size:11px;">×${it.quantity}</span></div>
+              <div class="item-sub">${price !== null ? `개당 시행 비용 ${costPerAttempt(price).toLocaleString()} G` : `강화 불가 아이템`}</div>
+            </div>
+          </div>
+          ${price === null ? `<div class="no-price">이 아이템은 강화할 수 없게 설정돼 있어요.</div>` : `
+          <div class="control-row">
+            <div class="ctrl">
+              <label>수량</label>
+              <select class="qty-select">${qtyOptions.map(q => `<option ${q===1?"selected":""}>${q}</option>`).join("")}</select>
+            </div>
+            <div class="ctrl">
+              <label>목표 강화수치</label>
+              <select class="lvl-select">${lvlOptions.map(l => `<option ${l===defaultLvl?"selected":""}>${l}</option>`).join("")}</select>
+            </div>
+            <div class="preview" data-preview></div>
+            <button class="try-btn">제련 시도</button>
+          </div>
+          `}
+        </div>
+      `;
+    }).join("");
+
+    bindEvents(el);
+  }
+
+  function updatePreview(card) {
+    const name = card.dataset.name;
+    const fromLevel = Number(card.dataset.level);
+    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel);
+    if (!it) return;
+    const price = refineCostBasis(name);
+    const qty = Number(card.querySelector(".qty-select").value);
+    const lvl = Number(card.querySelector(".lvl-select").value);
+    const perAttempt = costPerAttempt(price);
+    const attemptsNeeded = lvl - fromLevel;
+    const maxCost = perAttempt * qty * attemptsNeeded; // 전부 다 성공한다고 가정한 최대치(선지불 확인용)
+    let successChance = 1;
+    for (let l = fromLevel + 1; l <= lvl; l++) successChance *= successRate(l);
+    card.querySelector("[data-preview]").innerHTML =
+      `개당 성공확률 ${(successChance * 100).toFixed(3)}% · 최대 비용 <span class="cost">${maxCost.toLocaleString()} G</span>(실제로는 중간에 실패한 만큼 덜 나감)`;
+  }
+
+  function bindEvents(el) {
+    el.querySelectorAll(".item-card").forEach((card) => {
+      const qtySel = card.querySelector(".qty-select");
+      const lvlSel = card.querySelector(".lvl-select");
+      if (!qtySel) return; // 강화 불가 카드 — 컨트롤 자체가 없음
+      updatePreview(card);
+      qtySel.addEventListener("change", () => updatePreview(card));
+      lvlSel.addEventListener("change", () => updatePreview(card));
+      card.querySelector(".try-btn").addEventListener("click", () =>
+        openConfirm(card.dataset.name, Number(card.dataset.level), Number(qtySel.value), Number(lvlSel.value)));
+    });
+  }
+
+  function openConfirm(name, fromLevel, qty, targetLevel) {
+    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel);
+    if (!it || it.quantity < qty) { alert("수량이 부족해요(창고 상태가 바뀌었을 수 있어요) — 새로고침 후 다시 시도해주세요."); render(); return; }
+    const price = refineCostBasis(name);
+    const perAttempt = costPerAttempt(price);
+    const attemptsNeeded = targetLevel - fromLevel;
+    const maxCost = perAttempt * qty * attemptsNeeded;
+    const insufficient = maxCost > getGold();
+
+    const wrap = document.getElementById("modalWrap");
+    wrap.innerHTML = `
+      <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+          <div class="modal-head"><h2>제련 확인</h2></div>
+          <div class="modal-body">
+            <div class="row"><span>대상</span><span class="v">${name}${fromLevel > 0 ? ` (현재 +${fromLevel})` : ""} ×${qty}</span></div>
+            <div class="row"><span>목표</span><span class="v">+${targetLevel}</span></div>
+            <div class="row"><span>선차감(최대치 기준)</span><span class="v">${maxCost.toLocaleString()} G</span></div>
+            <div class="row"><span>실패 시</span><span class="v danger">해당 개체 완전 파괴${fromLevel > 0 ? `(현재 +${fromLevel} 포함)` : ""}</span></div>
+          </div>
+          <div class="modal-foot">
+            <button class="modal-btn cancel" id="cancelBtn">취소</button>
+            <button class="modal-btn confirm" id="confirmBtn" ${insufficient ? "disabled" : ""}>${insufficient ? "소지금 부족" : "제련 시작"}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById("cancelBtn").addEventListener("click", () => { wrap.innerHTML = ""; });
+    document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") wrap.innerHTML = ""; });
+    const confirmBtn = document.getElementById("confirmBtn");
+    if (confirmBtn) confirmBtn.addEventListener("click", () => runEnhancement(name, fromLevel, qty, targetLevel, perAttempt));
+  }
+
+  function runEnhancement(name, fromLevel, qty, targetLevel, perAttempt) {
+    let totalAttempts = 0;
+    let survivedCount = 0;
+    for (let i = 0; i < qty; i++) {
+      const r = attemptOne(fromLevel, targetLevel);
+      totalAttempts += r.attempts;
+      if (r.survived) survivedCount++;
+    }
+    const totalCost = totalAttempts * perAttempt;
+    setGold(getGold() - totalCost);
+
+    const warehouse = getWarehouse();
+    // 시도한 수량만큼 "지금 이 등급"의 풀에서 뺌(이름만이 아니라 등급까지
+    // 일치해야 함 — 같은 이름이라도 다른 등급 스택과 섞이면 안 됨).
+    const baseIdx = warehouse.findIndex((w) =>
+      w.name === name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel || 0) === fromLevel);
+    if (baseIdx !== -1) {
+      warehouse[baseIdx].quantity -= qty;
+      if (warehouse[baseIdx].quantity <= 0) warehouse.splice(baseIdx, 1);
+    }
+    // 살아남은 만큼 목표 레벨 풀에 추가(이미 같은 레벨의 풀이 있으면 병합).
+    // 배율은 항상 원본(+0) 정의 기준으로 다시 계산함(pristineSpecFor).
+    if (survivedCount > 0) {
+      const pristine = pristineSpecFor(name, baseIdx !== -1 ? warehouse[baseIdx] : null);
+      const enhancedSpec = computeEnhancedSpec(pristine, targetLevel);
+      const existing = warehouse.find((w) => w.name === name && w.category === "equipment" && !w.heldBy && w.enhanceLevel === targetLevel);
+      if (existing) existing.quantity += survivedCount;
+      else warehouse.push({ ...enhancedSpec, quantity: survivedCount });
+    }
+    saveWarehouse(warehouse);
+
+    document.getElementById("modalWrap").innerHTML = `
+      <div class="modal-overlay" id="modalOverlay2">
+        <div class="modal-box">
+          <div class="modal-head"><h2>제련 결과</h2></div>
+          <div class="modal-body">
+            <div class="row"><span>시도</span><span class="v">${qty}개</span></div>
+            <div class="row"><span>+${targetLevel} 도달</span><span class="v">${survivedCount}개</span></div>
+            <div class="row"><span>파괴됨</span><span class="v danger">${qty - survivedCount}개</span></div>
+            <div class="row"><span>실제 지출</span><span class="v">${totalCost.toLocaleString()} G</span></div>
+            <div class="row"><span>총 시행 횟수</span><span class="v">${totalAttempts}회</span></div>
+          </div>
+          <div class="modal-foot"><button class="modal-btn confirm" id="closeResultBtn">확인</button></div>
+        </div>
+      </div>
+    `;
+    document.getElementById("closeResultBtn").addEventListener("click", () => {
+      document.getElementById("modalWrap").innerHTML = "";
+      render();
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>

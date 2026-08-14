@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>용병 선택 · Roster Select</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:28px 40px 18px; border-bottom:1px solid var(--line); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:620px; line-height:1.6; margin-top:8px; }
+  .battle-context {
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold);
+    border:1px solid var(--gold-dim); border-radius:20px; padding:6px 14px; white-space:nowrap;
+  }
+  .nav-link {
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none;
+    border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
+  }
+  .nav-link:hover { border-color:var(--gold); color:var(--gold); }
+
+  main { flex:1; padding:24px 40px 20px; max-width:1000px; margin:0 auto; width:100%; }
+
+  .monster-preview-wrap { max-width:1000px; margin:0 auto; padding:4px 40px 140px; }
+  .monster-preview-title {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:var(--mist-dim);
+    text-transform:uppercase; margin-bottom:10px;
+  }
+  .monster-chip-row { display:flex; gap:10px; flex-wrap:wrap; }
+  .monster-chip {
+    display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px;
+    background:var(--panel); border:1px solid var(--line);
+  }
+  .monster-chip.rare { border-color:var(--gold-dim); background:#d9b45c14; }
+  .monster-chip .m-icon { font-size:18px; }
+  .monster-chip .m-name { font-family:'Cinzel',serif; font-size:12.5px; color:#f2efe8; }
+  .monster-chip .m-rare-tag { color:var(--gold); font-family:'JetBrains Mono',monospace; font-size:10px; }
+  .monster-chip .m-prob { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:14px; }
+
+  .pick-card {
+    position:relative; border-radius:12px; padding:16px 14px; background:var(--panel); border:2px solid var(--line);
+    cursor:pointer; transition:border-color 0.12s ease, transform 0.1s ease; display:flex; flex-direction:column; gap:8px;
+  }
+  .pick-card:hover { transform:translateY(-2px); }
+  .pick-card.selected { border-color:var(--gold); background:#d9b45c14; }
+  .pick-card .p-portrait {
+    width:52px; height:52px; border-radius:50%; background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .pick-card .p-name { font-family:'Cinzel',serif; font-size:14.5px; color:#f2efe8; }
+  .pick-card .p-meta { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+  .pick-card .p-check {
+    position:absolute; top:10px; right:10px; width:20px; height:20px; border-radius:50%;
+    border:1px solid var(--line); background:var(--panel-raised); display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:transparent;
+  }
+  .pick-card.selected .p-check { background:var(--gold); border-color:var(--gold); color:var(--ink); }
+
+  .empty-wrap {
+    text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px;
+  }
+  .empty-wrap a { color:var(--gold); }
+
+  /* 하단 고정 바 */
+  .selection-bar {
+    position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line);
+    padding:16px 40px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  }
+  .selection-count { font-family:'JetBrains Mono',monospace; font-size:13px; color:#f2efe8; }
+  .selection-count b { color:var(--gold); }
+  .selection-warning {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--danger);
+    display:flex; align-items:center; gap:6px;
+  }
+  .enter-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.05em; padding:11px 26px; border-radius:8px;
+    border:none; background:var(--gold); color:var(--ink); font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .practice-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--panel);
+    color:var(--mist); border:1px solid var(--line); border-radius:8px; padding:11px 20px;
+    cursor:pointer; margin-right:8px;
+  }
+  .practice-btn:hover:not(:disabled) { border-color:var(--cyan); color:var(--cyan); }
+  .practice-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .enter-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Roster Select</div>
+      <h1>용병 선택</h1>
+      <div class="desc">전투에 데려갈 용병을 최소 1명, 최대 5명까지 골라주세요.</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+      <span class="battle-context" id="battleContext"></span>
+      <a class="nav-link" href="battle-select.html">← 전투 선택으로</a>
+    </div>
+  </div>
+</header>
+
+<main id="mainArea"></main>
+
+<div id="monsterPreviewArea"></div>
+
+<script>
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+
+  const BATTLE_NAMES = {
+    "goblin-play": "고블린과 놀기",
+    "slightly-strong-goblin": "조금 강한 고블린",
+    "goblin-warriors": "고블린 전사들",
+    "noble-goblins": "고귀한 고블린들",
+    "goblin-fortress": "고블린 성채",
+    "goblin-king": "고블린의 왕",
+    "gate-ambush": "섭정과의 조우",
+  };
+
+  // ============================================================================
+  // battle-view.html의 MONSTER_TABLE/BATTLE_MONSTER_POOLS와 같은 데이터(중복 관리
+  // 지점). 여기서는 "등장 가능한 몬스터 목록"만 미리 보여주면 되니 이름/초상화만
+  // 있으면 충분해서 경량화함(스탯·패턴·드랍테이블은 battle-view.html에만 있음).
+  // ============================================================================
+  const MONSTER_PREVIEW = {
+    goblin_scout: { name: "고블린 척후병", portrait: "👺" },
+    goblin_warrior: { name: "고블린 전사", portrait: "👹" },
+    goblin_shaman: { name: "고블린 주술사", portrait: "🧙" },
+    goblin_noble: { name: "고귀한 고블린", portrait: "🎩" },
+    goblin_elite_guard: { name: "성채 수문장", portrait: "🛡️" },
+    goblin_king: { name: "고블린의 왕", portrait: "👑" },
+    goblin_cart: { name: "고블린 마차", portrait: "🛒" },
+    goblin_regent: { name: "섭정", portrait: "🧑‍⚖️" },
+  };
+
+  const BATTLE_MONSTER_POOLS = {
+    "goblin-play": { maxCount: 2, pool: [
+      { monsterId: "goblin_scout", weight: 80, maxAppearances: 2 },
+      { monsterId: "goblin_warrior", weight: 20, maxAppearances: 1 },
+    ]},
+    "slightly-strong-goblin": { maxCount: 2, pool: [
+      { monsterId: "goblin_scout", weight: 40, maxAppearances: 1 },
+      { monsterId: "goblin_warrior", weight: 60, maxAppearances: 2 },
+    ]},
+    "goblin-warriors": { maxCount: 3, pool: [
+      { monsterId: "goblin_warrior", weight: 60, maxAppearances: 3 },
+      { monsterId: "goblin_shaman", weight: 40, maxAppearances: 1 },
+    ]},
+    "noble-goblins": { maxCount: 3, pool: [
+      { monsterId: "goblin_noble", weight: 60, maxAppearances: 2 },
+      { monsterId: "goblin_shaman", weight: 40, maxAppearances: 1 },
+    ]},
+    "goblin-fortress": { maxCount: 3, pool: [
+      { monsterId: "goblin_elite_guard", weight: 65, maxAppearances: 2 },
+      { monsterId: "goblin_shaman", weight: 35, maxAppearances: 1 },
+    ]},
+    "goblin-king": { maxCount: 3, pool: [
+      { monsterId: "goblin_king", weight: 0, maxAppearances: 1, guaranteed: true },
+      { monsterId: "goblin_elite_guard", weight: 50, maxAppearances: 1 },
+      { monsterId: "goblin_shaman", weight: 50, maxAppearances: 1 },
+    ]},
+    "gate-ambush": { maxCount: 1, pool: [
+      { monsterId: "goblin_cart", weight: 5, maxAppearances: 1 },
+      { monsterId: "goblin_elite_guard", weight: 47.5, maxAppearances: 1 },
+      { monsterId: "goblin_regent", weight: 47.5, maxAppearances: 1 },
+    ]},
+  };
+
+  const RARE_THRESHOLD = 0.10; // battle-view.html과 동일 기준
+
+  function computePoolProbabilities(config) {
+    if (!config) return [];
+    const rollable = config.pool.filter((p) => !p.guaranteed);
+    const totalWeight = rollable.reduce((sum, p) => sum + p.weight, 0);
+    return config.pool.map((p) => {
+      const probability = p.guaranteed ? 1 : (totalWeight ? p.weight / totalWeight : 0);
+      return { ...p, probability, isRare: !p.guaranteed && probability < RARE_THRESHOLD };
+    });
+  }
+
+  const params = new URLSearchParams(location.search);
+  const themeId = params.get("theme") || "";
+
+  // 특수의뢰(Aftermath) 구획 테마 목록 — battle-select.html의 section:"aftermath"와
+  // 반드시 같아야 함. 이 구획은 "한 번 한 번의 기회가 신중해야 한다"는 설계라
+  // 연습 모드를 제공하지 않음(입장 조건도 소모재/쿨다운으로 무겁게 잡혀 있음).
+  const AFTERMATH_THEMES = ["goblinAftermath"];
+  const isAftermath = AFTERMATH_THEMES.includes(themeId);
+  const battleId = params.get("battle") || "";
+  const battleName = BATTLE_NAMES[battleId] || "이름 없는 전투";
+
+  const MAX_PARTY = 5;
+  const selected = new Set();
+
+  function renderContext() {
+    document.getElementById("battleContext").textContent = `⚔️ ${battleName}`;
+  }
+
+  function renderMain() {
+    const roster = getRoster();
+    const main = document.getElementById("mainArea");
+
+    if (!roster.length) {
+      main.innerHTML = `
+        <div class="empty-wrap">
+          보유한 용병이 없습니다.<br />
+          <a href="village.html">마을에서 용병을 고용하세요 →</a>
+        </div>
+      `;
+      return;
+    }
+
+    main.innerHTML = `
+      <div class="grid" id="grid">
+        ${roster.map((c) => `
+          <div class="pick-card ${selected.has(c.id) ? "selected" : ""}" data-id="${c.id}">
+            <div class="p-check">✓</div>
+            <div class="p-portrait">${c.portrait || "❓"}</div>
+            <div class="p-name">${c.name}</div>
+            <div class="p-meta">Lv.${c.level} · ${c.job} · ${c.row === "back" ? "후열" : "전열"}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="selection-bar">
+        <div>
+          <div class="selection-count">선택 <b id="countNum">0</b> / ${MAX_PARTY}</div>
+          <div class="selection-warning" id="warningText"></div>
+        </div>
+        ${isAftermath ? "" : `<button class="practice-btn" id="practiceBtn" disabled title="보상 없이 결과만 확인해요. 쿨다운도 소모되지 않아요.">🧪 연습하기</button>`}
+        <button class="enter-btn" id="enterBtn" disabled>전투 참가 →</button>
+      </div>
+    `;
+
+    main.querySelectorAll(".pick-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const id = card.dataset.id;
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        renderMain(); // 선택 상태 반영해서 다시 그림(간단하게 통짜 리렌더)
+      });
+    });
+
+    updateSelectionBar();
+  }
+
+  function updateSelectionBar() {
+    const countEl = document.getElementById("countNum");
+    const warnEl = document.getElementById("warningText");
+    const enterBtn = document.getElementById("enterBtn");
+    if (!countEl) return;
+
+    const count = selected.size;
+    countEl.textContent = count;
+
+    let warning = "";
+    if (count === 0) warning = "⚠ 최소 1명은 선택해야 전투에 참가할 수 있어요.";
+    else if (count > MAX_PARTY) warning = `⚠ 최대 ${MAX_PARTY}명까지만 참전할 수 있어요. ${count - MAX_PARTY}명을 빼주세요.`;
+
+    warnEl.textContent = warning;
+    const invalidParty = count === 0 || count > MAX_PARTY;
+    enterBtn.disabled = invalidParty;
+    const practiceBtn = document.getElementById("practiceBtn");
+    if (practiceBtn) practiceBtn.disabled = invalidParty;
+  }
+
+  document.addEventListener("click", (e) => {
+    const isEnter = e.target.id === "enterBtn";
+    const isPractice = e.target.id === "practiceBtn";
+    if ((isEnter || isPractice) && !e.target.disabled) {
+      const party = [...selected].join(",");
+      const q = new URLSearchParams({ theme: themeId, battle: battleId, party });
+      // 연습 모드 — 보상도 클리어 기록도 남기지 않고 결과만 봄. 쿨다운도
+      // 소모하지 않아서 빌드를 마음껏 시험할 수 있음(패턴 퍼즐 게임이라
+      // 시행착오 자체는 자유로워야 한다는 원칙).
+      // Aftermath 구획은 연습을 허용하지 않음 — 버튼도 안 그리지만,
+      // URL을 직접 만져 practice=1을 붙이는 경우까지 여기서 막음.
+      if (isPractice && !isAftermath) q.set("practice", "1");
+      location.href = `battle-view.html?${q.toString()}`;
+    }
+  });
+
+  function renderMonsterPreview() {
+    const el = document.getElementById("monsterPreviewArea");
+    const config = BATTLE_MONSTER_POOLS[battleId];
+    if (!config) { el.innerHTML = ""; return; }
+
+    const entries = computePoolProbabilities(config);
+    el.innerHTML = `
+      <div class="monster-preview-wrap">
+        <div class="monster-preview-title">⚔️ 등장 가능한 몬스터 (최대 ${config.maxCount}체)</div>
+        <div class="monster-chip-row">
+          ${entries.map((e) => {
+            const monster = MONSTER_PREVIEW[e.monsterId];
+            const probLabel = e.guaranteed ? "확정 등장" : `${(e.probability * 100).toFixed(1)}%`;
+            return `
+              <div class="monster-chip ${e.isRare ? "rare" : ""}">
+                <span class="m-icon">${monster.portrait}</span>
+                <span class="m-name">${e.isRare ? `<span class="m-rare-tag">[Rare]</span> ` : ""}${monster.name}</span>
+                <span class="m-prob">${probLabel}</span>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  renderContext();
+  renderMonsterPreview();
+  renderMain();
+</script>
+
+</body>
+</html>

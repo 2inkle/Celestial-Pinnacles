@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>모험가 길드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { max-width:1100px; width:100%; margin:0 auto; padding:26px 20px 0; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+
+  main { max-width:1100px; width:100%; margin:0 auto; padding:22px 20px 60px; flex:1; }
+
+  .greeting { display:flex; gap:16px; align-items:flex-start; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:18px; }
+  .greeting-icon { font-size:34px; line-height:1; }
+  .greeting-text { font-size:14px; line-height:1.75; color:var(--mist); }
+  .greeting-text b { color:var(--gold); }
+
+  .block { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .section-title { font-family:'Cinzel',serif; font-size:16px; color:#f2efe8; margin:0 0 14px; }
+
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .stat-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .stat-label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:var(--mist-dim); text-transform:uppercase; }
+  .stat-value { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:#f2efe8; margin-top:6px; }
+  .stat-value.gold { color:var(--gold); }
+  .stat-value.cyan { color:var(--cyan); }
+  .stat-value.warn { color:var(--ember); }
+  .stat-sub { font-size:11.5px; color:var(--mist-dim); margin-top:5px; line-height:1.5; }
+
+  .bar { height:8px; background:var(--panel-raised); border:1px solid var(--line); border-radius:5px; overflow:hidden; margin-top:14px; }
+  .bar > i { display:block; height:100%; background:var(--gold); }
+  .bar.full > i { background:var(--ember); }
+
+  .claim-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:18px; flex-wrap:wrap; }
+  .claim-note { font-size:12.5px; color:var(--mist-dim); line-height:1.6; flex:1; min-width:220px; }
+  button.claim { font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--gold); border:1px solid var(--gold-dim); border-radius:8px; padding:12px 26px; cursor:pointer; white-space:nowrap; }
+  button.claim:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+  button.claim:disabled { opacity:0.35; cursor:not-allowed; color:var(--mist-dim); border-color:var(--line); }
+
+  .rule { font-size:12px; color:var(--mist-dim); line-height:1.8; }
+  .rule b { color:var(--mist); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+
+<header>
+  <div class="eyebrow">Adventurer's Guild</div>
+  <h1>모험가 길드</h1>
+  <div style="font-size:13px; color:var(--mist-dim); line-height:1.7; margin-top:8px;">
+    장기 파견 의뢰를 수주할 수 있는 의뢰권을 발행해 드리고 있습니다.<br />
+    한 장이면 용병단이 현지에서 여러 차례 전투를 치르고 돌아옵니다.
+  </div>
+</header>
+
+<main>
+  <div class="greeting">
+    <div class="greeting-icon">🧝‍♀️</div>
+    <div class="greeting-text" id="greeting"></div>
+  </div>
+
+  <div class="block">
+    <h2 class="section-title">파견 의뢰 수주 현황</h2>
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="bar" id="capBar"><i style="width:0%"></i></div>
+    <div class="claim-row">
+      <div class="claim-note" id="claimNote"></div>
+      <button class="claim" id="claimBtn" disabled>수주하기</button>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2 class="section-title">수주 규정</h2>
+    <div class="rule">
+      · 파견 의뢰권은 <b>30분마다 1장</b>씩 발행됩니다.<br />
+      · 길드가 대신 맡아둘 수 있는 양은 <b>하루치(48장)</b>까지예요. 그 이상은 쌓이지 않으니 하루에 한 번은 들러 주세요.<br />
+      · <b>수주해 가신 의뢰권은 얼마든지 모아두실 수 있습니다.</b> 바쁘신 날에는 받아만 두셔도 괜찮아요.<br />
+      · 의뢰권 한 장으로 <b>2,000턴</b> 분량의 장기 파견을 지시할 수 있습니다. 한 번의 파견에서 전투가 여러 차례 반복되며, 보상은 축약해서 정산돼요 — 경험치·골드는 1/8, 전리품은 1/100입니다. 희귀한 물건은 직접 다녀오시는 편이 확실해요.<br />
+      · 수주 시각은 30분 단위로 절삭되며, 남은 시간은 다음 수주에 이어집니다.
+    </div>
+  </div>
+</main>
+
+<script>
+// ============================================================================
+// 모험가 길드 — 파견 의뢰권 발행/수주
+//
+// 설계 의도:
+//   흔한 "행동력" 방식(자동 충전 + 상한 도달 시 초과분 소멸)은 상한을 넘긴
+//   동안의 시간이 통째로 손해로 느껴져서, 정해진 시각에 접속하라는 압박이 됨.
+//   그래서 여기서는 "길드가 맡아두는 양에만 상한(하루치)"을 두고, 수주해 간
+//   의뢰권 자체는 무제한으로 쌓이게 함 — 접속만 하면 손해가 없고, 전투를
+//   당장 하지 않아도 되는 구조.
+//
+// 시간 처리:
+//   lastClaimAt(마지막 수주 시각)부터 지금까지 경과분을 30분 단위로 절삭해
+//   장수를 계산하고, 절삭하고 남은 시간은 버리지 않고 lastClaimAt에 더해서
+//   다음 수주로 이월함(예: 1시간 20분 → 2장 수주, 20분은 그대로 남음).
+// ============================================================================
+(function () {
+  const ISSUE_INTERVAL_MIN = 30;                       // 30분마다 1장
+  const MAX_HELD_BY_GUILD = 48;                        // 길드 보관 상한(하루치)
+  const TICKET_NAME = "파견 의뢰권";
+  const TURN_BUDGET = 2000;                            // 1장당 턴 예산
+
+  const $ = (s) => document.querySelector(s);
+  const now = () => Date.now();
+  const intervalMs = ISSUE_INTERVAL_MIN * 60 * 1000;
+
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
+
+  // 마지막 수주 시각. 기록이 없으면(최초 방문) 지금으로 잡아서, 계정을 만들자마자
+  // 하루치를 몰아 받는 일이 없게 함.
+  function getLastClaimAt() {
+    const raw = localStorage.getItem("battleSim_lastTicketClaimAt");
+    if (raw) return Number(raw);
+    const t = now();
+    localStorage.setItem("battleSim_lastTicketClaimAt", String(t));
+    return t;
+  }
+  function setLastClaimAt(t) { localStorage.setItem("battleSim_lastTicketClaimAt", String(t)); }
+
+  function heldTickets() {
+    const e = getWarehouse().find((w) => w.name === TICKET_NAME);
+    return e ? e.quantity : 0;
+  }
+
+  // 지금 수주 가능한 장수 — 경과 시간을 30분으로 나눈 몫, 길드 보관 상한에서 컷.
+  function pendingInfo() {
+    const last = getLastClaimAt();
+    const elapsed = Math.max(0, now() - last);
+    const rawCount = Math.floor(elapsed / intervalMs);
+    const count = Math.min(rawCount, MAX_HELD_BY_GUILD);
+    const capped = rawCount > MAX_HELD_BY_GUILD;      // 상한에 걸려 버려지는 중인지
+    const msToNext = count >= MAX_HELD_BY_GUILD ? 0 : intervalMs - (elapsed % intervalMs);
+    const msToCap = Math.max(0, last + MAX_HELD_BY_GUILD * intervalMs - now());
+    return { count, capped, msToNext, msToCap, elapsed };
+  }
+
+  function fmtDuration(ms) {
+    if (ms <= 0) return "지금";
+    const total = Math.ceil(ms / 60000);
+    const h = Math.floor(total / 60), m = total % 60;
+    if (h >= 24) { const d = Math.floor(h / 24); return `${d}일 ${h % 24}시간 뒤`; }
+    return h > 0 ? `${h}시간 ${m}분 뒤` : `${m}분 뒤`;
+  }
+
+  function greetingText(info) {
+    const held = heldTickets();
+    if (info.capped) {
+      return `어서 오세요! 맡아둘 수 있는 양이 <b>가득 찼어요</b>. 더는 맡아드릴 수 없으니 얼른 받아 가세요.`;
+    }
+    if (info.count > 0) {
+      return `어서 오세요! 맡아둔 의뢰권이 <b>${info.count}장</b> 있습니다. 받아 가시겠어요?` +
+             (held > 0 ? ` 지금 가지고 계신 건 ${held}장이네요.` : "");
+    }
+    return `어서 오세요! 아직 새로 발행된 의뢰권은 없어요. <b>${fmtDuration(info.msToNext)}</b> 다시 들러 주세요.` +
+           (held > 0 ? ` 가지고 계신 ${held}장은 언제 쓰셔도 괜찮습니다.` : "");
+  }
+
+  function render() {
+    const info = pendingInfo();
+    $("#greeting").innerHTML = greetingText(info);
+
+    $("#statGrid").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">수주 가능</div>
+        <div class="stat-value ${info.count > 0 ? "gold" : ""}">${info.count}<span style="font-size:13px; color:var(--mist-dim);"> / ${MAX_HELD_BY_GUILD}</span></div>
+        <div class="stat-sub">길드가 맡아둔 의뢰권</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">보유 중</div>
+        <div class="stat-value cyan">${heldTickets()}</div>
+        <div class="stat-sub">받아 가신 의뢰권 (상한 없음)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">다음 발행</div>
+        <div class="stat-value" style="font-size:17px;">${info.count >= MAX_HELD_BY_GUILD ? "보관 한도" : fmtDuration(info.msToNext)}</div>
+        <div class="stat-sub">${ISSUE_INTERVAL_MIN}분마다 1장씩</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">보관 한도 도달</div>
+        <div class="stat-value ${info.capped ? "warn" : ""}" style="font-size:17px;">${info.capped ? "이미 초과" : fmtDuration(info.msToCap)}</div>
+        <div class="stat-sub">${info.capped ? "더는 맡아둘 수 없는 상태" : "이때까진 안 오셔도 손해가 없어요"}</div>
+      </div>`;
+
+    const ratio = Math.min(1, info.count / MAX_HELD_BY_GUILD);
+    const bar = $("#capBar");
+    bar.classList.toggle("full", info.capped);
+    bar.querySelector("i").style.width = `${ratio * 100}%`;
+
+    $("#claimNote").innerHTML = info.count > 0
+      ? `<b style="color:var(--gold);">${info.count}장</b>을 수주합니다. (총 ${(info.count * TURN_BUDGET).toLocaleString()}턴 분량)`
+      : info.capped ? "" : "아직 받아 갈 의뢰권이 없어요.";
+
+    const btn = $("#claimBtn");
+    btn.disabled = info.count <= 0;
+    btn.textContent = info.count > 0 ? `${info.count}장 수주하기` : "수주하기";
+  }
+
+  $("#claimBtn").addEventListener("click", () => {
+    const info = pendingInfo();
+    if (info.count <= 0) return;
+
+    const warehouse = getWarehouse();
+    const entry = warehouse.find((w) => w.name === TICKET_NAME);
+    if (entry) entry.quantity += info.count;
+    else warehouse.push({ name: TICKET_NAME, category: "consumable", quantity: info.count });
+    saveWarehouse(warehouse);
+
+    // 30분 단위로 절삭하고 남은 시간은 버리지 않고 이월. 상한에 걸려 잘린
+    // 경우에는 "지금"부터 다시 세기 시작함(넘친 만큼은 이미 흘러간 것).
+    const last = getLastClaimAt();
+    const consumed = info.count * intervalMs;
+    setLastClaimAt(info.capped ? now() : last + consumed);
+
+    render();
+  });
+
+  render();
+  setInterval(render, 30 * 1000); // 남은 시간 표시를 주기적으로 갱신
+})();
+</script>
+</body>
+</html>

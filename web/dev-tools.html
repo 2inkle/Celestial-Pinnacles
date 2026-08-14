@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>개발자 도구 · Dev Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:32px 40px 22px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:600px; line-height:1.6; margin-top:10px; }
+
+  main { flex:1; padding:24px 40px 48px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:16px; max-width:900px; }
+  a.tool-card { text-decoration:none; color:inherit; }
+  .tool-card {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px; display:flex; flex-direction:column; gap:8px;
+    transition:border-color 0.15s ease, transform 0.1s ease;
+  }
+  .tool-card:hover { border-color:var(--gold); transform:translateY(-2px); }
+  .tool-icon { font-size:26px; }
+  .tool-name { font-family:'Cinzel',serif; font-size:15px; color:#f2efe8; }
+  .tool-desc { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); line-height:1.6; }
+
+  .tool-card.soon { opacity:0.45; cursor:default; }
+  .soon-badge { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--mist-dim); border:1px dashed var(--line); border-radius:10px; padding:2px 8px; width:fit-content; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <div class="eyebrow">Developer Tools</div>
+  <h1>개발자 도구</h1>
+  <div class="desc">각 테이블(몬스터/아이템/스킬 등)을 기존 UI로 직접 확인·추가하는 도구 모음. 오타나 잘못된 값 검증을 UI가 대신 해주므로, 테이블에 직접 쓰는 것보다 안전함.</div>
+</header>
+
+<main>
+  <div class="grid">
+    <a class="tool-card" href="monster-roster.html">
+      <div class="tool-icon">👹</div>
+      <div class="tool-name">몬스터 로스터</div>
+      <div class="tool-desc">몬스터 스탯/전투스탯/보상/드랍테이블/패턴을 캐릭터 시트와 동일한 UI로 직접 제작. battle-view.html의 MONSTER_TABLE이 여기서 읽어옴.</div>
+    </a>
+    <a class="tool-card" href="shop-table-editor.html">
+      <div class="tool-icon">🛒</div>
+      <div class="tool-name">상점 테이블</div>
+      <div class="tool-desc">상점 아이템을 UI로 직접 추가/수정.</div>
+    </a>
+    <a class="tool-card" href="skill-table-editor.html">
+      <div class="tool-icon">📜</div>
+      <div class="tool-name">스킬 테이블</div>
+      <div class="tool-desc">공통 스킬/직업별 스킬을 UI로 직접 추가/수정.</div>
+    </a>
+    <a class="tool-card" href="job-table-editor.html">
+      <div class="tool-icon">🎓</div>
+      <div class="tool-name">직업 테이블</div>
+      <div class="tool-desc">승급 트리(전직 조건)와 직업별 착용 가능 장비 타입을 UI로 직접 추가/수정.</div>
+    </a>
+    <a class="tool-card" href="feature-requests.html">
+      <div class="tool-icon">📝</div>
+      <div class="tool-name">요청 목록</div>
+      <div class="tool-desc">원하는 기능/조건/조정사항을 적어두고 다운로드해서 대화에 올리는 용도.</div>
+    </a>
+  </div>
+</main>
+
+<script>
+  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
+  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
+    document.body.innerHTML = `
+      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+      </div>
+    `;
+    throw new Error("access-denied");
+  }
+</script>
+</body>
+</html>

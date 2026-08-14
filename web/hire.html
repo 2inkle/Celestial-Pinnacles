@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>고용소 · Hiring Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:32px 40px 22px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:560px; line-height:1.6; margin-top:10px; }
+
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .header-actions { display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .gold-display { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .back-link {
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em; color:var(--mist-dim);
+    text-decoration:none; border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
+  }
+  .back-link:hover { border-color:var(--gold); color:var(--gold); }
+
+  main { flex:1; padding:32px 40px 48px; display:flex; justify-content:center; }
+  .hire-card {
+    width:100%; max-width:440px; background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:26px 26px 22px; display:flex; flex-direction:column; gap:16px; height:fit-content;
+  }
+  .hire-card .h-title { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; }
+  .hire-card .h-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); line-height:1.6; margin-top:-8px; }
+
+  label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.06em; color:var(--mist-dim); text-transform:uppercase; display:block; margin-bottom:6px; }
+  .field { display:flex; flex-direction:column; }
+  input[type=text], select {
+    font-family:'Inter',sans-serif; font-size:13.5px; background:var(--panel-raised); color:#f2efe8;
+    border:1px solid var(--line); border-radius:7px; padding:10px 12px; width:100%;
+  }
+  select { font-family:'JetBrains Mono',monospace; font-size:12.5px; }
+  input[type=text]:focus, select:focus { outline:none; border-color:var(--gold); }
+  input[type=text]::placeholder { color:var(--mist-dim); }
+
+  .preview-box {
+    border:1px dashed var(--line); border-radius:8px; padding:14px 14px 12px; display:flex; flex-direction:column; gap:10px;
+  }
+  .preview-head { display:flex; align-items:center; gap:10px; }
+  .preview-thumb {
+    width:40px; height:40px; border-radius:8px; background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .preview-name { font-family:'Cinzel',serif; font-size:13.5px; color:#f2efe8; }
+  .preview-job { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+  .stat-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; }
+  .stat-cell { text-align:center; font-family:'JetBrains Mono',monospace; }
+  .stat-cell .s-key { font-size:9px; color:var(--mist-dim); letter-spacing:0.04em; }
+  .stat-cell .s-val { font-size:12px; color:var(--mist); margin-top:2px; }
+  .res-row { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); }
+  .res-row span:last-child { color:var(--mist); }
+  .preview-note { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); line-height:1.6; }
+
+  .hire-row { display:flex; align-items:center; justify-content:space-between; padding-top:4px; border-top:1px solid var(--line); padding-top:14px; }
+  .cost { font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--gold); }
+  .hire-btn {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; text-transform:uppercase;
+    background:var(--ember); color:#1a1108; border:none; padding:10px 18px; border-radius:6px; cursor:pointer;
+  }
+  .hire-btn:hover:not(:disabled) { filter:brightness(1.08); }
+  .hire-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+  .field-error { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); min-height:14px; }
+
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:14px;
+  }
+
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--panel-raised); border:1px solid var(--gold-dim); color:#f2efe8;
+    font-family:'JetBrains Mono',monospace; font-size:12px; padding:11px 20px; border-radius:8px;
+    opacity:0; pointer-events:none; transition:opacity 0.2s ease, transform 0.2s ease; text-align:center;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  <script src="exp-table.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Mercenary Guild · Hiring Office</div>
+      <h1>고용소</h1>
+    </div>
+    <div class="header-actions">
+      <div class="gold-display">💰 <span id="goldVal">0</span> G</div>
+      <a class="back-link" href="village.html">← 마을로</a>
+    </div>
+  </div>
+  <div class="desc">이름과 직업을 정해 새 용병을 고용하세요. 스탯 · HP · SP · 패턴 슬롯은 모두 동일한 초심자 기준으로 시작하고, 고용 비용은 직업마다 다릅니다.</div>
+  <div class="mock-badge">⚠ 정적 목업 — 고용 결과는 브라우저에만 저장됩니다(서버 연동 없음)</div>
+</header>
+
+<main>
+  <div class="hire-card">
+    <div>
+      <div class="h-title">새 용병 고용</div>
+      <div class="h-sub">이름과 직업만 정하면 나머지는 동일한 초기 능력치로 채워집니다.</div>
+    </div>
+
+    <div class="field">
+      <label for="nameInput">이름</label>
+      <input type="text" id="nameInput" placeholder="용병의 이름을 입력하세요" maxlength="16" />
+    </div>
+
+    <div class="field">
+      <label for="jobSelect">직업</label>
+      <select id="jobSelect"></select>
+    </div>
+
+    <div class="preview-box">
+      <div class="preview-head">
+        <div class="preview-thumb" id="previewThumb"></div>
+        <div>
+          <div class="preview-name" id="previewName">이름 없음</div>
+          <div class="preview-job" id="previewJob"></div>
+        </div>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="res-row"><span>Max HP</span><span id="previewHp"></span></div>
+      <div class="res-row"><span>Max SP</span><span id="previewSp"></span></div>
+      <div class="preview-note">모든 용병은 전 스탯 10으로 동일하게 시작해요(기본 패턴 슬롯 1+⌊INT/10⌋=2개, INT를 올리거나 패턴 슬롯 옵션이 있는 장비로 늘어남). 미배분 스탯 포인트와 스킬 포인트는 Lv.1엔 0이고, 레벨업당 각각 5 · 2씩 늘어납니다. 직업은 초기 습득 스킬 · 초상화 · 고용 비용을 결정해요.</div>
+    </div>
+
+    <div class="field-error" id="fieldError"></div>
+
+    <div class="hire-row">
+      <span class="cost" id="costLabel"></span>
+      <button class="hire-btn" id="hireBtn">고용하기</button>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ============================================================================
+  // 저장소 헬퍼
+  // ============================================================================
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+  function saveRoster(roster) {
+    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
+  }
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+  function setGold(amount) {
+    localStorage.setItem("battleSim_gold", String(amount));
+  }
+  function getUsername() {
+    // ⚠ 실제 로그인/계정 시스템이 아직 없어서 임시로 로컬스토리지에 저장된 값을 씀.
+    // 값이 없으면 데모 기본값으로 "2inkle"을 사용함 — 나중에 인증 시스템이 들어오면
+    // 이 함수만 실제 로그인 유저이름을 반환하도록 교체하면 됨.
+    return localStorage.getItem("battleSim_username") || "2inkle";
+  }
+  function nextCharacterId() {
+    // id 형식: "유저이름_생성순번" (예: 2inkle_32 = 2inkle의 32번째 생성 캐릭터)
+    const username = getUsername();
+    const prefix = username + "_";
+    const roster = getRoster();
+    const usedSeq = roster
+      .map(c => c.id)
+      .filter(id => typeof id === "string" && id.startsWith(prefix))
+      .map(id => Number(id.slice(prefix.length)))
+      .filter(n => Number.isInteger(n));
+    const nextSeq = usedSeq.length ? Math.max(...usedSeq) + 1 : 1;
+    return `${prefix}${nextSeq}`;
+  }
+
+  // ============================================================================
+  // 직업 메타 — 스탯/HP/SP/패턴 슬롯은 전 직업 공통, 직업은 초상화 · 시작 스킬 ·
+  // 고용 비용(cost)만 결정. 새 직업을 추가하거나 비용을 조정하려면 이 객체만 고치면
+  // 드롭다운 · 미리보기 · 고용 로직에 전부 자동 반영됨.
+  // ⚠ startSkill.name은 character-sheet.html의 SKILL_TABLE에서 해당 직업의
+  //   Lv.1 · skillPointCost:0 스킬 이름과 반드시 일치해야 함(고용 시 무료로 습득 처리).
+  // ============================================================================
+  // job-table의 실제 최하위(1차) 직업은 사제·전사·마법사·헌터 4개뿐임
+  // (advancement 키 중 다른 직업의 toJob으로 등장하지 않는 이름 = 최하위 직업).
+  // 예전엔 검사·궁수·도적·마도사·연금술사까지 7개가 있었는데, 이 5개는
+  // job-table/skill-table 어디에도 없는 더미데이터였음(CLAUDE.md 참조).
+  // startSkill.name도 skill-table-editor.html의 LEGACY_SKILL_SEED.jobSkills에서
+  // 실제 Lv.1 · skillPointCost:0 스킬 이름으로 맞춤.
+  const JOB_META = {
+    "사제":   { portrait:"✨", startSkill:{name:"Healing",  tag:"MAGIC · HEAL"}, cost:200 },
+    "전사":   { portrait:"🪓", startSkill:{name:"Bash",     tag:"PHYS · STR"},  cost:170 },
+    "마법사": { portrait:"📖", startSkill:{name:"Fire Ball", tag:"MAGIC · INT"}, cost:220 },
+    "헌터":   { portrait:"🏹", startSkill:{name:"Shoot",    tag:"PHYS · DEX"},  cost:150 }
+  };
+  const STAT_KEYS = ["str","int","dex","spd","luk"];
+  const BASE_STATS = { str:10, int:10, dex:10, spd:10, luk:10 };
+  // character-sheet.html/src/character.js와 동일한 공식: JOB_BASE_HP + STR×20, JOB_BASE_SP + INT×10
+  const JOB_BASE_HP = 200;
+  const JOB_BASE_SP = 50;
+  const BASE_MAX_HP = JOB_BASE_HP + BASE_STATS.str * 20;
+  const BASE_MAX_SP = JOB_BASE_SP + BASE_STATS.int * 10;
+
+  function buildCharacter(name, job, id) {
+    const meta = JOB_META[job];
+    return {
+      id,
+      name,
+      job,
+      level: 1,
+      exp: 0,
+      expToNext: window.ExpTable.expToNextForLevel(1),
+      portrait: meta.portrait,
+      realStats: { ...BASE_STATS },
+      // unassignedPoints/skillPoints는 저장하지 않음 — character-sheet.html이
+      // (레벨-1)*포인트/레벨 - 이미 투자한 양 으로 매번 계산함. Lv.1은 0포인트.
+      // hp/sp/maxHp/maxSp는 저장하지 않음 — character-sheet.html이
+      // JOB_BASE_HP(200)+realStr×20, JOB_BASE_SP(50)+realInt×10 공식으로 계산함
+      // (장비의 real형 스탯 보너스가 있으면 그것도 합산해서 반영).
+      // maxPatternSlots/weightCapacity도 저장하지 않음 — character-sheet.html이
+      // realStats.int/dex + 장착 장비(패턴슬롯/무게제한 옵션)로 매번 계산함.
+      // bonusStats/weightUsed는 저장하지 않음 — character-sheet.html이 실제 장착
+      // 아이템(data.equipment)에서 매번 계산함(장착/해제가 즉시 반영되도록).
+      // 장비 슬롯 12종(character-sheet.html의 EQUIPMENT_SLOT_TYPES와 동일한 키) —
+      // 전부 빈 상태로 시작. 이 목록이 바뀌면 이쪽도 같이 맞춰줘야 함(중복 관리 지점).
+      equipment: { mainhand:null, subhand:null, armor:null, cloak:null, shoes:null, head:null, accessory:null, jItem:null, item:null, avatar:null, skillSeal:null, uItem:null },
+      inventory: [],
+      learnedSkillNames: [ "공격", meta.startSkill.name ], // "공격"은 전 직업 공통 무료 스킬
+      // 개인 자원(화살/탄환/열정 등) — 기본은 빈 객체. 직업이나 장비에 따라
+      // 어떤 자원을 얼마나 갖고 시작할지는 character-sheet.html에서 채워 넣을 수 있음.
+      personalResources: {},
+      row: "front", // 진형(전열/후열) — 기본은 전열, Sheet에서 전환 가능
+      guardAllies: false, // 아군 보호 — 전열일 때만 의미 있음, 기본 꺼짐
+      presets: [
+        { name:"기본", rows:[ {subject:"self", metric:"always", action:"공격"} ] }
+      ]
+    };
+  }
+
+  // ============================================================================
+  // 폼 세팅
+  // ============================================================================
+  const nameInput = document.getElementById("nameInput");
+  const jobSelect = document.getElementById("jobSelect");
+  const hireBtn = document.getElementById("hireBtn");
+  const fieldError = document.getElementById("fieldError");
+  const goldEl = document.getElementById("goldVal");
+  const toastEl = document.getElementById("toast");
+
+  jobSelect.innerHTML = Object.keys(JOB_META).map(j => `<option value="${j}">${j}</option>`).join("");
+  document.getElementById("statGrid").innerHTML = STAT_KEYS.map(k => `
+    <div class="stat-cell"><div class="s-key">${k.toUpperCase()}</div><div class="s-val">${BASE_STATS[k]}</div></div>
+  `).join("");
+  document.getElementById("previewHp").textContent = BASE_MAX_HP;
+  document.getElementById("previewSp").textContent = BASE_MAX_SP;
+
+  function updatePreview() {
+    const name = nameInput.value.trim();
+    const job = jobSelect.value;
+    const meta = JOB_META[job];
+    document.getElementById("previewThumb").textContent = meta.portrait;
+    document.getElementById("previewName").textContent = name || "이름 없음";
+    document.getElementById("previewJob").textContent = job;
+    document.getElementById("costLabel").textContent = `${meta.cost.toLocaleString()} G`;
+    refreshHireButton();
+  }
+
+  function refreshHireButton() {
+    const gold = getGold();
+    goldEl.textContent = gold.toLocaleString();
+    const name = nameInput.value.trim();
+    const cost = JOB_META[jobSelect.value].cost;
+    if (!name) {
+      hireBtn.disabled = true;
+      fieldError.textContent = "";
+    } else if (gold < cost) {
+      hireBtn.disabled = true;
+      fieldError.textContent = "골드가 부족합니다.";
+    } else {
+      hireBtn.disabled = false;
+      fieldError.textContent = "";
+    }
+  }
+
+  nameInput.addEventListener("input", updatePreview);
+  jobSelect.addEventListener("change", updatePreview);
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toastEl.classList.remove("show"), 2200);
+  }
+
+  hireBtn.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    const job = jobSelect.value;
+    const cost = JOB_META[job].cost;
+    const gold = getGold();
+    if (!name) { fieldError.textContent = "이름을 입력해주세요."; return; }
+    if (gold < cost) { fieldError.textContent = "골드가 부족합니다."; return; }
+
+    const id = nextCharacterId();
+    const character = buildCharacter(name, job, id);
+    const roster = getRoster();
+    roster.push(character);
+    saveRoster(roster);
+    setGold(gold - cost);
+
+    showToast(`${name}(${job})이(가) 용병단에 합류했습니다.`);
+    nameInput.value = "";
+    updatePreview();
+  });
+
+  updatePreview();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>캐릭터 정보창 · Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing:border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:20px 32px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  .back-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none; }
+  .back-link:hover { color:var(--cyan); }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  .mock-badge { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim); border:1px dashed var(--line); border-radius:20px; padding:5px 12px; }
+  .spectate-banner {
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--danger);
+    background:rgba(217,97,92,0.1); border:1px solid var(--danger-dim); border-radius:8px;
+    padding:12px 16px; margin-bottom:16px;
+  }
+
+  main { flex:1; display:grid; grid-template-columns:280px 1fr 420px; gap:1px; background:var(--line); }
+  @media (max-width:1200px) { main { grid-template-columns:1fr; } }
+  section { background:var(--ink); padding:20px; min-width:0; }
+  /* #spectateBanner도 <main>의 grid item이라, 비어있어도(관전 모드가 아니면
+     항상 빈 채로 있음) 1번 칸(280px)을 차지해서 profileSection/statSection/
+     patternSection이 전부 한 칸씩 밀리는 버그가 있었음(2026-08-14 발견) —
+     3칼럼 전체 폭으로 지정해서 grid 흐름에서 완전히 분리함. */
+  #spectateBanner:empty { display:none; }
+  #spectateBanner { grid-column:1/-1; }
+
+  h2.section-title { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--mist-dim); margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; }
+  h2.section-title .hint { color:var(--gold); font-size:10px; letter-spacing:0.04em; text-transform:none; }
+  .block { margin-bottom:26px; }
+  .block:last-child { margin-bottom:0; }
+
+  /* 프로필 */
+  .portrait { width:100%; aspect-ratio:3/4; border-radius:10px; border:1px solid var(--line);
+    background: repeating-linear-gradient(135deg, var(--panel) 0 10px, var(--panel-raised) 10px 20px);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:40px; }
+  .char-title { font-family:'Cinzel',serif; font-size:20px; color:#f2efe8; margin:14px 0 2px; }
+  .char-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .level-row { display:flex; align-items:baseline; gap:8px; margin-top:14px; }
+  .level-row .lv-num { font-family:'Cinzel',serif; font-size:16px; color:var(--gold); }
+  .level-row .lv-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); letter-spacing:0.08em; }
+  .exp-bar { height:6px; border-radius:3px; background:var(--panel-raised); border:1px solid var(--line); overflow:hidden; margin-top:8px; }
+  .exp-bar > i { display:block; height:100%; background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
+  .exp-caption { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:5px; text-align:right; }
+  .row-toggle { display:flex; gap:6px; margin-top:12px; }
+  .row-btn { flex:1; font-family:'JetBrains Mono',monospace; font-size:11px; padding:7px 0; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--mist-dim); cursor:pointer; }
+  .row-btn:hover { border-color:var(--mist-dim); color:var(--mist); }
+  .row-btn.active { border-color:var(--gold); color:var(--gold); background:#d9b45c14; }
+  .guard-toggle { display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%; margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:12px; padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--mist-dim); cursor:pointer; text-align:left; }
+  .guard-toggle:hover { border-color:var(--mist-dim); }
+  .guard-toggle.active { border-color:var(--cyan); color:var(--cyan); background:#5fd3c414; }
+  .guard-toggle.armed { border-color:var(--gold-dim); color:var(--gold); border-style:dashed; }
+  .guard-toggle .guard-hint { font-size:9.5px; color:var(--mist-dim); font-weight:normal; }
+
+  /* 스탯/장비 (가운데) */
+  .points-banner { display:flex; align-items:center; justify-content:space-between; background:var(--panel-raised); border:1px solid var(--gold-dim); border-radius:8px; padding:10px 14px; margin-bottom:16px; }
+  .points-banner .p-label { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .points-banner .p-value { font-family:'Cinzel',serif; font-size:18px; color:var(--gold); margin-left:6px; }
+
+  .max-row { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); padding:5px 4px; }
+  .max-row span:last-child { color:#f2efe8; }
+
+  .stat-row { display:grid; grid-template-columns:82px 1fr auto; align-items:center; gap:8px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .stat-row:last-child { border-bottom:none; }
+  .stat-row .s-name { font-family:'Cinzel',serif; font-size:13px; color:#f2efe8; }
+  .stat-row .s-bars { display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+  .stat-row .s-bonus { color:var(--cyan); font-size:11px; }
+  .stat-row .s-real-gear { color:var(--gold); font-size:10px; margin-left:2px; }
+  .stepper { display:flex; align-items:center; gap:5px; }
+  .stepper button { width:21px; height:21px; border-radius:5px; border:1px solid var(--line); background:var(--panel); color:var(--mist); font-family:'JetBrains Mono',monospace; cursor:pointer; line-height:1; }
+  .stepper button:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
+  .stepper button:disabled { opacity:0.3; cursor:not-allowed; }
+
+  .resource-bar-row { margin-bottom:10px; }
+  .resource-bar-row .rb-label { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; margin-bottom:4px; color:var(--mist-dim); }
+  .resource-bar { height:8px; border-radius:4px; background:var(--panel-raised); overflow:hidden; border:1px solid var(--line); }
+  .resource-bar > i { display:block; height:100%; border-radius:4px; }
+  .resource-bar.hp > i { background:var(--ember); } .resource-bar.sp > i { background:var(--cyan); }
+  .resource-bar.weight > i { background:var(--gold); } .resource-bar.weight.over > i { background:var(--danger); }
+  .weight-warning { display:flex; align-items:center; gap:6px; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--danger); }
+  .set-bonus-note { margin-top:8px; padding:8px 10px; border-radius:6px; border:1px solid var(--gold-dim); background:#d9b45c14; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--gold); line-height:1.6; }
+
+  .equip-slots { display:grid; grid-template-columns:1fr; gap:8px; margin-top:4px; }
+  .equip-slot { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); }
+  .equip-slot .e-icon { width:28px; height:28px; border-radius:5px; background:var(--panel-raised); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .equip-slot .e-body { flex:1; min-width:0; }
+  .equip-slot .e-type { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em; color:var(--mist-dim); text-transform:uppercase; }
+  .equip-slot .e-name { font-size:12px; color:#f2efe8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .equip-slot .e-bonus { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--cyan); }
+  .equip-slot.empty { border-style:dashed; color:var(--mist-dim); }
+  .equip-slot.empty .e-name { color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .unequip-x { background:none; border:none; color:var(--mist-dim); cursor:pointer; font-size:13px; padding:2px 4px; }
+  .unequip-x:hover { color:var(--danger); }
+
+  .inv-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  .inv-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel-sunken); }
+  .inv-item .i-name { font-size:12px; color:var(--mist); }
+  .inv-item .i-slot-tag { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--mist-dim); margin-left:6px; }
+  .inv-item .i-bonus { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--cyan); margin-left:8px; }
+  .equip-btn { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.05em; background:transparent; border:1px solid var(--cyan-dim); color:var(--cyan); padding:5px 10px; border-radius:5px; cursor:pointer; white-space:nowrap; }
+  .equip-btn:hover { border-color:var(--cyan); background:#5fd3c414; }
+
+  /* 패턴 빌더 (오른쪽, 핵심) */
+  .preset-tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .preset-tab { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em; background:var(--panel); border:1px solid var(--line); color:var(--mist-dim); padding:7px 12px; border-radius:6px; cursor:pointer; }
+  .preset-tab.active { border-color:var(--gold); color:var(--gold); background:var(--panel-raised); }
+  .preset-tab.add { color:var(--mist-dim); border-style:dashed; }
+
+  .pattern-list { display:flex; flex-direction:column; gap:10px; }
+  .pattern-row { border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:10px 12px; }
+  .pattern-row.locked { opacity:0.5; }
+  .pattern-row.active { border-color:var(--gold-dim); box-shadow:0 0 12px -6px var(--gold); }
+
+  .row-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .row-head .idx { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); }
+  .pattern-row.locked .row-head .idx { color:var(--mist-dim); }
+  .row-actions { display:flex; gap:4px; }
+  .mini-btn { width:20px; height:20px; border-radius:4px; border:1px solid var(--line); background:var(--panel-raised); color:var(--mist-dim); font-size:10px; cursor:pointer; line-height:1; }
+  .mini-btn:hover { color:var(--mist); border-color:var(--mist-dim); }
+  .mini-btn.danger:hover { color:var(--danger); border-color:var(--danger-dim); }
+
+  .builder-line { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .builder-line:last-child { margin-bottom:0; }
+  .cb-tag { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.08em; color:var(--mist-dim); width:34px; flex-shrink:0; }
+  select, input[type=number] {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-sunken); color:var(--mist);
+    border:1px solid var(--line); border-radius:5px; padding:5px 7px;
+  }
+  select:hover, input[type=number]:hover { border-color:var(--mist-dim); }
+  select:focus, input[type=number]:focus { outline:none; border-color:var(--gold); }
+  input[type=number] { width:58px; }
+  select.cb-action { color:#f2efe8; }
+
+  .lock-note { margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); display:flex; gap:5px; align-items:center; }
+
+  .add-row-btn { width:100%; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em; background:transparent; border:1px dashed var(--line); color:var(--mist-dim); padding:9px; border-radius:8px; cursor:pointer; }
+  .add-row-btn:hover { border-color:var(--gold); color:var(--gold); }
+
+  .save-row { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+  .unsaved-flag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ember); display:flex; align-items:center; gap:6px; }
+  .unsaved-flag.clean { color:var(--mist-dim); }
+  .unsaved-flag .dot { width:6px; height:6px; border-radius:50%; background:var(--ember); }
+  .unsaved-flag.clean .dot { background:var(--mist-dim); }
+  .save-btn { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; background:var(--ember); color:#1a1108; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; text-transform:uppercase; }
+  .save-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+  .section-save-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .section-save-flag { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ember); display:flex; align-items:center; gap:6px; }
+  .section-save-flag.clean { color:var(--mist-dim); }
+  .section-save-flag .dot { width:6px; height:6px; border-radius:50%; background:var(--ember); }
+  .section-save-flag.clean .dot { background:var(--mist-dim); }
+  .section-save-row .save-btn { padding:6px 12px; font-size:10px; }
+
+  .skill-list { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .skill-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); }
+  .skill-item .sk-main { display:flex; flex-direction:column; gap:3px; }
+  .skill-item .sk-name { font-size:12px; color:#f2efe8; }
+  .skill-item .sk-meta { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); letter-spacing:0.02em; }
+  /* 스킬 카드(습득한/습득 가능 스킬) 전용 — 정보가 많아 세로로 쌓음. 전직/테스트
+     도구 등 기존의 단순 이름+버튼 한 줄짜리 .skill-item에는 영향 없음. */
+  .skill-item.skill-card { flex-direction:column; align-items:stretch; gap:6px; padding:10px 12px; }
+  .skill-item.skill-card .sk-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .skill-item.skill-card .sk-row { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); letter-spacing:0.02em; }
+  .sk-type-badge { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.05em; padding:2px 8px; border-radius:10px; border:1px solid; white-space:nowrap; }
+  .sk-type-badge.physical { color:var(--ember); border-color:var(--ember-dim); }
+  .sk-type-badge.magic    { color:var(--cyan);  border-color:var(--cyan-dim); }
+  .sk-type-badge.support  { color:var(--gold);  border-color:var(--gold-dim); }
+  .sk-type-badge.invalid  { color:var(--danger); border-color:var(--danger-dim); }
+  .sk-badges { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+  .sk-effects { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+  .sk-effect { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:4px; background:var(--panel-raised); border:1px solid var(--line); }
+  .sk-effect.buff { color:var(--cyan); border-color:var(--cyan-dim); }
+  .sk-effect.debuff { color:var(--danger); border-color:var(--danger-dim); }
+  .sk-effect.neutral { color:var(--mist); }
+  .skill-item.skill-card .sk-footer { display:flex; justify-content:flex-end; margin-top:2px; }
+  .assign-btn { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px solid var(--gold-dim); color:var(--gold); padding:4px 9px; border-radius:5px; cursor:pointer; white-space:nowrap; }
+  .assign-btn:hover { border-color:var(--gold); background:#d9b45c14; }
+  .assign-btn:disabled { opacity:0.35; border-color:var(--line); color:var(--mist-dim); cursor:not-allowed; background:transparent; }
+
+  .empty-wrap { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:100px 20px; text-align:center; }
+  .empty-wrap .e-icon { font-size:34px; }
+  .empty-wrap .e-title { font-family:'Cinzel',serif; font-size:18px; color:#f2efe8; }
+  .empty-wrap .e-desc { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); max-width:340px; line-height:1.6; }
+  .empty-wrap a { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold); text-decoration:none; border:1px solid var(--gold-dim); padding:8px 16px; border-radius:6px; margin-top:4px; }
+  .empty-wrap a:hover { border-color:var(--gold); background:#d9b45c14; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  <script src="exp-table.js"></script>
+  
+
+
+
+<header>
+  <a class="back-link" href="roster-index.html">← 용병단으로</a>
+  <span class="eyebrow">Character Sheet</span>
+  <span class="mock-badge">⚠ 정적 목업 — 패턴 빌더는 화면 상에서만 동작, 서버 저장 없음</span>
+</header>
+
+<main>
+  <div id="spectateBanner"></div>
+  <section id="profileSection"></section>
+  <section id="statSection"></section>
+  <section id="patternSection"></section>
+  <section id="advancementSection" style="grid-column:1/-1;"></section>
+</main>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+// ============================================================================
+// 목업 데이터 (mockDb 시드와 동일 인물 기준으로 확장)
+// ============================================================================
+// 조건 타입 레지스트리 — 조건 종류는 계속 늘어날 예정이므로, 새 조건을 추가할 때
+// 이 객체에 항목 하나만 더하면 됨(라벨/비교연산자 필요 여부/단위). 빌더의 드롭다운과
+// 상세 입력칸 표시 여부는 전부 이 메타데이터를 읽어서 자동으로 그려짐.
+const CONDITION_TYPES = {
+  always:   { label:"조건 없음(항상)", needsDetail:false },
+  hp:       { label:"HP",           needsDetail:true, unit:"%" },
+  sp:       { label:"SP",           needsDetail:true, unit:"%" },
+  resource: { label:"자원 개수",      needsDetail:true, unit:"개" },
+  notGuarding: { label:"Guard 중이 아닐 때", needsDetail:false }
+  // 새 조건 예시: turnCount: { label:"경과 턴 수", needsDetail:true, unit:"턴" }
+};
+const COMPARATOR_LABEL = { gte:"이상", gt:"초과", lte:"이하", lt:"미만", eq:"같음" };
+const SUBJECT_LABEL = { self:"자신", allyAll:"아군 전체", allyOne:"특정 아군", enemyAll:"적 전체", enemyOne:"특정 적", allyFaction:"우리 진영 자원", enemyFaction:"상대 진영 자원" };
+const ACTION_OPTIONS = ["마법진 생성", "마법진 폭발", "소환"]; // "공격"은 COMMON_SKILLS로, "아이템 사용"은 U.Item 장착 시에만 actionOptionsFor()에서 추가됨
+
+// ============================================================================
+// 코스트 타입 레지스트리 — 스킬 사용 코스트는 SP 한 종류로 고정하지 않고 자유롭게
+// 조합할 수 있음(예: SP + 자신 HP, SP + 팀 자원, 화살 같은 개인 자원). 새 코스트
+// "종류"가 필요하면 이 객체에 항목 하나만 더하면 됨. 단, "팀 자원"과 "개인 자원"은
+// 종류가 여러 개 있을 수 있어서 이 레지스트리엔 sp/hp만 두고, 실제 어떤 자원인지는
+// 아래 TEAM_RESOURCE_TYPES/PERSONAL_RESOURCE_TYPES를 cost.resource 필드로 참조함.
+// ============================================================================
+const COST_TYPES = {
+  sp: { label:"SP" },
+  hp: { label:"자신 HP" }
+  // 새 코스트 종류 예시(자원 구분이 필요 없는 것만): stamina: { label:"기력" }
+};
+
+// ============================================================================
+// 팀 자원 종류 레지스트리 — 진영이 공유하는 자원. 지금까지 마법진(MAGIC_CIRCLE)
+// 하나뿐이라 구분할 필요가 없었지만, 앞으로 여러 종류가 생길 걸 대비해 분리함.
+// key는 FactionResourceManager.registerResource()에 실제로 등록되는 이름과 정확히
+// 일치해야 함(src/resourceManager.js, src/resourceTypes.js 참고). 코스트/효과에서
+// { type:"teamResource", resource:"magicCircle", amount:N } 형태로 참조함.
+// ============================================================================
+const TEAM_RESOURCE_TYPES = {
+  magicCircle: { label:"마법진", key:"MAGIC_CIRCLE", icon:"🔮", defaultMax:10 }
+  // 새 팀 자원 예시: warBanner: { label:"전쟁 깃발", key:"WAR_BANNER", icon:"🚩", defaultMax:5 }
+};
+
+// ============================================================================
+// 개인 자원 종류 레지스트리 — 진영 공유가 아니라 캐릭터 개인이 갖는 자원(화살,
+// 탄환, 열정 등). SP/HP처럼 전 캐릭터 공통이 아니라서, 캐릭터별로
+// data.personalResources에 "이 캐릭터가 실제로 뭘 얼마나 갖고 시작하는지"를 따로
+// 기록함(예: { arrows: { current:20, max:20 } }) — 이 레지스트리는 "어떤 개인
+// 자원 종류가 존재하는지"의 카탈로그일 뿐, 누가 얼마나 갖는지는 캐릭터 데이터 몫.
+// 코스트/효과에서 { type:"personalResource", resource:"arrows", amount:N } 형태로 참조함.
+// ============================================================================
+const PERSONAL_RESOURCE_TYPES = {
+  arrows:  { label:"화살", icon:"🏹" },
+  bullets: { label:"탄환", icon:"🔫" },
+  passion: { label:"열정", icon:"🔥" }
+  // 새 개인 자원 예시: mana: { label:"마나", icon:"💧" }
+};
+
+// ============================================================================
+// 대상 진영 / 대상 수 레지스트리 — 스킬이 발동될 때 누구에게 적용되는지.
+// ============================================================================
+const TARGET_FACTION_TYPES = {
+  self:  { label:"자신" },
+  ally:  { label:"아군" },
+  enemy: { label:"적" }
+  // 새 대상 진영 예시(팀 전체 자원 등을 직접 조작하는 스킬이 생기면): faction: { label:"진영 자원" }
+};
+const TARGET_COUNT_TYPES = {
+  single:   { label:"단일" },
+  multiple: { label:"다수" },
+  all:      { label:"전체" }
+};
+
+// ============================================================================
+// 진형 레지스트리 — 전열/후열. 지금은 캐릭터가 어느 줄에 있는지 "존재"만 하고,
+// 여기서 파생되는 이점/불리점(피격률, 사거리 제한, 자원 수급 차이 등)은 아직
+// 연결 안 함 — 나중에 정해지면 이 값을 참조해서 로직을 붙이면 됨.
+// ============================================================================
+const FORMATION_ROW_TYPES = {
+  front: { label:"전열" },
+  back:  { label:"후열" }
+};
+
+// ============================================================================
+// 스킬 유형 레지스트리 — 물리/마법/보조. Sheet에 색으로 구분되는 배지로 표시됨.
+// ============================================================================
+const SKILL_TYPES = {
+  physical: { label:"물리(Physical)", cls:"physical" },
+  magic:    { label:"마법(Magic)",    cls:"magic" },
+  support:  { label:"보조(Support)",  cls:"support" }
+};
+
+// ============================================================================
+// 효과 레지스트리 — 스킬의 부가효과 종류. 한 스킬이 여러 효과를 동시에 가질 수
+// 있어서(예: 시전 지연 + 공격력 감소, 또는 자신 최대HP 증가 + 방어력 감소) 스킬의
+// `effects`는 배열로 관리함. 각 원소 형태: { type, value? }
+//  - type: 이 레지스트리의 키
+//  - value: 효과 수치(단위는 효과 성격에 따라 설계자가 정함 — 보통 %, 회복류는 고정치)
+// 버프/디버프는 한 번 걸리면 그 전투 세션이 끝날 때까지 영구 적용됨(턴/틱 단위로
+// 풀리는 지속시간 개념 없음) — 그래서 duration 필드는 없음.
+// 새 효과 종류가 필요하면 이 객체에 { label, polarity } 한 줄만 추가하면 됨.
+// polarity는 배지 색 구분용("buff"|"debuff"|"neutral").
+//
+// ⚠ 스킬 발동을 완전히 차단하는 효과(구 interruptAction/interruptCast)는 없음 —
+// 이미 시작한 스킬은 원칙적으로 반드시 발동됨. 유일한 예외는 선딜레이가 진행되는
+// 동안 코스트를 더 이상 감당할 수 없게 된 경우뿐(예: SP 100을 요구하는 스킬인데,
+// 그 사이 SP 소모/감소 효과를 맞아 100 미만이 됨) — 이때만 발동 시점에 실패
+// 판정이 나고, 그 실패는 반드시 화면/로그에 알려짐. actionDelay/castDelay처럼
+// "선딜레이를 늘리는" 효과는 있어도, "그 자리에서 취소시키는" 효과는 없음.
+// ============================================================================
+const EFFECT_TYPES = {
+  atkUp:          { label:"공격력 증가", polarity:"buff" },
+  atkDown:        { label:"공격력 감소", polarity:"debuff" },
+  defUp:          { label:"방어력 증가", polarity:"buff" },
+  defDown:        { label:"방어력 감소", polarity:"debuff" },
+  maxHpUp:        { label:"최대 HP 증가", polarity:"buff" },
+  maxHpDown:      { label:"최대 HP 감소", polarity:"debuff" },
+  heal:           { label:"HP 회복",     polarity:"buff" },
+  spUp:           { label:"SP 증가",     polarity:"buff" },
+  spDown:         { label:"SP 감소",     polarity:"debuff" },
+  // STR/INT/DEX/SPD/LUK 중 하나의 bonus를 고정치만큼 올림 — effect.stat으로
+  // 어떤 스탯인지 지정(예: { type:"statUp", stat:"str", value:20 }). 매 발동마다
+  // 그대로 누적됨(statDownPercent처럼 "그 순간 값의 %"가 아니라 순수 고정치라
+  // 여러 번 걸면 계속 쌓임).
+  statUp:         { label:"핵심 스탯 증가", polarity:"buff", needsStatTarget:true },
+  // 팀 자원/개인 자원 증감 — 어떤 자원인지는 effect.resource로 지정
+  // (TEAM_RESOURCE_TYPES/PERSONAL_RESOURCE_TYPES 키). 예: { type:"teamResourceUp",
+  // resource:"magicCircle", value:1 }, { type:"personalResourceDown", resource:"arrows", value:1 }
+  teamResourceUp:       { label:"팀 자원 증가",   polarity:"buff" },
+  teamResourceDown:     { label:"팀 자원 감소",   polarity:"debuff" },
+  personalResourceUp:   { label:"개인 자원 증가", polarity:"buff" },
+  personalResourceDown: { label:"개인 자원 감소", polarity:"debuff" },
+  // "대상이 해당 선딜레이 상태일 때만" 발동을 늦추는 조건부 효과. value는 대상의
+  // originalPreDelay 대비 퍼센트(예: 105 = 원래 선딜레이의 105%만큼 추가).
+  // requiresPreDelayType과 대상 상태가 안 맞으면 효과 자체가 발동하지 않음
+  // (조건 불만족 — 아무 일도 안 일어남). 취소가 아니라 "지연"이라 스킬 자체는
+  // 여전히 (더 늦게) 발동됨 — 다만 그사이 코스트 조건이 깨지면 그건 이 효과가
+  // 아니라 위의 "코스트 재판정" 규칙 때문에 실패하는 것.
+  //
+  // ⚠ 딜레이 저항: 한 스킬(준비 상태 하나)에 누적으로 추가되는 딜레이는 원래
+  // 선딜레이의 250%를 절대 못 넘음(여러 명이 계속 지연 효과를 걸어서 죽을 때까지
+  // 발동을 못 시키는 상황 방지). 한도를 넘는 요청은 남은 만큼만 부분 적용되고,
+  // 이미 한도에 도달했으면 완전히 무효. 실제 판정은 src/prepState.js의
+  // DELAY_RESISTANCE_CAP_RATIO(2.5)가 담당 — Sheet는 표시만 하고 계산은 안 함.
+  actionDelay:    { label:"행동 지연",   polarity:"debuff", requiresPreDelayType:"action", valueUnit:"%" },
+  castDelay:      { label:"시전 지연",   polarity:"debuff", requiresPreDelayType:"casting", valueUnit:"%" },
+  // Guard — 다음 피격 1회를 완전히 무효화함(관통 없음, 1회성). 어떤 종류의
+  // 피해를 막는지는 팀/개인 자원 효과가 effect.resource로 자원 종류를 구분하는
+  // 것과 똑같은 방식으로, effect.guardType(physical/magic/all)으로 구분함 —
+  // 종류별로 guardPhysical/guardMagic/guardAll 같은 별도 타입을 만들지 않고,
+  // 이 하나의 타입에 하위 옵션만 다르게 주는 쪽으로 통일(기존 자원 효과 관례와
+  // 일관성 유지). guardType 생략 시 기본값은 "all"(모든 피해 무효화).
+  guard: { label:"Guard(피격 무효화)", polarity:"buff" }
+  // 새 효과 예시: stun: { label:"기절", polarity:"debuff" }
+};
+
+// ============================================================================
+// 선딜레이 종류 레지스트리 — 스킬 발동 전 준비 동작이 어떤 성격인지에 따라
+// 어떤 지연 효과가 먹히는지가 달라짐. Action 속성은 EFFECT_TYPES.actionDelay로,
+// Casting 속성은 EFFECT_TYPES.castDelay로만 늦출 수 있음(완전 취소는 없음 — 위
+// EFFECT_TYPES 설명 참고) — 이 매칭은 각 효과의 requiresPreDelayType 필드로
+// 데이터화되어 있어서, 전투 엔진은 "타겟이 현재 선딜레이 중이고, preDelayType이
+// 맞는 효과의 requiresPreDelayType과 같은지"만 확인하면 되도록 설계함. 새
+// 선딜레이 종류가 필요하면 이 객체에 { label } 한 줄만 추가하면 스킬 표시에
+// 자동 반영됨.
+// ============================================================================
+const PRE_DELAY_TYPES = {
+  action:  { label:"행위(Action)" },
+  casting: { label:"주문 읊기(Casting)" }
+  // 새 선딜레이 종류 예시: channel: { label:"채널링" }
+};
+
+// ============================================================================
+// 스킬 하나의 전체 필드 형태(공통 스킬 "공격"이 견본):
+//   name, requiredLevel, skillPointCost,
+//   stat, coefficient        — 기본 위력 계산(피해/회복 등 스킬의 1차 수치)
+//   costs[]                  — 사용 코스트(SP/HP/팀 자원 등 자유 조합)
+//   skillType                — SKILL_TYPES 키(physical/magic/support)
+//   targetFaction, targetCount — TARGET_FACTION_TYPES / TARGET_COUNT_TYPES 키
+//   preDelay, preDelayType, postDelay — 딜레이(선제:후속)
+//   effects[]                — 부가효과 배열(EFFECT_TYPES 키 기반, 여러 개 동시 가능)
+//   invalid                  — true면 "차단 불가": 상대 진영의 "아군 보호"(전열
+//                              taunt) 규칙을 무시하고 원래 대상 풀에서 그대로
+//                              선택함. 힐이 탱커한테만 쏠리는 걸 뚫거나, 요주의
+//                              대상·선딜레이 준비 중인 캐릭터를 직접 노릴 단일/
+//                              다수기에 붙이는 용도(생략하면 기본 false).
+// 전부 선택 필드라 값을 아직 안 정한 스킬은 필드 자체를 생략해도 되고, 그 항목은
+// Sheet 화면에서 조용히 생략됨.
+// ============================================================================
+function getSkillTable() {
+  try { return JSON.parse(localStorage.getItem("battleSim_skillTable")) || { commonSkills:[], jobSkills:{} }; }
+  catch { return { commonSkills:[], jobSkills:{} }; }
+}
+// 스킬 테이블은 이제 dev-tools의 skill-table-editor.html에서 관리하는 공용
+// 소스(battleSim_skillTable)에서 읽어옴 — character-sheet.html/monster-sheet.html
+// 둘 다 같은 데이터를 봄(예전엔 각자 하드코딩된 사본이 있어서 "마도사"/"마법사"
+// 처럼 이름이 어긋나는 실수가 실제로 있었음).
+const COMMON_SKILLS = getSkillTable().commonSkills;
+const SKILL_TABLE = getSkillTable().jobSkills;
+
+// ============================================================================
+// 전직(승급) 요구조건 레지스트리 — COST_TYPES와 동일한 설계 언어.
+// 새 조건 종류(예: 특정 스킬 습득 여부, 퀘스트 완료 등)가 필요하면 이 객체에
+// { label, describe, check } 한 줄만 추가하면 JOB_ADVANCEMENT_TABLE의 requirements
+// 배열에서 바로 쓸 수 있음.
+// ============================================================================
+const ADVANCEMENT_REQUIREMENT_TYPES = {
+  level: {
+    label: "레벨",
+    describe: (value) => `Lv.${value}`,
+    check: (data, value) => data.level >= value
+  },
+  item: {
+    label: "아이템 보유",
+    describe: (value) => `"${value}" 보유`,
+    check: (data, value) => hasItem(data, value)
+  }
+  // 새 조건 예시: quest: { label:"퀘스트 완료", describe:v=>`퀘스트 "${v}" 완료`, check:(data,v)=>data.completedQuests?.includes(v) }
+};
+
+function hasItem(data, itemName) {
+  const inKeyItems = (data.keyItems || []).some((name) => name === itemName);
+  const inEquipment = Object.values(data.equipment || {}).some((it) => it && it.name === itemName);
+  return inKeyItems || inEquipment;
+}
+
+// ============================================================================
+// 직업별 전직(승급) 테이블 — 현재 직업(data.job)을 키로, 전직 가능한 상위 직업
+// 목록을 관리. 각 항목: toJob(전직할 직업명), portrait(전직 후 초상화),
+// requirements(레벨/아이템 등 조건 배열, 전부 만족해야 전직 가능).
+// 조건을 만족하지 못한 전직 선택지는 화면에 아예 표시되지 않음(스킬과 동일한 방식).
+//
+// 승급한 직업도 그대로 SKILL_TABLE의 키가 되므로, 비숍/드루이드 등의 전용 스킬을
+// 만들고 싶으면 SKILL_TABLE에 "비숍": [...] 식으로 배열을 추가하면 됨(지금은
+// 비어있어 전직 직후엔 습득 가능한 스킬이 없이 시작함 — 다음 작업으로 채우면 됨).
+// ============================================================================
+function getJobTable() {
+  try { return JSON.parse(localStorage.getItem("battleSim_jobTable")) || { advancement:{}, allowedEquipmentTypes:{} }; }
+  catch { return { advancement:{}, allowedEquipmentTypes:{} }; }
+}
+// 승급 트리 — 이제 dev-tools의 job-table-editor.html에서 관리하는 공용 소스
+// (battleSim_jobTable)에서 읽어옴(예전엔 여기 하드코딩돼있었음).
+const JOB_ADVANCEMENT_TABLE = getJobTable().advancement;
+
+function getAvailableAdvancements(data) {
+  return (JOB_ADVANCEMENT_TABLE[data.job] || []).filter((adv) =>
+    adv.requirements.every((r) => ADVANCEMENT_REQUIREMENT_TYPES[r.type].check(data, r.value))
+  );
+}
+
+function describeRequirements(adv) {
+  return adv.requirements.map((r) => ADVANCEMENT_REQUIREMENT_TYPES[r.type].describe(r.value)).join(" · ");
+}
+
+// job이 ancestorJob 본인이거나, ancestorJob으로부터 전직(승급)을 거쳐 도달 가능한
+// 직업인지 판정. J.Item 착용 규칙("하위 직업 아이템은 상위 직업도 착용 가능,
+// 그 반대는 불가")에 씀 — JOB_ADVANCEMENT_TABLE의 전직 트리를 그대로 타고 내려감.
+function isJobOrDescendantOf(job, ancestorJob) {
+  if (job === ancestorJob) return true;
+  return (JOB_ADVANCEMENT_TABLE[ancestorJob] || []).some((adv) => isJobOrDescendantOf(job, adv.toJob));
+}
+
+// ============================================================================
+// 로스터 저장소 연동
+// 고용소(hire.html)에서 고용한 용병이 여기 저장된 로스터에 담겨 있음.
+// 정적 목업이라 스탯/패턴 편집은 여전히 화면 위에서만 반영되고 저장은 안 됨 —
+// 로스터 자체(보유 여부)만 브라우저에 남아 페이지를 오가도 유지됨.
+// ============================================================================
+function getRoster() {
+  try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+  catch { return []; }
+}
+function saveRoster(roster) {
+  localStorage.setItem("battleSim_roster", JSON.stringify(roster));
+}
+function getWarehouse() {
+  try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+  catch { return []; }
+}
+function saveWarehouse(warehouse) {
+  localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
+}
+
+const params = new URLSearchParams(location.search);
+const charId = params.get("id"); // id가 "유저이름_순번" 형태의 문자열이라 숫자 변환 안 함
+const roster = getRoster();
+const committedIndex = roster.findIndex(c => c.id === charId);
+const committed = committedIndex === -1 ? null : roster[committedIndex];
+
+function getUsername() {
+  try { return localStorage.getItem("battleSim_username") || "2inkle"; }
+  catch { return "2inkle"; }
+}
+
+// charId("유저이름_번호")에서 유저이름만 정확히 뽑아냄 — 유저이름 자체에 밑줄이
+// 들어갈 수 있어서(예: "2inkle_owo") startsWith가 아니라 "마지막 밑줄+숫자"를
+// 잘라내는 방식으로 함(character-sheet.html 개발자 도구 노출 조건과 동일한 로직).
+// 이 값과 현재 로그인 유저가 다르면 "남의 캐릭터"이므로 편집을 막아야 함 —
+// URL의 id만 바꿔서 남의 캐릭터에 직접 접근하는 경우(관전 목적이 아니라
+// 미배분 포인트를 악의적으로 조작하는 것 등)를 방지하기 위함.
+const ownerUsername = (() => {
+  const m = typeof charId === "string" ? charId.match(/^(.+)_(\d+)$/) : null;
+  return m ? m[1] : null;
+})();
+const isOwner = ownerUsername !== null && ownerUsername === getUsername();
+
+if (committed) {
+  if (!committed.learnedSkillNames) {
+    committed.learnedSkillNames = (committed.learnedSkills || []).map(s => s.name);
+  }
+  if (!committed.personalResources) committed.personalResources = {};
+  if (committed.row !== "front" && committed.row !== "back") committed.row = "front";
+  if (typeof committed.guardAllies !== "boolean") committed.guardAllies = false;
+  // "공격"이 COMMON_SKILLS로 전환되기 전에 만들어진 캐릭터도 계속 쓸 수 있도록 보정
+  if (!committed.learnedSkillNames.includes("공격")) committed.learnedSkillNames.unshift("공격");
+
+  // 장비 슬롯 4종(무기/장갑/방어구/장신구) -> 12종 마이그레이션. 매핑 안 되거나
+  // 이미 그 슬롯이 찬 경우엔 창고 풀로 돌려서 아이템을 잃어버리지 않게 함
+  // (개인 인벤토리는 더 이상 안 쓰므로).
+  const NEW_SLOT_KEYS = ["mainhand","subhand","armor","cloak","shoes","head","accessory","jItem","item","avatar","skillSeal","uItem"];
+  const OLD_SLOT_MAP = { "무기":"mainhand", "방어구":"armor", "장신구":"accessory", "장갑":"head" };
+  if (!committed.equipment) {
+    committed.equipment = {};
+    NEW_SLOT_KEYS.forEach((k) => { committed.equipment[k] = null; });
+  } else {
+    const needsMigration = Object.keys(committed.equipment).some((k) => OLD_SLOT_MAP[k]) || NEW_SLOT_KEYS.some((k) => !(k in committed.equipment));
+    if (needsMigration) {
+      const migrated = {};
+      NEW_SLOT_KEYS.forEach((k) => { migrated[k] = null; });
+      const displaced = [];
+      Object.entries(committed.equipment).forEach(([oldKey, item]) => {
+        if (!item) return;
+        const newKey = OLD_SLOT_MAP[oldKey] || (NEW_SLOT_KEYS.includes(oldKey) ? oldKey : null);
+        if (newKey && !migrated[newKey]) migrated[newKey] = item;
+        else displaced.push(item);
+      });
+      if (displaced.length) {
+        const warehouse = getWarehouse();
+        displaced.forEach((item) => {
+          const existing = warehouse.find((w) => w.name === item.name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
+          if (existing) existing.quantity += 1;
+          else warehouse.push({ ...item, category: "equipment", quantity: 1 });
+        });
+        saveWarehouse(warehouse);
+      }
+      committed.equipment = migrated;
+    }
+  }
+
+  // 위 마이그레이션/기본값 보정은 "사용자 편집"이 아니라 데이터 정합성 문제라
+  // 섹션별 저장 버튼을 기다리지 않고 즉시 반영해둠(사용자가 아무것도 안 만져도
+  // 다음에 열었을 때 또 마이그레이션할 필요 없도록).
+  saveRoster(roster);
+}
+
+// data는 이제 로스터 원본(committed)의 참조가 아니라 "편집용 작업 사본"(깊은
+// 복사)임 — 섹션별 저장 버튼을 눌러야만 이 안의 변경분이 그 섹션에 해당하는
+// 필드만 committed(및 localStorage)로 넘어감. SAVE_SECTIONS/saveSection() 참고.
+const data = committed ? JSON.parse(JSON.stringify(committed)) : null;
+
+// ============================================================================
+// 섹션별 저장 — 버튼마다 "이 필드들만" 커밋하도록 매핑. 예를 들어 패턴을
+// 편집하다가 스탯 섹션의 저장 버튼을 눌러도 realStats만 반영되고 presets(패턴)는
+// 여전히 미저장 상태로 남음.
+// ============================================================================
+const SAVE_SECTIONS = {
+  profile:   { fields: ["row", "guardAllies", "job", "level", "portrait", "keyItems"] },
+  stat:      { fields: ["realStats"] },
+  equipment: { fields: ["equipment", "personalResources"] },
+  skill:     { fields: ["learnedSkillNames"] },
+  pattern:   { fields: ["presets"] },
+};
+const dirtyFlags = { profile:false, stat:false, equipment:false, skill:false, pattern:false };
+
+function markDirty(section) {
+  dirtyFlags[section] = true;
+}
+
+// 이 섹션에 속한 필드만 골라서 로스터(및 localStorage)에 반영. 저장 직전에
+// getRoster()로 최신 상태를 다시 읽어서 그 위에 얹으므로, 다른 곳(다른 섹션의
+// 저장, 또는 다른 탭)에서 이미 반영된 내용을 덮어쓰지 않음.
+function saveSection(section) {
+  // 소유자가 아니면(=URL의 id를 바꿔서 남의 캐릭터에 들어온 경우) 절대 저장 안 함.
+  // 저장은 결국 이 함수 하나로 다 모이므로, 다른 버튼을 아무리 눌러 화면상
+  // 상태를 바꿔도 새로고침하면 원래대로 돌아옴 — 실질적인 방어는 여기서 끝남.
+  if (!isOwner) return;
+
+  // ⚠ 무게 초과를 여기서 막으면 안 됨. 장착/해제 핸들러는 창고 쪽
+  // (returnToWarehousePool/equipFromWarehouse)을 먼저 즉시 반영한 뒤에
+  // 이 함수를 부르기 때문에, 여기서 저장을 거부하면 "창고에는 반영됐는데
+  // 캐릭터에는 저장 안 된" 불일치가 남아 장비가 복제되거나 사라짐.
+  // 무게 제한은 (1) 장착 시점 차단(isItemEquippableBy) (2) 저장 버튼 비활성화
+  // (renderSectionSaveButton) 두 곳에서 거름.
+  const freshRoster = getRoster();
+  const idx = freshRoster.findIndex(c => c.id === charId);
+  if (idx === -1) return;
+  SAVE_SECTIONS[section].fields.forEach((field) => {
+    freshRoster[idx][field] = data[field];
+  });
+  saveRoster(freshRoster);
+  dirtyFlags[section] = false;
+}
+
+// 섹션 저장 버튼 HTML — "N건" 같은 카운트 없이 "저장 안 된 변경사항 있음/저장됨"
+// 정도로만 표시(자잘한 조작을 반복하다 보면 숫자가 커져서 오히려 부담스러워
+// 보인다는 이유로 카운트 표시는 뺌).
+function renderSectionSaveButton(section) {
+  const isDirty = dirtyFlags[section];
+  if (!isOwner) {
+    return `
+      <div class="section-save-row">
+        <span class="section-save-flag clean"><span class="dot"></span>관전 모드 — 저장 불가</span>
+        <button class="save-btn" data-save-section="${section}" disabled>저장</button>
+      </div>
+    `;
+  }
+  // 장비 섹션은 무게 초과 상태로는 저장할 수 없음. 해제/장착을 이리저리
+  // 바꾸는 편집 도중에는 초과 상태를 오가도 되지만(그래야 "무거운 걸 빼고
+  // 다른 걸 끼는" 순서 조작이 가능함), 확정하는 순간에는 반드시 용량 안에
+  // 들어와 있어야 함 — DEX를 올려주는 장비를 뺐을 때 나머지가 초과로 남는
+  // 구멍을 여기서 막음.
+  if (section === "equipment") {
+    const cap = computeWeightCapacity();
+    const used = computeWeightUsed();
+    if (used > cap) {
+      return `
+        <div class="section-save-row">
+          <span class="section-save-flag" style="color:var(--danger);"><span class="dot"></span>무게 초과 (${used}/${cap}) — 저장할 수 없어요</span>
+          <button class="save-btn" data-save-section="${section}" disabled title="무게 초과 상태로는 저장할 수 없습니다">저장</button>
+        </div>
+      `;
+    }
+  }
+  return `
+    <div class="section-save-row">
+      <span class="section-save-flag ${isDirty ? "" : "clean"}"><span class="dot"></span>${isDirty ? "저장 안 된 변경사항 있음" : "저장됨"}</span>
+      <button class="save-btn" data-save-section="${section}" ${isDirty ? "" : "disabled"}>저장</button>
+    </div>
+  `;
+}
+
+// 섹션 저장 버튼은 여러 렌더 함수에 걸쳐 반복 등장하므로, 매번 다시 바인딩하는
+// 대신 문서 레벨에서 한 번만 위임 등록(버튼이 재렌더로 새로 생겨도 버블링으로
+// 그대로 잡힘).
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-save-section]");
+  if (!btn || btn.disabled) return;
+  const section = btn.dataset.saveSection;
+  saveSection(section);
+  if (section === "profile") renderProfile();
+  else if (section === "stat" || section === "equipment" || section === "skill") renderStatSection();
+  else if (section === "pattern") renderPatternSection();
+});
+
+let activePresetIdx = 0;
+
+// ============================================================================
+// 프로필 (왼쪽)
+// ============================================================================
+function renderProfile() {
+  const el = document.getElementById("profileSection");
+  // expToNext는 level에서 유도되는 값이라 저장된 값을 믿지 않고 다시 계산함
+  // (예전 방식으로 잘못 저장된 캐릭터도 여기서 정상값으로 교정됨).
+  window.ExpTable.syncExpFields(data);
+  const expPct = Math.round((data.exp / data.expToNext) * 100);
+  el.innerHTML = `
+    <div class="block">
+      <div class="portrait">${data.portrait}</div>
+      <div class="char-title">${data.name}</div>
+      <div class="char-sub">${data.job}</div>
+      <div class="level-row"><span class="lv-num">Lv. ${data.level}</span><span class="lv-label">NEXT ${data.exp.toLocaleString()} / ${data.expToNext.toLocaleString()} EXP</span></div>
+      <div class="exp-bar"><i style="width:${expPct}%"></i></div>
+      <div class="exp-caption">다음 레벨까지 ${(data.expToNext - data.exp).toLocaleString()}</div>
+      <div class="row-toggle">
+        ${Object.entries(FORMATION_ROW_TYPES).map(([key, meta]) => `
+          <button class="row-btn ${data.row === key ? "active" : ""}" data-row="${key}">${meta.label}</button>
+        `).join("")}
+      </div>
+      <button class="guard-toggle ${data.guardAllies ? (data.row === "front" ? "active" : "armed") : ""}" id="guardToggleBtn">
+        🛡️ 아군 보호 ${data.guardAllies ? "ON" : "OFF"}
+        <span class="guard-hint">
+          ${data.row === "front"
+            ? (data.guardAllies ? "전열이라 지금 바로 적용 중 — 단일/다수 공격의 최우선 타겟" : "켜면 지금 바로 적용됨(전열)")
+            : (data.guardAllies ? "후열이라 지금은 비활성 — 전열로 이동하면 자동 적용됨" : "후열이라 지금은 효과 없음 — 나중에 전열로 끌려나올 때를 대비해 미리 설정 가능")}
+        </span>
+      </button>
+    </div>
+
+    ${ownerUsername === "2inkle" ? `
+    <div class="block">
+      <h2 class="section-title">🧪 개발자 도구 <span class="hint">밸런스/기믹 테스트용 — 2inkle 계정에서만 보임</span></h2>
+      <div class="skill-list">
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">레벨 +5</span></div>
+          <button class="assign-btn" id="devLevelUpBtn">적용</button>
+        </div>
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">"부정한 성배" 지급</span></div>
+          <button class="assign-btn" id="devGrantItemBtn" ${hasItem(data, "부정한 성배") ? "disabled" : ""}>${hasItem(data, "부정한 성배") ? "보유중" : "지급"}</button>
+        </div>
+      </div>
+    </div>` : ""}
+
+    <div class="block">
+      ${renderSectionSaveButton("profile")}
+    </div>
+  `;
+
+  el.querySelectorAll(".row-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const row = e.target.dataset.row;
+      if (data.row === row) return;
+      data.row = row;
+      markDirty("profile");
+      renderProfile();
+    });
+  });
+
+  const guardBtn = document.getElementById("guardToggleBtn");
+  if (guardBtn) guardBtn.addEventListener("click", () => {
+    data.guardAllies = !data.guardAllies;
+    markDirty("profile");
+    renderProfile();
+  });
+
+  const levelBtn = document.getElementById("devLevelUpBtn");
+  if (levelBtn) levelBtn.addEventListener("click", () => {
+    data.level += 5;
+    markDirty("profile");
+    renderProfile();
+    renderStatSection();       // 레벨이 오르면 미배분 스탯 포인트·스킬 포인트·습득 가능 스킬 목록이 전부 여기서 바뀜
+    renderAdvancementSection(); // 레벨 조건을 새로 만족했을 수 있으니 같이 갱신
+  });
+
+  const itemBtn = document.getElementById("devGrantItemBtn");
+  if (itemBtn) itemBtn.addEventListener("click", () => {
+    data.keyItems = data.keyItems || [];
+    data.keyItems.push("부정한 성배");
+    markDirty("profile"); // keyItems는 profile 섹션 필드로 관리(승급 조건 체크용 개인 플래그)
+    renderProfile();
+  });
+}
+
+// ============================================================================
+// 전직(승급) — Sheet 최하단, 3칼럼 전체 폭으로 표시(grid-column:1/-1).
+// 예전엔 profileSection(왼쪽 280px 칼럼) 안에 작은 항목으로 끼어 있어서
+// 조건을 만족해도 눈에 잘 안 띄었음 — 여기로 옮기고 폭도 넓혀서 눈에 띄게 함.
+// ============================================================================
+function renderAdvancementSection() {
+  const el = document.getElementById("advancementSection");
+  const advancements = getAvailableAdvancements(data);
+  el.innerHTML = advancements.length ? `
+    <div class="block">
+      <h2 class="section-title">전직 가능 <span class="hint">조건 만족 시에만 표시</span></h2>
+      <div class="skill-list">
+        ${advancements.map((adv, i) => `
+          <div class="skill-item" data-adv="${i}">
+            <div class="sk-main">
+              <span class="sk-name">${adv.portrait} ${adv.toJob}</span>
+              <span class="sk-meta">${describeRequirements(adv)}</span>
+            </div>
+            <button class="assign-btn advance-btn">전직하기</button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  el.querySelectorAll(".advance-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(e.target.closest(".skill-item").dataset.adv);
+      const adv = advancements[idx];
+      if (!adv) return;
+      data.job = adv.toJob;
+      if (adv.portrait) data.portrait = adv.portrait;
+      markDirty("profile");
+      renderProfile();
+      renderStatSection();       // 직업이 바뀌면 습득 스킬 후보(SKILL_TABLE 조회 키)도 바뀜 — 스킬 목록이 여기 있음
+      renderPatternSection();    // THEN 드롭다운 후보도 새 직업 기준으로 갱신
+      renderAdvancementSection(); // 전직 직후 "다음 전직" 조건은 대부분 안 열려있어서 보통 비워짐
+    });
+  });
+}
+
+// ============================================================================
+// 스탯 + 장비 (가운데)
+// ============================================================================
+const STAT_META = [
+  { key:"str", label:"STR 힘" },
+  { key:"int", label:"INT 지능" },
+  { key:"dex", label:"DEX 민첩" },
+  { key:"spd", label:"SPD 속도" },
+  { key:"luk", label:"LUK 행운" }
+];
+
+// ============================================================================
+// 스탯 포인트 / 스킬 포인트 획득 공식
+// 초기치 없음 — 레벨 1은 기본 스탯(각 10)과 무료 시작 스킬만 갖고, 레벨업당
+// 아래 수치만큼 포인트가 늘어남. unassignedPoints/skillPoints는 더 이상 캐릭터
+// 데이터에 저장하지 않고, 매번 (레벨로 얻은 총량 - 이미 투자한 양)으로 계산함
+// — 장비 무게/보너스 스탯과 같은 방식이라 저장값이 실제 상태와 어긋날 일이 없음.
+// ============================================================================
+const STAT_POINTS_PER_LEVEL = 5;
+const SKILL_POINTS_PER_LEVEL = 2;
+const BASE_STAT_VALUE = 10; // hire.html의 BASE_STATS와 동일한 기준치
+const JOB_BASE_HP = 200; // src/character.js의 BaseJob.baseHp와 동일
+const JOB_BASE_SP = 50;  // src/character.js의 BaseJob.baseSp와 동일
+
+function allSkillsFlat() {
+  return [...COMMON_SKILLS, ...Object.values(SKILL_TABLE).flat()];
+}
+function computeUnassignedPoints(d) {
+  const earned = Math.max(0, d.level - 1) * STAT_POINTS_PER_LEVEL;
+  const spent = STAT_META.reduce((sum, m) => sum + (d.realStats[m.key] - BASE_STAT_VALUE), 0);
+  return earned - spent;
+}
+function computeSkillPoints(d) {
+  const earned = Math.max(0, d.level - 1) * SKILL_POINTS_PER_LEVEL;
+  const spent = allSkillsFlat()
+    .filter(s => d.learnedSkillNames.includes(s.name))
+    .reduce((sum, s) => sum + s.skillPointCost, 0);
+  return earned - spent;
+}
+
+// ============================================================================
+// 스탯 real/bonus/effective 클램프 공식 — BattleCharacter(src/character.js)의
+// calculateEffectiveStat와 동일한 공식. 장비의 공격력/방어력/마법공격력도 이제
+// 이 공식을 그대로 씀: effective = clamp(real+bonus, real×0.5, real×20).
+// "낮은 Real + 버프 의존형" vs "높은 Real + 버프 덜 필요형"은 별도 공식이 아니라,
+// 아이템마다 real 수치를 다르게 설계하는 것만으로 이 공식 위에서 자연히 갈림
+// (real이 낮으면 20배를 해도 절대값이 작아서 "버프 없인 약함"이 성립).
+// ============================================================================
+function calcEffective(real, bonus) {
+  const maxCap = real * 20;   // 버프로도 real의 2000%를 못 넘음
+  const minFloor = real * 0.5;
+  return Math.max(minFloor, Math.min(maxCap, real + bonus));
+}
+
+// ============================================================================
+// 스탯 표기 용어 통일 규칙 (앞으로 추가되는 모든 표시 문구에 적용):
+//   - real형 수치에 영향 → "real" + 스탯명 접두사 (예: realSTR, realATK, realMATK)
+//   - bonus형 수치에 영향 → 스탯명만, "real" 접두사 없음 (예: STR, ATK)
+// describeItem()/ITEM_SET_TABLE의 description 문구는 전부 이 규칙을 따름.
+// ============================================================================
+
+// 아이템의 옵션 필드들을 사람이 읽을 표시 문구로 자동 생성(고정 bonus 문자열을
+// 따로 저장하지 않아도 필드만 채우면 화면에 정확히 반영되도록).
+function describeItem(item) {
+  const parts = [];
+  if (item.equipmentType) parts.push(item.equipmentType);
+  const combatReal = item.combatReal || {};
+  const combatBonus = item.combatBonus || {};
+  [["ATK", "atk"], ["MATK", "matk"], ["DEF", "def"], ["MDEF", "mdef"]].forEach(([label, key]) => {
+    if (combatReal[key] || combatBonus[key]) parts.push(`${label} ${combatReal[key] || 0}+${combatBonus[key] || 0}`);
+  });
+  if (item.statRealBonus) {
+    STAT_META.forEach((m) => { if (item.statRealBonus[m.key]) parts.push(`real${m.label.split(" ")[0]} +${item.statRealBonus[m.key]}`); });
+  }
+  if (item.statBonus) {
+    STAT_META.forEach((m) => { if (item.statBonus[m.key]) parts.push(`${m.label.split(" ")[0]} +${item.statBonus[m.key]}`); });
+  }
+  if (item.patternSlotBonus) parts.push(`패턴 슬롯 +${item.patternSlotBonus}`);
+  if (item.weight) parts.push(`무게 ${item.weight}`);
+  if (item.requiredJob) parts.push(`"${item.requiredJob}" 계열 전용`);
+  if (item.twoHanded) parts.push(`양손 무기`);
+  if (item.avatarPortrait) parts.push(`외형 ${item.avatarPortrait}로 변경`);
+  if (item.grantsSkill) parts.push(`"${item.grantsSkill}" 사용 가능`);
+  if (item.consumable) parts.push(`소모품 · 전투당 ${item.usesPerBattle || 1}회`);
+  if (item.setId && ITEM_SET_TABLE[item.setId]) parts.push(`[${ITEM_SET_TABLE[item.setId].name}]`);
+  return parts.join(" · ") || "옵션 없음";
+}
+
+// ============================================================================
+// 장비 슬롯 종류 레지스트리 — 캐릭터가 동시에 착용할 수 있는 슬롯 12종.
+// order는 정보창에 표시되는 순서. 새 슬롯이 필요하면 여기 한 줄만 추가하면
+// data.equipment 초기화(hire.html)·렌더링에 자동 반영됨(단, hire.html의 초기
+// equipment 객체에도 키를 추가해야 신규 캐릭터가 그 슬롯을 갖고 시작함).
+// ============================================================================
+// ============================================================================
+// needsEquipmentType — 이 슬롯의 아이템에 equipmentType(dagger/sword/greatsword/
+// staff/bow/gun/robe/armor/plate/sandal/shoes/greave 등, 직업별 착용 가능
+// 여부를 가릴 무게/숙련 등급 분류)이 필요한지. 무기·방어구 계열(mainhand/
+// subhand/armor/shoes/head)만 true — 나머지는 각자 다른 이유로 false:
+//   jItem   — 이미 requiredJob(아이템 쪽에 직접 붙는 단일 직업 지정, job→type
+//             목록이 아니라 item→job 단방향)으로 착용 가능 여부가 갈림.
+//             equipmentType과는 완전히 다른 메커니즘이라 겹쳐 쓸 필요 없음.
+//   uItem   — 소모형이라 모든 캐릭터가 동일하게 사용 가능(직업 제한 자체가 없음).
+//   cloak/accessory/item — 직업 제한을 둘 필요가 없는 범용 슬롯으로 정함.
+//   avatar/skillSeal — 무기·방어구가 아니라 외형/스킬 부여용이라 해당 없음.
+// equipmentType은 "직업이 어떤 타입들을 허용하는지" 목록을 직업 테이블 쪽에
+// 따로 둘 예정(아이템 쪽에서 직업을 지정하는 requiredJob과는 반대 방향) — 지금
+// 당장은 아이템에 값만 붙여두고, 직업 테이블 연동은 필요할 때 별도로 진행함.
+// ============================================================================
+const EQUIPMENT_SLOT_TYPES = {
+  mainhand:  { label: "Mainhand",  order: 1,  description: "주무기 — 검/도끼/활/지팡이 등", needsEquipmentType: true },
+  subhand:   { label: "Subhand",   order: 2,  description: "방패나 보조무기 — Mainhand와 함께 착용", needsEquipmentType: true },
+  armor:     { label: "Armor",     order: 3,  description: "몸통 갑옷 — 천갑옷/경갑/중갑 등", needsEquipmentType: true },
+  cloak:     { label: "Cloak",     order: 4,  description: "망토", needsEquipmentType: false },
+  shoes:     { label: "Shoes",     order: 5,  description: "신발 — 샌들/신발/그리브 등", needsEquipmentType: true },
+  head:      { label: "Head",      order: 6,  description: "머리 장비", needsEquipmentType: true },
+  accessory: { label: "Accessory", order: 7,  description: "장신구", needsEquipmentType: false },
+  jItem:     { label: "J.Item",    order: 8,  description: "직업 전용 아이템 — 하위 직업 아이템은 상위 직업도 착용 가능, 반대는 불가", needsEquipmentType: false },
+  item:      { label: "Item",      order: 9,  description: "모든 직업이 공유하는 범용 아이템", needsEquipmentType: false },
+  avatar:    { label: "Avatar",    order: 10, description: "장착 시 전투 중 캐릭터 외형이 바뀜(장비 효과도 있음)", needsEquipmentType: false },
+  skillSeal: { label: "SkillSeal", order: 11, description: "원래 못 쓰는 스킬을 쓸 수 있게 해줌", needsEquipmentType: false },
+  uItem:     { label: "U.Item",    order: 12, description: "소모형 — 전투 중 1회만 사용 가능, 패턴에 \"아이템 사용\" 행동이 필요함", needsEquipmentType: false }
+};
+const EQUIPMENT_SLOT_KEYS = Object.entries(EQUIPMENT_SLOT_TYPES).sort((a, b) => a[1].order - b[1].order).map(([k]) => k);
+
+// 아이템이 이 캐릭터에게 착용 가능한지. requiredJob이 없으면 전 직업 공용.
+// requiredJob이 있으면 J.Item 규칙(isJobOrDescendantOf) 적용.
+// ============================================================================
+// 장비 소유 모델 — 캐릭터 개인 인벤토리(data.inventory)는 더 이상 안 씀.
+// 대신 창고(battleSim_warehouse) 안에서 장비 항목을 두 가지 상태로 다룸:
+//   풀(pool)   — heldBy 없음. quantity로 뭉쳐서 관리(같은 이름+분류는 병합).
+//                누구나 장착 후보로 가져갈 수 있음.
+//   보유(held) — heldBy: 캐릭터id. quantity 항상 1(개별 인스턴스). 그 캐릭터가
+//                장착 중인 바로 그 장비 — 다른 캐릭터에게는 후보로 안 보임.
+// 장착: 풀에서 1개를 꺼내(quantity -1, 0 되면 그 행 삭제) 완전히 같은 스펙의
+//   새 행을 만들어 heldBy를 붙여 창고에 넣고, 그 데이터를 character.equipment
+//   [슬롯]에도 그대로 복사해둠(전투 엔진이 character.equipment를 직접 읽으므로).
+// 해제: heldBy가 붙은 그 행을 지우고, 풀에 병합(없으면 새로 만듦) — 해제하는
+//   즉시 "누구 것도 아닌 공용 재고"로 돌아가 다른 캐릭터도 다시 가져갈 수 있음
+//   (캐릭터 개인이 아이템을 독점하지 않는다는 원칙).
+// ============================================================================
+function equipFromWarehouse(character, poolItem) {
+  const warehouse = getWarehouse();
+  const idx = warehouse.findIndex((w) => w === poolItem || (w.name === poolItem.name && w.category === poolItem.category && !w.heldBy && (w.enhanceLevel||0) === (poolItem.enhanceLevel||0)));
+  if (idx === -1) return null;
+  warehouse[idx].quantity -= 1;
+  if (warehouse[idx].quantity <= 0) warehouse.splice(idx, 1);
+
+  const { quantity, heldBy, ...spec } = poolItem;
+  const heldInstance = { ...spec, quantity: 1, heldBy: character.id };
+  warehouse.push(heldInstance);
+  saveWarehouse(warehouse);
+  return heldInstance;
+}
+function returnToWarehousePool(item) {
+  if (!item) return;
+  const warehouse = getWarehouse();
+  // heldBy가 붙어있던 그 개별 인스턴스를 제거(이름+분류+heldBy로 특정)
+  const heldIdx = warehouse.findIndex((w) => w.name === item.name && w.category === item.category && w.heldBy === item.heldBy && w.heldBy);
+  if (heldIdx !== -1) warehouse.splice(heldIdx, 1);
+
+  const { quantity, heldBy, ...spec } = item;
+  // enhanceLevel도 같이 봐야 함 — 강화된 장비(예: 대검+10)는 기본형(대검+0)과
+  // 스펙이 다른 별개 아이템이라 절대 같이 뭉치면 안 됨.
+  const poolExisting = warehouse.find((w) => w.name === item.name && w.category === item.category && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
+  if (poolExisting) poolExisting.quantity += 1;
+  else warehouse.push({ ...spec, quantity: 1 });
+  saveWarehouse(warehouse);
+}
+// ============================================================================
+// 양손무기(twoHanded) 예외 규칙 저장소 — 원칙은 "mainhand에 양손무기가 장착돼
+// 있으면 subhand엔 아무것도 못 낌"이지만, 여기 등록된 {mainhand, subhand}
+// 이름 조합만 예외로 함께 장착을 허용함. 새 예외가 필요해지면(예: 활+화살통처럼
+// mainhand가 양손 취급이면서도 특정 subhand와는 같이 쓰는 무기 종류가 생기면)
+// 이 배열에 한 줄만 추가하면 됨 — 다른 코드는 안 건드려도 됨.
+// ============================================================================
+const TWO_HANDED_EXCEPTIONS = [
+  { mainhand: "활", subhand: "화살통" },
+  // 새 예외 예시: { mainhand: "석궁", subhand: "볼트 주머니" }
+];
+function isTwoHandedExceptionAllowed(mainhandName, subhandName) {
+  return TWO_HANDED_EXCEPTIONS.some((ex) => ex.mainhand === mainhandName && ex.subhand === subhandName);
+}
+
+// ============================================================================
+// 직업별 착용 가능 equipmentType 목록 — job→허용 타입 목록(다대다) 방향.
+// 여기 항목이 아예 없는 직업은 제한 없음(모든 타입 착용 가능)으로 취급함 —
+// 안 그러면 아직 등록 안 된 다른 모든 직업이 장비를 하나도 못 끼는 상태가
+// 돼버림(직업 테이블은 필요할 때마다 하나씩 채워나가는 방식이라). 이제
+// dev-tools의 job-table-editor.html에서 관리하는 공용 소스에서 읽어옴.
+// ============================================================================
+const JOB_ALLOWED_EQUIPMENT_TYPES = getJobTable().allowedEquipmentTypes;
+
+function isItemEquippableBy(item, job, currentEquipment) {
+  if (item.requiredJob && !isJobOrDescendantOf(job, item.requiredJob)) {
+    return { ok: false, reason: `"${item.requiredJob}" 계열 전용 (현재 직업: ${job})` };
+  }
+  // 이 슬롯이 equipmentType 제한 대상이고, 이 직업에 허용 목록이 등록돼
+  // 있으면 그 목록에 있는 타입만 착용 가능.
+  const slotMeta = EQUIPMENT_SLOT_TYPES[item.slot];
+  if (slotMeta && slotMeta.needsEquipmentType && item.equipmentType) {
+    const allowed = JOB_ALLOWED_EQUIPMENT_TYPES[job];
+    if (allowed && !allowed.includes(item.equipmentType)) {
+      return { ok: false, reason: `"${item.equipmentType}" 타입은 "${job}" 착용 불가` };
+    }
+  }
+  // subhand에 뭔가 장착하려는데, 지금 mainhand가 양손무기고 예외 조합도
+  // 아니면 불가 — mainhand를 양손무기로 새로 장착하는 쪽(반대 방향)은 여기가
+  // 아니라 장착 처리 함수에서 subhand를 자동 해제하는 식으로 따로 처리함.
+  if (item.slot === "subhand" && currentEquipment) {
+    const mh = currentEquipment.mainhand;
+    if (mh && mh.twoHanded && !isTwoHandedExceptionAllowed(mh.name, item.name)) {
+      return { ok: false, reason: `"${mh.name}"은(는) 양손무기라 Subhand 장착 불가` };
+    }
+  }
+
+  // 무게(handle) 제한 — 초과하면 아예 장착 불가. 예전엔 "초과 시 행동속도
+  // 페널티"라는 UI 문구만 있었고 실제 페널티는 구현된 적이 없었는데,
+  // "수용치를 못 맞추면 장착 승인 자체가 안 된다"는 규칙으로 확정함.
+  // 이 슬롯에 이미 뭔가 끼고 있으면 교체이므로 그 무게는 빼고 계산함.
+  if (currentEquipment) {
+    const capacity = computeWeightCapacity();
+    const replacing = currentEquipment[item.slot];
+    const projected = computeWeightUsed() - (replacing?.weight || 0) + (item.weight || 0);
+    if (projected > capacity) {
+      return { ok: false, reason: `무게 초과 (${projected}/${capacity}) — 이 장비를 들 수 없음` };
+    }
+  }
+
+  return { ok: true };
+}
+
+// ============================================================================
+// 아이템 시리즈(세트) 테이블 — 같은 setId 장비를 몇 개 장착했는지에 따라 문턱값
+// (thresholds)마다 추가 보너스가 붙음. 아이템 하나의 속성이 아니라 "장착 조합"에
+// 대한 규칙이라 개별 아이템 데이터(상점/창고)와는 별개로 관리함.
+// ============================================================================
+const ITEM_SET_TABLE = {
+  sage_series: {
+    name: "현자의 시리즈",
+    thresholds: [
+      { count: 2, statBonus: { int: 5 }, description: "INT +5" },
+      { count: 4, combatReal: { matk: 6 }, patternSlotBonus: 1, description: "realMATK +6, 패턴 슬롯 +1" }
+    ]
+  },
+  // 왕관 조각을 소재로 넣어 제작/개조한 장비에 자동으로 붙는 세트.
+  // 소재 하나로 세트가 결정되므로, 여러 부위를 왕관 조각으로 맞추면
+  // 자연스럽게 세트가 완성됨 — 다만 왕관 조각은 왕/섭정에게서만 나오고
+  // 부위마다 무게 +1이 붙어서, 전부 맞추려면 DEX 투자가 필요함.
+  goblin_crown_series: {
+    name: "고블린 왕관 시리즈",
+    thresholds: [
+      { count: 2, combatReal: { atk: 4, matk: 4 }, description: "realATK +4, realMATK +4" },
+      { count: 3, maxHpBonus: 150, description: "MaxHP +150" },
+      // 세트 완성 보상 — 잡졸(normal)과 소환체(creature)에게 받는 피해 15% 감소.
+      // 소환된 개체는 creatureTier가 creature로 강제 변환되므로, 둘 다 넣어야
+      // "잡졸은 함부로 덤비지 못한다"가 실제로 성립함(마차가 뱉는 물량이
+      // 정확히 creature라, normal만 걸면 정작 수송대에서 안 통했음).
+      { count: 4, statBonus: { str: 4, int: 4 }, patternSlotBonus: 1,
+        passiveBonus: {
+          damageTakenFrom_normalPct: 10, damageTakenFrom_creaturePct: 10,
+          damageDealtTo_normalPct: 10, damageDealtTo_creaturePct: 10,
+        },
+        description: "STR +4, INT +4, 패턴 슬롯 +1, 일반·소환체에게 주는 피해 +10% / 받는 피해 -10%" }
+    ]
+  }
+  // 새 세트 예시: knight_series: { name:"기사단 시리즈", thresholds:[{count:2, combatReal:{def:5}, description:"realDEF +5"}] }
+};
+
+function getSetBonusesForEquipped() {
+  const counts = {};
+  equippedItems().forEach((it) => {
+    if (!it.setId) return;
+    counts[it.setId] = (counts[it.setId] || 0) + 1;
+  });
+
+  const active = [];
+  Object.entries(counts).forEach(([setId, count]) => {
+    const set = ITEM_SET_TABLE[setId];
+    if (!set) return;
+    set.thresholds.forEach((tier) => {
+      if (count >= tier.count) active.push({ setId, setName: set.name, ...tier });
+    });
+  });
+  return active;
+}
+
+// 장비 무게/스탯 보너스는 더 이상 캐릭터 객체에 고정된 숫자로 저장하지 않고,
+// 실제로 장착 중인 아이템(+ 세트 보너스)에서 매번 계산함(장착/해제 즉시 반영).
+// 아이템 자체는 마스터 테이블 없이(상점/창고 각자의 데이터로) 흘러들어옴 —
+// character.js의 combatReal/combatBonus/statBonus 등 필드를 그대로 씀.
+function equippedItems() {
+  return Object.values(data.equipment).filter(Boolean);
+}
+function computeWeightUsed() {
+  return equippedItems().reduce((sum, it) => sum + (it.weight || 0), 0);
+}
+function computeBonusStats() {
+  const bonus = { str:0, int:0, dex:0, spd:0, luk:0 };
+  equippedItems().forEach((it) => {
+    if (it.statBonus) STAT_META.forEach((m) => { bonus[m.key] += it.statBonus[m.key] || 0; });
+  });
+  getSetBonusesForEquipped().forEach((tier) => {
+    if (tier.statBonus) STAT_META.forEach((m) => { bonus[m.key] += tier.statBonus[m.key] || 0; });
+  });
+  return bonus;
+}
+// 장비가 주는 "real형" 스탯 보너스 — statBonus(bonus형)와 별개. real형은 캐릭터의
+// 잠재치 자체를 올려서 Max HP/SP·패턴 슬롯·무게 제한의 "기본치" 계산에도 반영됨.
+// 아이템 하나가 real형/bonus형을 동시에 줄 수도 있음(예: 잠재력도 올리고 즉시
+// 성능도 올리는 장비).
+function computeEquipmentRealStatBonus() {
+  const bonus = { str:0, int:0, dex:0, spd:0, luk:0 };
+  equippedItems().forEach((it) => {
+    if (it.statRealBonus) STAT_META.forEach((m) => { bonus[m.key] += it.statRealBonus[m.key] || 0; });
+  });
+  getSetBonusesForEquipped().forEach((tier) => {
+    if (tier.statRealBonus) STAT_META.forEach((m) => { bonus[m.key] += tier.statRealBonus[m.key] || 0; });
+  });
+  return bonus;
+}
+// 투자한 real 스탯(data.realStats) + 장비의 real형 보너스를 합친 "결합 real".
+// Max HP/SP, 패턴 슬롯, 무게 제한의 기본치는 전부 이 결합 real을 기준으로 계산됨
+// — bonus형 스탯(장비의 statBonus, 전투 중 버프)은 여기 안 들어감(잠재치 자체를
+// 안 올리고 당장의 성능만 끌어올리는 성격이라서).
+function computeCombinedRealStats() {
+  const equipReal = computeEquipmentRealStatBonus();
+  const combined = {};
+  STAT_META.forEach((m) => { combined[m.key] = data.realStats[m.key] + equipReal[m.key]; });
+  return combined;
+}
+function computeMaxHp() {
+  return JOB_BASE_HP + Math.floor(computeCombinedRealStats().str * 20);
+}
+function computeMaxSp() {
+  return JOB_BASE_SP + Math.floor(computeCombinedRealStats().int * 10);
+}
+// 크리티컬 — src/character.js의 critRate/critMultiplier 게터와 반드시 같은
+// 공식이어야 함(시트 표시값과 실제 전투값이 어긋나면 안 되므로).
+//   확률 = min(100, realLUK×0.5 + 장비/패시브 critChancePct 합산)
+//   배율 = max(1.5, 장비/패시브 critMultiplier 중 최댓값)  ← 합산 아님
+function computeCritStats() {
+  const items = equippedItems();
+  const passives = learnedSkillObjs().filter(s => s.passive);
+  const chanceSum =
+    items.reduce((sum, it) => sum + (it.passiveBonus?.critChancePct || 0), 0) +
+    passives.reduce((sum, s) => sum + (s.passiveMods?.critChancePct || 0), 0);
+  const multiplier = Math.max(
+    1.5,
+    ...items.map(it => it.critMultiplier || 0),
+    ...passives.map(s => s.critMultiplier || 0)
+  );
+  return {
+    rate: Math.min(100, computeCombinedRealStats().luk * 0.5 + chanceSum),
+    multiplier,
+  };
+}
+
+function computeMaxPatternSlots() {
+  const base = 1 + Math.floor(computeCombinedRealStats().int / 10);
+  const itemBonus = equippedItems().reduce((sum, it) => sum + (it.patternSlotBonus || 0), 0);
+  const setBonus = getSetBonusesForEquipped().reduce((sum, t) => sum + (t.patternSlotBonus || 0), 0);
+  const passiveBonus = learnedSkillObjs().filter(s => s.passive).reduce((sum, s) => sum + (s.patternSlotBonus || 0), 0);
+  return base + itemBonus + setBonus + passiveBonus;
+}
+function computeWeightCapacity() {
+  const base = 5 + Math.floor(computeCombinedRealStats().dex / 5); // src/character.js의 weightCapacity와 동일 공식
+  // handle(무게)은 순수 코스트 — 장비가 용량을 "늘려주는" 개념은 없앰.
+  // 예전엔 handleReduction이라는 필드가 용량을 더해줘서, 무거운 장비를 낄수록
+  // 오히려 용량이 늘어나 무게 제한이 아무 의미가 없었음. weight(소모) 하나로 통일.
+  // 용량을 늘려주는 효과가 필요하면 그건 별도 옵션으로 다루기로 함.
+  const itemBonus = 0;
+  const setBonus = 0;
+  return base + itemBonus + setBonus;
+}
+
+// 전투 스탯(공격력/방어력/마법공격력/마법방어력) — STR/INT 등 실제 스탯과 완전히
+// 무관하게, 오직 착용 중인 장비(+ 세트 보너스)의 combatReal 합산이 real이 됨.
+// 기본 real은 0(맨몸이면 다 0)이라 STAT_META 같은 "기본치+투자" 개념이 없음 —
+// 스탯 포인트로 못 올리고 오직 장비로만 바뀜.
+function computeRealCombatStats() {
+  const real = { atk:0, def:0, matk:0, mdef:0 };
+  equippedItems().forEach((it) => {
+    if (it.combatReal) {
+      real.atk += it.combatReal.atk || 0;
+      real.def += it.combatReal.def || 0;
+      real.matk += it.combatReal.matk || 0;
+      real.mdef += it.combatReal.mdef || 0;
+    }
+  });
+  getSetBonusesForEquipped().forEach((tier) => {
+    if (tier.combatReal) {
+      real.atk += tier.combatReal.atk || 0;
+      real.def += tier.combatReal.def || 0;
+      real.matk += tier.combatReal.matk || 0;
+      real.mdef += tier.combatReal.mdef || 0;
+    }
+  });
+  return real;
+}
+// 장비가 주는 combatBonus(버프 취급 수치) 합산 — 실제 전투 중 버프와는 별개로,
+// 장비 자체가 항상 주는 값이라 Sheet(전투 밖)에서도 그대로 보여야 함. 실제
+// 전투에선 여기에 전투 중 버프가 "더" 얹혀서 계속 변할 수 있지만, Sheet는
+// 정적 조회라 장비발 몫만 보여줌.
+function computeEquipmentBonusCombatStats() {
+  const bonus = { atk:0, def:0, matk:0, mdef:0 };
+  equippedItems().forEach((it) => {
+    if (it.combatBonus) {
+      bonus.atk += it.combatBonus.atk || 0;
+      bonus.def += it.combatBonus.def || 0;
+      bonus.matk += it.combatBonus.matk || 0;
+      bonus.mdef += it.combatBonus.mdef || 0;
+    }
+  });
+  return bonus;
+}
+function computeCombatStats() {
+  const real = computeRealCombatStats();
+  const bonus = computeEquipmentBonusCombatStats();
+  return {
+    real,
+    bonus,
+    effective: {
+      atk: calcEffective(real.atk, bonus.atk),
+      def: calcEffective(real.def, bonus.def),
+      matk: calcEffective(real.matk, bonus.matk),
+      mdef: calcEffective(real.mdef, bonus.mdef),
+    },
+  };
+}
+
+function renderStatSection() {
+  const el = document.getElementById("statSection");
+  const weightUsed = computeWeightUsed();
+  const weightCapacity = computeWeightCapacity();
+  const bonusStats = computeBonusStats();
+  const equipRealBonus = computeEquipmentRealStatBonus();
+  const combatStats = computeCombatStats();
+  const setBonuses = getSetBonusesForEquipped();
+  const unassignedPoints = computeUnassignedPoints(data);
+  const over = weightUsed > weightCapacity;
+  el.innerHTML = `
+    <div class="block">
+      <h2 class="section-title">스탯 <span class="hint">투자 real + 장비 real + bonus</span></h2>
+      <div class="points-banner">
+        <div><span class="p-label">미배분 포인트</span><span class="p-value" id="pointsVal">${unassignedPoints}</span></div>
+      </div>
+      <div class="max-row"><span>Max HP</span><span>${computeMaxHp()}</span></div>
+      <div class="max-row"><span>Max SP</span><span>${computeMaxSp()}</span></div>
+      ${STAT_META.map(m => `
+        <div class="stat-row" data-stat="${m.key}">
+          <div class="s-name">${m.label}</div>
+          <div class="s-bars">
+            <span class="s-real">${data.realStats[m.key]}${equipRealBonus[m.key] ? `<span class="s-real-gear">+${equipRealBonus[m.key]}</span>` : ""}</span>
+            <span class="s-bonus">+${bonusStats[m.key]}</span>
+          </div>
+          <div class="stepper">
+            <button class="stat-plus" ${unassignedPoints <= 0 ? "disabled" : ""}>+</button>
+          </div>
+        </div>
+      `).join("")}
+      ${renderSectionSaveButton("stat")}
+    </div>
+
+    <div class="block">
+      <h2 class="section-title">전투 스탯 <span class="hint">전적으로 장비 의존 — real/effective(2000% 캡) 존재</span></h2>
+      <div class="stat-row"><div class="s-name">⚔️ 공격력(ATK)</div><div class="s-bars"><span class="s-real">${combatStats.real.atk}</span><span class="s-bonus">eff ${combatStats.effective.atk}</span></div></div>
+      <div class="stat-row"><div class="s-name">🔮 마법 공격력(MATK)</div><div class="s-bars"><span class="s-real">${combatStats.real.matk}</span><span class="s-bonus">eff ${combatStats.effective.matk}</span></div></div>
+      <div class="stat-row"><div class="s-name">🛡️ 방어력(DEF)</div><div class="s-bars"><span class="s-real">${combatStats.real.def}</span><span class="s-bonus">eff ${combatStats.effective.def}</span></div></div>
+      <div class="stat-row"><div class="s-name">🔰 마법 방어력(MDEF)</div><div class="s-bars"><span class="s-real">${combatStats.real.mdef}</span><span class="s-bonus">eff ${combatStats.effective.mdef}</span></div></div>
+      <div class="stat-row"><div class="s-name">💥 치명타</div><div class="s-bars"><span class="s-real">${computeCritStats().rate.toFixed(1)}%</span><span class="s-bonus">×${computeCritStats().multiplier.toFixed(2)}</span></div></div>
+    </div>
+
+    ${Object.keys(data.personalResources).length ? `
+    <div class="block">
+      <h2 class="section-title">개인 자원 <span class="hint">진영 공유 자원과 별개 — 이 캐릭터만의 자원</span></h2>
+      ${Object.entries(data.personalResources).map(([key, r]) => {
+        const meta = PERSONAL_RESOURCE_TYPES[key];
+        return `<div class="max-row"><span>${meta ? `${meta.icon} ${meta.label}` : key}</span><span>${r.current} / ${r.max}</span></div>`;
+      }).join("")}
+    </div>` : ""}
+
+    <div class="block">
+      <h2 class="section-title">장비 <span class="hint">무게 ${weightUsed} / ${weightCapacity}${over ? " — 초과" : ""}</span></h2>
+      ${over ? `<div class="weight-warning">⚠ 무게 제한 초과 — 이 상태에서는 새 장비를 장착할 수 없어요 (DEX를 올리거나 장비를 해제하세요)</div>` : ""}
+      <div class="resource-bar-row" style="margin-top:8px;">
+        <div class="resource-bar weight ${over ? "over" : ""}"><i style="width:${Math.min(100,(weightUsed/weightCapacity)*100)}%"></i></div>
+      </div>
+      ${setBonuses.length ? `<div class="set-bonus-note">${setBonuses.map(t => `✨ ${t.setName} ${t.count}세트: ${t.description}`).join("<br>")}</div>` : ""}
+      <div class="equip-slots">
+        ${EQUIPMENT_SLOT_KEYS.map((type) => {
+          const item = data.equipment[type];
+          const label = EQUIPMENT_SLOT_TYPES[type].label;
+          return item ? `
+          <div class="equip-slot" data-type="${type}">
+            <div class="e-icon">◆</div>
+            <div class="e-body"><div class="e-type">${label}</div><div class="e-name">${item.name}${item.enhanceLevel ? ` +${item.enhanceLevel}` : ""}</div><div class="e-bonus">${describeItem(item)}</div></div>
+            <button class="unequip-x" title="해제">✕</button>
+          </div>
+        ` : `
+          <div class="equip-slot empty" data-type="${type}" title="${EQUIPMENT_SLOT_TYPES[type].description}">
+            <div class="e-icon">—</div>
+            <div class="e-body"><div class="e-type">${label}</div><div class="e-name">비어 있음</div></div>
+          </div>
+        `;
+        }).join("")}
+      </div>
+      ${(() => {
+        const allPool = getWarehouse().filter((w) => w.category === "equipment" && !w.heldBy);
+        if (allPool.length === 0) return "";
+        return `
+        <h2 class="section-title" style="margin-top:18px;">창고에서 장착 가능한 장비 <span class="hint">용병단 공용 — 장착하면 그 개체가 이 캐릭터 전용이 됨, 해제하면 다시 공용으로</span></h2>
+        <div class="inv-list">
+          ${allPool.map((it, idx) => {
+            const eligibility = isItemEquippableBy(it, data.job, data.equipment);
+            return `
+            <div class="inv-item" data-idx="${idx}">
+              <span class="i-name">${it.name}${it.enhanceLevel ? ` <b style="color:var(--gold);">+${it.enhanceLevel}</b>` : ""}${it.quantity > 1 ? ` ×${it.quantity}` : ""} <span class="i-slot-tag">[${EQUIPMENT_SLOT_TYPES[it.slot]?.label || it.slot}]</span><span class="i-bonus">${describeItem(it)}${eligibility.ok ? "" : ` · ⚠ ${eligibility.reason}`}</span></span>
+              <button class="equip-btn" ${eligibility.ok ? "" : "disabled title=\"착용 자격 없음\""}>장착</button>
+            </div>
+          `;
+          }).join("")}
+        </div>
+      `;
+      })()}
+      <div class="skill-list" style="margin-top:14px;">
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">🧪 테스트용 무기 지급</span><span class="sk-meta">일시 비활성화 — ITEM_TABLE 제거로 갱신 예정</span></div>
+          <button class="assign-btn" id="devGrantWeaponBtn" disabled>지급</button>
+        </div>
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">🧪 현자의 시리즈 조각 지급</span><span class="sk-meta">일시 비활성화 — ITEM_TABLE 제거로 갱신 예정</span></div>
+          <button class="assign-btn" id="devGrantSetPieceBtn" disabled>지급</button>
+        </div>
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">🧪 카디널의 홀장 지급</span><span class="sk-meta">일시 비활성화 — ITEM_TABLE 제거로 갱신 예정</span></div>
+          <button class="assign-btn" id="devGrantJItemBtn" disabled>지급</button>
+        </div>
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">🧪 금단의 주문서 지급</span><span class="sk-meta">일시 비활성화 — ITEM_TABLE 제거로 갱신 예정</span></div>
+          <button class="assign-btn" id="devGrantSkillSealBtn" disabled>지급</button>
+        </div>
+        <div class="skill-item">
+          <div class="sk-main"><span class="sk-name">🧪 화살 20/20 지급</span><span class="sk-meta">개인 자원 테스트용 — "필살의 화살" 스킬 코스트 확인 가능</span></div>
+          <button class="assign-btn" id="devGrantArrowsBtn">지급</button>
+        </div>
+      </div>
+      ${renderSectionSaveButton("equipment")}
+    </div>
+
+    <div class="block">
+      <h2 class="section-title">스킬 포인트 <span class="hint">레벨업으로 획득, 스킬 습득에 사용</span></h2>
+      <div class="points-banner">
+        <div><span class="p-label">보유 스킬 포인트</span><span class="p-value">${computeSkillPoints(data)}</span></div>
+      </div>
+    </div>
+
+    ${learnedSkillObjs().length ? `
+    <div class="block">
+      <h2 class="section-title">습득한 스킬 <span class="hint">패턴 행동으로 사용 가능</span></h2>
+      <div class="skill-list">
+        ${learnedSkillObjs().map(s => renderSkillCard(s)).join("")}
+      </div>
+    </div>` : ""}
+
+    ${equipmentGrantedSkillObjs().length ? `
+    <div class="block">
+      <h2 class="section-title">SkillSeal로 사용 가능한 스킬 <span class="hint">습득 여부와 무관 — 장착 해제하면 사라짐</span></h2>
+      <div class="skill-list">
+        ${equipmentGrantedSkillObjs().map(s => renderSkillCard(s)).join("")}
+      </div>
+    </div>` : ""}
+
+    ${(() => {
+      // 선행 스킬 미충족·상호배타 위반인 스킬은 아예 표시하지 않음(2026-08-14
+      // 변경 — 예전엔 🔒/🚫 경고 문구와 함께 카드는 보여주고 배우기 버튼만
+      // 비활성화했음). 레벨 조건은 이미 learnableSkillObjs() 자체에서 걸러짐.
+      // 스킬 포인트 부족은 여기 포함 안 함 — "지금 배울 형편은 안 되지만
+      // 뭘 위해 모으는지"는 계속 보여주는 게 나아서 카드는 남기고 버튼만 비활성화.
+      const visible = learnableSkillObjs().filter(s => meetsSkillPrereq(s) && !violatesExclusion(s));
+      if (!visible.length) return "";
+      return `
+    <div class="block">
+      <h2 class="section-title">습득 가능 스킬 <span class="hint">조건을 만족한 스킬만 표시됨</span></h2>
+      <div class="skill-list">
+        ${visible.map(s => {
+          const pointsOk = computeSkillPoints(data) >= s.skillPointCost;
+          return renderSkillCard(s, { learnBtnState: { disabled: !pointsOk } });
+        }).join("")}
+      </div>
+    </div>`;
+    })()}
+
+    <div class="block">
+      ${renderSectionSaveButton("skill")}
+    </div>
+  `;
+
+  el.querySelectorAll(".stat-plus").forEach(btn => btn.addEventListener("click", (e) => {
+    const key = e.target.closest(".stat-row").dataset.stat;
+    if (computeUnassignedPoints(data) <= 0) return;
+    data.realStats[key]++; markDirty("stat"); renderStatSection();
+  }));
+
+  // 장착: 창고 풀에서 개체를 하나 꺼내 이 캐릭터 전용(heldBy)으로 전환하고,
+  // 그 슬롯에 이미 있던 장비는 다시 풀로 돌려보냄. 관전 모드(남의 캐릭터)면
+  // 창고를 건드릴 수 없게 맨 위에서 막음 — 안 그러면 실제로 소유하지도 않을
+  // 캐릭터에게 창고 아이템이 잘못 배정되는 구멍이 생김.
+  el.querySelectorAll(".equip-btn").forEach(btn => btn.addEventListener("click", (e) => {
+    if (!isOwner) return;
+    const idx = Number(e.target.closest(".inv-item").dataset.idx);
+    const poolItem = getWarehouse().filter((w) => w.category === "equipment" && !w.heldBy)[idx];
+    if (!poolItem) return;
+    const eligibility = isItemEquippableBy(poolItem, data.job, data.equipment);
+    if (!eligibility.ok) return; // 버튼이 disabled라 보통 여기 안 옴 — 방어적 처리
+
+    const prev = data.equipment[poolItem.slot];
+    const heldInstance = equipFromWarehouse(data, poolItem);
+    if (!heldInstance) return;
+    if (prev) returnToWarehousePool(prev);
+    data.equipment[poolItem.slot] = heldInstance;
+
+    // mainhand에 "새로" 양손무기를 장착하는 경우 — 예외 조합이 아니면 subhand를
+    // 강제로 해제함(요청하신 "장착 요청이 들어왔을 때 강제로 장착 해제됨" 규칙).
+    if (poolItem.slot === "mainhand" && poolItem.twoHanded) {
+      const sub = data.equipment.subhand;
+      if (sub && !isTwoHandedExceptionAllowed(poolItem.name, sub.name)) {
+        data.equipment.subhand = null;
+        returnToWarehousePool(sub);
+      }
+    }
+
+    // 창고 거래는 즉시 반영되는 공용 자원이라, 저장 버튼을 기다리지 않고 이
+    // 캐릭터의 equipment 필드도 곧바로 커밋함(안 그러면 "창고엔 이 캐릭터가
+    // 가져간 걸로 나오는데 정작 저장은 안 돼서 아무도 못 쓰는" 상태가 생김).
+    saveSection("equipment");
+    markDirty("equipment"); renderStatSection();
+  }));
+
+  // 해제: 슬롯을 비우고 창고 풀로 되돌림(해제하는 즉시 다른 캐릭터도 다시
+  // 가져갈 수 있는 공용 재고가 됨 — 캐릭터가 아이템을 독점하지 않음).
+  el.querySelectorAll(".unequip-x").forEach(btn => btn.addEventListener("click", (e) => {
+    if (!isOwner) return;
+    const type = e.target.closest(".equip-slot").dataset.type;
+    const item = data.equipment[type];
+    if (!item) return;
+    data.equipment[type] = null;
+    returnToWarehousePool(item);
+    saveSection("equipment");
+    markDirty("equipment"); renderStatSection();
+  }));
+
+  // 아래 개발자 도구 버튼들은 이제 창고 "풀"에 지급함(개인 인벤토리 직행이
+  // 아님) — 실제 장착 플로우(풀 → 장착)까지 그대로 타게 해서, 테스트가 진짜
+  // 유저 경로를 검증하게 함.
+  function grantToWarehousePool(item) {
+    const warehouse = getWarehouse();
+    const existing = warehouse.find((w) => w.name === item.name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
+    if (existing) existing.quantity += 1;
+    else warehouse.push({ ...item, category: "equipment", quantity: 1 });
+    saveWarehouse(warehouse);
+  }
+
+  // devGrantWeaponBtn / devGrantSetPieceBtn / devGrantJItemBtn / devGrantSkillSealBtn은
+  // ITEM_TABLE(마스터 테이블) 제거에 맞춰 일시 비활성화함(버튼 자체는 disabled).
+  // 나중에 각자 필요한 아이템 데이터를 직접 들고 있는 형태로 갱신할 예정.
+  const arrowsBtn = document.getElementById("devGrantArrowsBtn");
+  if (arrowsBtn) arrowsBtn.addEventListener("click", () => {
+    data.personalResources.arrows = { current: 20, max: 20 };
+    markDirty("equipment"); renderStatSection();
+  });
+
+  bindSkillEvents();
+}
+
+// ============================================================================
+// 패턴 빌더 (오른쪽, 핵심 기능)
+// ============================================================================
+function jobSkillTable() {
+  return [...COMMON_SKILLS, ...(SKILL_TABLE[data.job] || [])];
+}
+function formatCosts(costs) {
+  return costs.map(c => {
+    if (c.type === "teamResource") {
+      const meta = TEAM_RESOURCE_TYPES[c.resource];
+      return `${meta ? `${meta.icon} ${meta.label}` : `팀 자원(${c.resource || "?"})`} ${c.amount}`;
+    }
+    if (c.type === "personalResource") {
+      const meta = PERSONAL_RESOURCE_TYPES[c.resource];
+      return `${meta ? `${meta.icon} ${meta.label}` : `개인 자원(${c.resource || "?"})`} ${c.amount}`;
+    }
+    return `${COST_TYPES[c.type].label} ${c.amount}`;
+  }).join(" · ");
+}
+function formatDelay(s) {
+  if (s.preDelay === undefined && s.postDelay === undefined) return "";
+  const preTypeLabel = s.preDelayType && PRE_DELAY_TYPES[s.preDelayType] ? `(${PRE_DELAY_TYPES[s.preDelayType].label})` : "";
+  const pre = s.preDelay !== undefined ? `${s.preDelay}${preTypeLabel}` : "?";
+  const post = s.postDelay !== undefined ? `${s.postDelay}` : "?";
+  return `선제:후속 ${pre} : ${post}`;
+}
+function formatTarget(s) {
+  if (!s.targetFaction && !s.targetCount) return "";
+  const faction = s.targetFaction && TARGET_FACTION_TYPES[s.targetFaction] ? TARGET_FACTION_TYPES[s.targetFaction].label : "?";
+  const count = s.targetCount && TARGET_COUNT_TYPES[s.targetCount] ? TARGET_COUNT_TYPES[s.targetCount].label : "?";
+  return `${faction} · ${count}`;
+}
+// 습득한 스킬 / 습득 가능 스킬 카드 렌더링(공용). learnBtnState가 있으면 "배우기"
+// 버튼을 붙임(습득 가능 목록용), 없으면 순수 조회용(습득한 스킬 목록용).
+function renderSkillCard(s, { learnBtnState } = {}) {
+  const typeBadge = s.skillType && SKILL_TYPES[s.skillType]
+    ? `<span class="sk-type-badge ${SKILL_TYPES[s.skillType].cls}">${SKILL_TYPES[s.skillType].label}</span>` : "";
+  const invalidBadge = s.invalid ? `<span class="sk-type-badge invalid" title="상대의 아군 보호(전열) 규칙을 무시함">차단 불가</span>` : "";
+  const target = formatTarget(s);
+  const delay = formatDelay(s);
+  // 힐/버프 등 스탯×계수 공식이 아예 적용 안 되는 스킬은 stat/coefficient
+  // 필드 자체가 없음(예: Healing의 scaledHeal 효과) — 전체 스킬의 약 26%가
+  // 이 경우라 "" ×undefined" 같은 깨진 표시를 막으려면 줄 자체를 생략해야 함.
+  const statLine = s.stat !== undefined
+    ? `${s.stat.toUpperCase()} ×${s.coefficient}${delay ? " · " + delay : ""}`
+    : delay;
+  const costLabel = s.costs && s.costs.length ? formatCosts(s.costs) : "코스트 없음";
+  const effects = (s.effects || []).map(e => {
+    const meta = EFFECT_TYPES[e.type];
+    if (!meta) return "";
+    const unit = meta.valueUnit || "";
+    const valueLabel = e.value !== undefined ? ` ${e.value > 0 ? "+" : ""}${e.value}${unit}` : "";
+    const resourceMeta = e.resource ? (TEAM_RESOURCE_TYPES[e.resource] || PERSONAL_RESOURCE_TYPES[e.resource]) : null;
+    const resourceLabel = resourceMeta ? `(${resourceMeta.icon} ${resourceMeta.label})` : "";
+    // guard는 팀/개인 자원 효과가 resource로 종류를 구분하는 것과 같은 방식으로
+    // guardType 하위 필드로 물리/마법/전체를 구분함(생략 시 전체로 취급).
+    const guardTypeLabel = e.type === "guard"
+      ? `(${e.guardType === "physical" ? "물리" : e.guardType === "magic" ? "마법" : "전체"})`
+      : "";
+    return `<span class="sk-effect ${meta.polarity || "neutral"}">${meta.label}${resourceLabel}${guardTypeLabel}${valueLabel}</span>`;
+  }).join("");
+
+  return `
+    <div class="skill-item skill-card" ${learnBtnState ? `data-skill="${s.name}"` : ""}>
+      <div class="sk-head">
+        <span class="sk-name">${s.name}${learnBtnState ? ` <span class="sk-meta">Lv.${s.requiredLevel}</span>` : ""}</span>
+        <span class="sk-badges">${typeBadge}${invalidBadge}</span>
+      </div>
+      ${target ? `<div class="sk-row">대상: ${target}</div>` : ""}
+      ${statLine ? `<div class="sk-row">${statLine}</div>` : ""}
+      <div class="sk-row">코스트: ${costLabel}</div>
+      ${effects ? `<div class="sk-effects">${effects}</div>` : ""}
+      ${learnBtnState ? `<div class="sk-footer"><button class="assign-btn learn-btn" ${learnBtnState.disabled ? "disabled" : ""}>포인트 ${s.skillPointCost} · 배우기</button></div>` : ""}
+    </div>
+  `;
+}
+function learnedSkillObjs() {
+  return jobSkillTable().filter(s => data.learnedSkillNames.includes(s.name));
+}
+// 선행 스킬 조건 — s.requiredSkills(배열)가 있으면 그중 최소 한 개(mode:"any",
+// 기본값) 또는 전부(mode:"all")를 이미 배웠어야 함. requiredSkills가 없거나
+// 빈 배열이면 조건 자체가 없는 것으로 취급(true). 레벨 조건(requiredLevel)과는
+// 완전히 별개 — 둘 다 만족해야 배울 수 있음.
+function meetsSkillPrereq(skill) {
+  if (!skill.requiredSkills || skill.requiredSkills.length === 0) return true;
+  const mode = skill.requiredSkillMode === "all" ? "all" : "any";
+  return mode === "all"
+    ? skill.requiredSkills.every(name => data.learnedSkillNames.includes(name))
+    : skill.requiredSkills.some(name => data.learnedSkillNames.includes(name));
+}
+// 상호배타(택일) — s.excludesSkills(배열)에 있는 스킬 중 하나라도 이미
+// 배웠으면 이 스킬은 배울 수 없음. requiredSkills("배웠어야 함")와 정반대
+// 방향. ⚠ 판정 자체는 "이 스킬" 쪽 excludesSkills만 보므로, 진짜 상호배타로
+// 만들려면 A/B 양쪽 스킬 데이터에 각각 서로를 excludesSkills로 적어둬야 함
+// (한쪽에만 적으면 어느 걸 먼저 배우느냐에 따라 막히는 방향이 달라지는
+// 비대칭 버그가 생김).
+function violatesExclusion(skill) {
+  if (!skill.excludesSkills || skill.excludesSkills.length === 0) return false;
+  return skill.excludesSkills.some(name => data.learnedSkillNames.includes(name));
+}
+function learnableSkillObjs() {
+  return jobSkillTable().filter(s => s.requiredLevel <= data.level && !data.learnedSkillNames.includes(s.name));
+}
+// SkillSeal 장비가 부여하는 스킬 — SKILL_TABLE 습득 여부와 무관하게 장착 중엔 씀.
+// 자기 직업 스킬이 아닐 수도 있어서 jobSkillTable()이 아니라 전체에서 찾음.
+function equipmentGrantedSkillObjs() {
+  const seal = data.equipment.skillSeal;
+  if (!seal || !seal.grantsSkill) return [];
+  return allSkillsFlat().filter(s => s.name === seal.grantsSkill);
+}
+function actionOptionsFor() {
+  const names = new Set([
+    ...ACTION_OPTIONS,
+    ...learnedSkillObjs().map(s => s.name),
+    ...equipmentGrantedSkillObjs().map(s => s.name),
+  ]);
+  if (data.equipment.uItem) names.add("아이템 사용"); // U.Item 장착 중일 때만 후보로 노출
+  return [...names];
+}
+
+function buildRowHTML(row, idx, active) {
+  const type = CONDITION_TYPES[row.metric] || CONDITION_TYPES.always;
+  const showDetail = type.needsDetail;
+  return `
+    <div class="pattern-row ${active ? "active" : "locked"}" data-idx="${idx}">
+      <div class="row-head">
+        <span class="idx">패턴 ${idx + 1}${active ? "" : " · 잠김"}</span>
+        <div class="row-actions">
+          <button class="mini-btn move-up" title="위로" ${idx === 0 ? "disabled" : ""}>↑</button>
+          <button class="mini-btn move-down" title="아래로">↓</button>
+          <button class="mini-btn danger remove-row" title="삭제">✕</button>
+        </div>
+      </div>
+      <div class="builder-line">
+        <span class="cb-tag">IF</span>
+        <select class="cb-subject">
+          ${Object.entries(SUBJECT_LABEL).map(([k,v]) => `<option value="${k}" ${row.subject===k?"selected":""}>${v}</option>`).join("")}
+        </select>
+        <select class="cb-metric">
+          ${Object.entries(CONDITION_TYPES).map(([k,t]) => `<option value="${k}" ${row.metric===k?"selected":""}>${t.label}</option>`).join("")}
+        </select>
+        <span class="cb-cond-detail" style="${showDetail ? "display:flex;gap:6px;align-items:center;" : "display:none;"}">
+          <select class="cb-comparator">
+            ${Object.entries(COMPARATOR_LABEL).map(([k,v]) => `<option value="${k}" ${row.comparator===k?"selected":""}>${v}</option>`).join("")}
+          </select>
+          <input type="number" class="cb-value" value="${row.value ?? 0}" min="0" />
+          <select class="cb-unit">
+            ${["%","pt","개","턴"].map(u => `<option ${(row.unit || type.unit)===u?"selected":""}>${u}</option>`).join("")}
+          </select>
+        </span>
+      </div>
+      <div class="builder-line and-chain-line">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+          <input type="checkbox" class="cb-and-next" ${row.andNext ? "checked" : ""} />
+          다음 패턴과 동시에 만족해야 발동(이 줄의 액션은 안 씀, 조건만 이어붙음)
+        </label>
+      </div>
+      <div class="builder-line" style="${row.andNext ? "display:none;" : ""}">
+        <span class="cb-tag">THEN</span>
+        <select class="cb-action">
+          ${actionOptionsFor().map(a => `<option ${row.action===a?"selected":""}>${a}</option>`).join("")}
+        </select>
+      </div>
+      <div class="builder-line max-uses-line" style="${row.andNext ? "display:none;" : ""}">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+          <input type="checkbox" class="cb-max-uses-toggle" ${row.maxUses != null ? "checked" : ""} />
+          이 슬롯은 전투 중 최대
+        </label>
+        <input type="number" class="cb-max-uses" value="${row.maxUses ?? 1}" min="1"
+          style="width:56px;${row.maxUses != null ? "" : "display:none;"}" />
+        <span class="cb-max-uses-suffix" style="${row.maxUses != null ? "" : "display:none;"}">회만 발동</span>
+      </div>
+      ${active ? "" : `<div class="lock-note">🔒 패턴 슬롯 ${computeMaxPatternSlots()}개 초과 — INT를 올리거나 패턴 슬롯 옵션이 있는 장비를 장착하면 자동으로 활성화됩니다</div>`}
+    </div>
+  `;
+}
+
+function renderPatternSection() {
+  const el = document.getElementById("patternSection");
+  const preset = data.presets[activePresetIdx];
+  const maxPatternSlots = computeMaxPatternSlots();
+  el.innerHTML = `
+    <div class="block">
+      <h2 class="section-title">패턴 프리셋 <span class="hint">조건 → 행동을 자유롭게 설계</span></h2>
+      <div class="preset-tabs" id="presetTabs">
+        ${data.presets.map((p, i) => `<button class="preset-tab ${i===activePresetIdx?"active":""}" data-i="${i}">${p.name}</button>`).join("")}
+        <button class="preset-tab add" id="addPresetBtn">+ 새 프리셋</button>
+      </div>
+      <div class="pattern-list" id="patternList">
+        ${preset.rows.map((row, i) => buildRowHTML(row, i, i < maxPatternSlots)).join("")}
+      </div>
+      <button class="add-row-btn" id="addRowBtn">+ 패턴 줄 추가</button>
+      ${renderSectionSaveButton("pattern")}
+    </div>
+  `;
+
+  bindPatternEvents();
+}
+
+function bindSkillEvents() {
+  document.querySelectorAll(".learn-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const skillName = e.target.closest(".skill-item").dataset.skill;
+      const skill = jobSkillTable().find(s => s.name === skillName);
+      if (!skill || computeSkillPoints(data) < skill.skillPointCost) return;
+      if (!meetsSkillPrereq(skill)) return; // UI가 어긋나도 여기서 한 번 더 막음
+      if (violatesExclusion(skill)) return; // 상호배타도 동일하게 안전장치
+      data.learnedSkillNames.push(skillName);
+      markDirty("skill");
+      renderStatSection();   // 습득한/습득 가능 스킬 목록 · 스킬 포인트가 여기 있음
+      renderPatternSection(); // 새로 배운 스킬이 THEN 드롭다운 후보에 추가되도록
+    });
+  });
+}
+
+function bindPatternEvents() {
+  const preset = data.presets[activePresetIdx];
+
+  document.querySelectorAll(".preset-tab[data-i]").forEach(tab => {
+    tab.addEventListener("click", () => { activePresetIdx = Number(tab.dataset.i); renderPatternSection(); });
+  });
+  document.getElementById("addPresetBtn").addEventListener("click", () => {
+    const name = prompt("새 프리셋 이름을 입력하세요", "새 프리셋");
+    if (!name) return;
+    data.presets.push({ name, rows:[ {subject:"self", metric:"always", action:"공격"} ] });
+    activePresetIdx = data.presets.length - 1;
+    markDirty("pattern"); renderPatternSection();
+  });
+  document.getElementById("addRowBtn").addEventListener("click", () => {
+    preset.rows.push({ subject:"self", metric:"always", action:"공격" });
+    markDirty("pattern"); renderPatternSection();
+  });
+
+  document.querySelectorAll(".pattern-row").forEach(rowEl => {
+    const idx = Number(rowEl.dataset.idx);
+    const row = preset.rows[idx];
+
+    rowEl.querySelector(".remove-row").addEventListener("click", () => {
+      preset.rows.splice(idx, 1); markDirty("pattern"); renderPatternSection();
+    });
+    rowEl.querySelector(".move-up").addEventListener("click", () => {
+      if (idx === 0) return;
+      [preset.rows[idx-1], preset.rows[idx]] = [preset.rows[idx], preset.rows[idx-1]];
+      markDirty("pattern"); renderPatternSection();
+    });
+    rowEl.querySelector(".move-down").addEventListener("click", () => {
+      if (idx === preset.rows.length - 1) return;
+      [preset.rows[idx+1], preset.rows[idx]] = [preset.rows[idx], preset.rows[idx+1]];
+      markDirty("pattern"); renderPatternSection();
+    });
+    rowEl.querySelector(".cb-subject").addEventListener("change", e => { row.subject = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
+    rowEl.querySelector(".cb-metric").addEventListener("change", e => {
+      row.metric = e.target.value;
+      const type = CONDITION_TYPES[row.metric];
+      if (type.needsDetail) {
+        row.comparator = row.comparator || "gte";
+        row.value = row.value ?? 0;
+        row.unit = row.unit || type.unit;
+      }
+      markDirty("pattern");
+      renderPatternSection(); // 조건 종류별 상세 입력칸 표시 여부가 다르므로 재렌더
+    });
+    const cmp = rowEl.querySelector(".cb-comparator");
+    if (cmp) cmp.addEventListener("change", e => { row.comparator = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
+    const val = rowEl.querySelector(".cb-value");
+    if (val) val.addEventListener("input", e => { row.value = Number(e.target.value); markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
+    const unit = rowEl.querySelector(".cb-unit");
+    if (unit) unit.addEventListener("change", e => { row.unit = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
+    rowEl.querySelector(".cb-action").addEventListener("change", e => { row.action = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
+    rowEl.querySelector(".cb-and-next").addEventListener("change", e => {
+      row.andNext = e.target.checked;
+      markDirty("pattern");
+      renderPatternSection(); // THEN/최대발동횟수 표시 여부가 바뀌므로 재렌더
+    });
+    rowEl.querySelector(".cb-max-uses-toggle").addEventListener("change", e => {
+      row.maxUses = e.target.checked ? (row.maxUses ?? 1) : null;
+      markDirty("pattern");
+      renderPatternSection(); // 입력칸 표시 여부가 바뀌므로 재렌더
+    });
+    const maxUsesInput = rowEl.querySelector(".cb-max-uses");
+    if (maxUsesInput) maxUsesInput.addEventListener("input", e => {
+      row.maxUses = Math.max(1, Number(e.target.value) || 1);
+      markDirty("pattern"); updateSectionSaveIndicator("pattern");
+    });
+  });
+}
+
+// 텍스트/숫자 입력처럼 매 키 입력마다 전체 재렌더를 하면 포커스를 잃어버리는
+// 곳에서 씀 — 전체를 다시 그리지 않고 그 섹션의 저장 버튼/표시만 살짝 갱신.
+function updateSectionSaveIndicator(section) {
+  const btn = document.querySelector(`[data-save-section="${section}"]`);
+  if (!btn) return;
+  const isDirty = dirtyFlags[section];
+  btn.disabled = !isDirty;
+  const flag = btn.parentElement.querySelector(".section-save-flag");
+  if (flag) {
+    flag.className = "section-save-flag" + (isDirty ? "" : " clean");
+    flag.innerHTML = `<span class="dot"></span>${isDirty ? "저장 안 된 변경사항 있음" : "저장됨"}`;
+  }
+}
+if (data) {
+  if (!isOwner) {
+    document.getElementById("spectateBanner").innerHTML = `
+      <div class="spectate-banner">👁 관전 모드 — 본인 캐릭터가 아니라서 모든 항목이 읽기 전용입니다. 어떤 값을 바꿔도 저장되지 않아요.</div>
+    `;
+  }
+  renderProfile();
+  renderStatSection();
+  renderPatternSection();
+  renderAdvancementSection();
+} else {
+  document.querySelector("main").innerHTML = `
+    <div class="empty-wrap">
+      <div class="e-icon">❓</div>
+      <div class="e-title">캐릭터를 찾을 수 없습니다</div>
+      <div class="e-desc">삭제되었거나 잘못된 링크예요. 용병단 목록에서 다시 확인해주세요.</div>
+      <a href="roster-index.html">← 용병단으로 돌아가기</a>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>

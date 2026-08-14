@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>상점 테이블 편집 · Shop Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item { font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim); text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:24px 40px 16px; border-bottom:1px solid var(--line); }
+  .back-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none; }
+  .back-link:hover { color:var(--gold); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:8px; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:24px; margin:6px 0 0; color:#f2efe8; }
+  .header-actions { display:flex; gap:10px; }
+  .action-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; padding:9px 16px; border-radius:8px; cursor:pointer;
+    background:transparent; border:1px solid var(--line); color:var(--mist-dim);
+  }
+  .action-btn:hover { color:var(--mist); border-color:var(--mist-dim); }
+  .action-btn.primary { background:var(--ember); border:none; color:#1a1108; font-weight:600; }
+  .action-btn.primary:hover { opacity:0.9; }
+
+  main { flex:1; padding:24px 40px 60px; max-width:900px; margin:0 auto; width:100%; }
+  .item-card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .item-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .item-head .name-input { font-family:'Cinzel',serif; font-size:14px; background:transparent; border:none; border-bottom:1px solid var(--line); color:#f2efe8; padding:4px 0; width:180px; }
+  .item-head .name-input:focus { outline:none; border-color:var(--gold); }
+  .remove-item { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px solid var(--line); color:var(--mist-dim); padding:5px 9px; border-radius:5px; cursor:pointer; }
+  .remove-item:hover { color:var(--danger); border-color:var(--danger-dim); }
+
+  .field-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:8px; }
+  .field-grid.small { grid-template-columns:repeat(6, 1fr); }
+  .fg-item label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--mist-dim); display:block; margin-bottom:3px; }
+  .fg-item input, .fg-item select {
+    width:100%; font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+  }
+  .fg-item input:focus, .fg-item select:focus { outline:none; border-color:var(--gold); }
+  .fg-item.checkbox { display:flex; align-items:center; gap:6px; margin-top:16px; }
+  .json-row { margin-top:6px; margin-bottom:8px; }
+  .json-row label { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--gold); display:block; margin-bottom:3px; }
+  .json-row textarea {
+    width:100%; font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:7px 9px; min-height:44px; resize:vertical;
+  }
+  .json-row textarea:focus { outline:none; border-color:var(--gold); }
+  .json-row textarea.json-pending { border-color:var(--gold); }
+  .json-warn { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--gold); margin-top:5px; line-height:1.5; }
+  .fg-item.checkbox label { margin:0; }
+
+  .section-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.06em; color:var(--gold); margin:10px 0 6px; }
+
+  .add-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; background:transparent; border:1px dashed var(--line);
+    color:var(--mist-dim); padding:10px 16px; border-radius:8px; cursor:pointer; width:100%;
+  }
+  .add-btn:hover { color:var(--gold); border-color:var(--gold-dim); }
+
+  .save-bar { position:sticky; bottom:0; background:var(--ink); padding:14px 0; text-align:center; }
+  .save-flag { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); margin-top:6px; }
+  .save-flag.dirty { color:var(--gold); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <a class="back-link" href="dev-tools.html">← 개발자 도구로</a>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Shop Table</div>
+      <h1>상점 테이블</h1>
+    </div>
+    <div class="header-actions">
+      <button class="action-btn" id="uploadBtn">⬆ 업로드</button>
+      <input type="file" id="uploadInput" accept="application/json" style="display:none;" />
+      <button class="action-btn" id="downloadBtn">⬇ 다운로드</button>
+      <button class="action-btn primary" id="saveBtn">저장</button>
+    </div>
+  </div>
+</header>
+
+<main id="mainArea"></main>
+
+<script>
+  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
+  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
+    document.body.innerHTML = `
+      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+      </div>
+    `;
+    throw new Error("access-denied");
+  }
+
+  function getShopTable() {
+    try { return JSON.parse(localStorage.getItem("battleSim_shopTable")) || []; }
+    catch { return []; }
+  }
+  function saveShopTable(table) {
+    localStorage.setItem("battleSim_shopTable", JSON.stringify(table));
+  }
+  function downloadJSON(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const CATEGORY_OPTIONS = ["equipment", "material", "keyItem", "stash"];
+  const SLOT_OPTIONS = ["", "mainhand", "subhand", "armor", "cloak", "shoes", "head", "accessory", "jItem", "item", "avatar", "skillSeal", "uItem"];
+
+  let table = getShopTable();
+  let isDirty = false;
+  function markDirty() { isDirty = true; renderSaveFlag(); }
+  function renderSaveFlag() {
+    const el = document.getElementById("saveFlag");
+    if (el) { el.textContent = isDirty ? "저장 안 된 변경사항 있음" : "저장됨"; el.className = "save-flag" + (isDirty ? " dirty" : ""); }
+  }
+
+  function render() {
+    const el = document.getElementById("mainArea");
+    el.innerHTML = table.map((it, i) => `
+      <div class="item-card" data-idx="${i}">
+        <div class="item-head">
+          <input type="text" class="name-input f-name" value="${it.name || ""}" placeholder="아이템명" />
+          <button class="remove-item" data-idx="${i}">✕ 삭제</button>
+        </div>
+        <div class="field-grid small">
+          <div class="fg-item"><label>category</label><select class="f-category">${CATEGORY_OPTIONS.map(c => `<option ${it.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
+          <div class="fg-item"><label>price</label><input type="number" class="f-price" value="${it.price ?? 0}" /></div>
+          <div class="fg-item"><label>slot</label><select class="f-slot">${SLOT_OPTIONS.map(s => `<option value="${s}" ${it.slot===s?"selected":""}>${s || "(없음)"}</option>`).join("")}</select></div>
+          <div class="fg-item"><label>equipmentType</label><input type="text" class="f-equipmentType" value="${it.equipmentType || ""}" /></div>
+          <div class="fg-item"><label>requiredJob</label><input type="text" class="f-requiredJob" value="${it.requiredJob || ""}" /></div>
+          <div class="fg-item"><label>weight(무게 코스트)</label><input type="number" class="f-weight" value="${it.weight ?? 0}" /></div>
+        </div>
+        <div class="section-label">combatReal / combatBonus</div>
+        <div class="field-grid">
+          ${["atk","def","matk","mdef"].map(k => `<div class="fg-item"><label>real${k.toUpperCase()}</label><input type="number" class="f-real" data-key="${k}" value="${(it.combatReal && it.combatReal[k]) || 0}" /></div>`).join("")}
+        </div>
+        <div class="field-grid">
+          ${["atk","def","matk","mdef"].map(k => `<div class="fg-item"><label>${k.toUpperCase()} bonus</label><input type="number" class="f-bonus" data-key="${k}" value="${(it.combatBonus && it.combatBonus[k]) || 0}" /></div>`).join("")}
+          <div class="fg-item checkbox"><input type="checkbox" class="f-twoHanded" id="th-${i}" ${it.twoHanded ? "checked" : ""} /><label for="th-${i}">twoHanded</label></div>
+        </div>
+        <div class="section-label">passiveBonus(%) — 상시 적용, 흡혈 포함</div>
+        <div class="field-grid">
+          ${["physicalDamageDealtPct","physicalDamageTakenPct","magicDamageDealtPct","magicDamageTakenPct","hpCostReductionPct","spCostReductionPct","healingDealtPct","healingDealtFlat","lifestealPct","physicalIgnoreBonusDefPct","magicIgnoreBonusDefPct","accuracyBonusPct","completeDefenseChancePct","critChancePct"].map(k => `<div class="fg-item"><label>${k}</label><input type="number" class="f-passive" data-key="${k}" value="${(it.passiveBonus && it.passiveBonus[k]) || 0}" /></div>`).join("")}
+        </div>
+        <div class="section-label">statBonus(고정치, 즉시 성능) / statRealBonus(고정치, 잠재치 자체)</div>
+        <div class="field-grid">
+          ${["str","int","dex","spd","luk"].map(k => `<div class="fg-item"><label>${k}</label><input type="number" class="f-statBonus" data-key="${k}" value="${(it.statBonus && it.statBonus[k]) || 0}" /></div>`).join("")}
+        </div>
+        <div class="field-grid">
+          ${["str","int","dex","spd","luk"].map(k => `<div class="fg-item"><label>real${k}</label><input type="number" class="f-statRealBonus" data-key="${k}" value="${(it.statRealBonus && it.statRealBonus[k]) || 0}" /></div>`).join("")}
+        </div>
+        <div class="field-grid">
+          <div class="fg-item"><label>maxHpBonus</label><input type="number" class="f-maxHpBonus" value="${it.maxHpBonus || 0}" /></div>
+          <div class="fg-item"><label>maxSpBonus</label><input type="number" class="f-maxSpBonus" value="${it.maxSpBonus || 0}" /></div>
+          <div class="fg-item"><label>critMultiplier(배율,최댓값적용)</label><input type="number" step="0.1" class="f-critMul" value="${it.critMultiplier || 0}" placeholder="0=없음" /></div>
+          <div class="fg-item"><label>grantsResource.key</label><input type="text" class="f-grantsResourceKey" value="${(it.grantsResource && it.grantsResource.key) || ""}" placeholder="arrow" /></div>
+          <div class="fg-item"><label>grantsResource.max</label><input type="number" class="f-grantsResourceMax" value="${(it.grantsResource && it.grantsResource.max) || ""}" placeholder="개인자원 최대치 고정" /></div>
+        </div>
+        <div class="json-row">
+          <label>conditionalPassiveMods(JSON 배열) — "장착 중, 지금 상태가 조건에 맞을 때만" 적용되는 패시브. 예: [{"key":"physicalDamageTakenPct","value":15,"condition":{"type":"guardAlliesIs","value":true}}]. condition.type: isGuarding / isShielded / guardAlliesIs(value:true|false) / rowIs(value:"front"|"back") / hpPctBelow(value:N) / hpPctAbove(value:N)</label>
+          <textarea class="j-condPassive ${typeof it.conditionalPassiveMods === "string" ? "json-pending" : ""}">${typeof it.conditionalPassiveMods === "string" ? it.conditionalPassiveMods : JSON.stringify(it.conditionalPassiveMods || [])}</textarea>
+          <div class="json-warn j-condPassive-warn" style="display:${typeof it.conditionalPassiveMods === "string" ? "block" : "none"};">📝 JSON이 아니라서 자연어 그대로 저장돼요 — 구현이 필요한 규칙이면 이렇게 적어서 넘겨주세요.</div>
+        </div>
+        <div class="section-label">판매 조건(선택) · stock / saleStart / saleEnd / saleDays(콤마구분 0~6)</div>
+        <div class="field-grid">
+          <div class="fg-item"><label>stock</label><input type="number" class="f-stock" value="${it.stock ?? ""}" placeholder="무제한" /></div>
+          <div class="fg-item"><label>saleStart</label><input type="text" class="f-saleStart" value="${it.saleStart || ""}" placeholder="YYYY-MM-DD" /></div>
+          <div class="fg-item"><label>saleEnd</label><input type="text" class="f-saleEnd" value="${it.saleEnd || ""}" placeholder="YYYY-MM-DD" /></div>
+          <div class="fg-item"><label>saleDays</label><input type="text" class="f-saleDays" value="${(it.saleDays || []).join(",")}" placeholder="0,1,2" /></div>
+        </div>
+        <div class="section-label">description(장비는 유니크 아이템에만)</div>
+        <div class="field-grid" style="grid-template-columns:1fr;">
+          <div class="fg-item"><input type="text" class="f-description" value="${it.description || ""}" /></div>
+        </div>
+      </div>
+    `).join("");
+    el.innerHTML += `<button class="add-btn" id="addItemBtn">+ 아이템 추가</button>`;
+    bindEvents(el);
+  }
+
+  function bindEvents(el) {
+    el.querySelectorAll(".item-card").forEach((card) => {
+      const idx = Number(card.dataset.idx);
+      const it = table[idx];
+      const bind = (sel, fn) => { const inp = card.querySelector(sel); if (inp) inp.addEventListener("input", fn); };
+      const bindChange = (sel, fn) => { const inp = card.querySelector(sel); if (inp) inp.addEventListener("change", fn); };
+
+      bind(".f-name", e => { it.name = e.target.value; markDirty(); });
+      bindChange(".f-category", e => { it.category = e.target.value; markDirty(); });
+      bind(".f-price", e => { it.price = Number(e.target.value) || 0; markDirty(); });
+      bindChange(".f-slot", e => { if (e.target.value) it.slot = e.target.value; else delete it.slot; markDirty(); });
+      bind(".f-equipmentType", e => { if (e.target.value) it.equipmentType = e.target.value; else delete it.equipmentType; markDirty(); });
+      bind(".f-requiredJob", e => { if (e.target.value) it.requiredJob = e.target.value; else delete it.requiredJob; markDirty(); });
+      bind(".f-weight", e => { it.weight = Number(e.target.value) || 0; markDirty(); });
+      bind(".f-stock", e => { if (e.target.value !== "") it.stock = Number(e.target.value); else delete it.stock; markDirty(); });
+      bind(".f-saleStart", e => { if (e.target.value) it.saleStart = e.target.value; else delete it.saleStart; markDirty(); });
+      bind(".f-saleEnd", e => { if (e.target.value) it.saleEnd = e.target.value; else delete it.saleEnd; markDirty(); });
+      bind(".f-saleDays", e => {
+        const v = e.target.value.trim();
+        if (v) it.saleDays = v.split(",").map(s => Number(s.trim())).filter(n => !isNaN(n));
+        else delete it.saleDays;
+        markDirty();
+      });
+      bind(".f-description", e => { if (e.target.value) it.description = e.target.value; else delete it.description; markDirty(); });
+      card.querySelectorAll(".f-real").forEach(inp => inp.addEventListener("input", e => {
+        it.combatReal = it.combatReal || {}; it.combatReal[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+      }));
+      card.querySelectorAll(".f-bonus").forEach(inp => inp.addEventListener("input", e => {
+        it.combatBonus = it.combatBonus || {}; it.combatBonus[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+      }));
+      card.querySelectorAll(".f-passive").forEach(inp => inp.addEventListener("input", e => {
+        it.passiveBonus = it.passiveBonus || {}; it.passiveBonus[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+      }));
+      card.querySelectorAll(".f-statBonus").forEach(inp => inp.addEventListener("input", e => {
+        it.statBonus = it.statBonus || {}; it.statBonus[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+      }));
+      card.querySelectorAll(".f-statRealBonus").forEach(inp => inp.addEventListener("input", e => {
+        it.statRealBonus = it.statRealBonus || {}; it.statRealBonus[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+      }));
+      const maxHpBonusInput = card.querySelector(".f-maxHpBonus");
+      if (maxHpBonusInput) maxHpBonusInput.addEventListener("input", e => { it.maxHpBonus = Number(e.target.value) || 0; markDirty(); });
+      const maxSpBonusInput = card.querySelector(".f-maxSpBonus");
+      if (maxSpBonusInput) maxSpBonusInput.addEventListener("input", e => { it.maxSpBonus = Number(e.target.value) || 0; markDirty(); });
+      const critMulInput = card.querySelector(".f-critMul");
+      if (critMulInput) critMulInput.addEventListener("input", e => { const v = Number(e.target.value) || 0; if (v > 0) it.critMultiplier = v; else delete it.critMultiplier; markDirty(); });
+      const grKeyInput = card.querySelector(".f-grantsResourceKey");
+      const grMaxInput = card.querySelector(".f-grantsResourceMax");
+      const syncGrantsResource = () => {
+        const key = grKeyInput.value.trim();
+        const max = Number(grMaxInput.value) || 0;
+        if (key && max > 0) it.grantsResource = { key, max };
+        else delete it.grantsResource;
+        markDirty();
+      };
+      if (grKeyInput) grKeyInput.addEventListener("input", syncGrantsResource);
+      if (grMaxInput) grMaxInput.addEventListener("input", syncGrantsResource);
+      const condPassiveArea = card.querySelector(".j-condPassive");
+      const condPassiveWarn = card.querySelector(".j-condPassive-warn");
+      condPassiveArea.addEventListener("input", e => {
+        try { it.conditionalPassiveMods = JSON.parse(e.target.value || "[]"); e.target.classList.remove("json-pending"); condPassiveWarn.style.display = "none"; }
+        catch { it.conditionalPassiveMods = e.target.value; e.target.classList.add("json-pending"); condPassiveWarn.style.display = "block"; }
+        markDirty();
+      });
+      bindChange(".f-twoHanded", e => { if (e.target.checked) it.twoHanded = true; else delete it.twoHanded; markDirty(); });
+
+      card.querySelector(".remove-item").addEventListener("click", () => {
+        table.splice(idx, 1); markDirty(); render();
+      });
+    });
+
+    el.querySelector("#addItemBtn").addEventListener("click", () => {
+      table.push({ name:"새 아이템", category:"equipment", price:0 });
+      markDirty(); render();
+    });
+  }
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    saveShopTable(table);
+    isDirty = false; renderSaveFlag();
+  });
+  document.getElementById("uploadBtn").addEventListener("click", () => {
+    document.getElementById("uploadInput").click();
+  });
+  document.getElementById("uploadInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); }
+      catch { alert("올바른 JSON 파일이 아니에요."); return; }
+      if (!Array.isArray(parsed)) { alert("상점 테이블 형식이 아니에요(배열이어야 함)."); return; }
+      if (!confirm("지금 이 브라우저에 저장된 상점 테이블을 파일 내용으로 완전히 덮어쓸까요?")) return;
+      saveShopTable(parsed);
+      location.reload();
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    downloadJSON("shop-table.json", table);
+  });
+
+  render();
+  document.querySelector("main").insertAdjacentHTML("afterend", `<div class="save-bar"><div class="save-flag" id="saveFlag">저장됨</div></div>`);
+</script>
+</body>
+</html>

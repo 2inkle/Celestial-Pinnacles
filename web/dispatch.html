@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>파견 의뢰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { max-width:1000px; width:100%; margin:0 auto; padding:26px 20px 0; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:25px; margin:8px 0 4px; color:#f2efe8; }
+  .desc { font-size:13px; color:var(--mist-dim); line-height:1.7; margin-top:6px; }
+
+  main { max-width:1000px; width:100%; margin:0 auto; padding:20px 20px 60px; flex:1; }
+  .block { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .section-title { font-family:'Cinzel',serif; font-size:16px; color:#f2efe8; margin:0 0 12px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .hint { font-family:'Inter',sans-serif; font-size:11.5px; color:var(--mist-dim); font-weight:400; }
+
+  .member { display:flex; align-items:center; gap:12px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:7px; cursor:pointer; }
+  .member.on { border-color:var(--gold); background:#2b2740; }
+  .member-name { flex:1; font-size:13.5px; color:#e8e4f0; font-weight:600; }
+  .member-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .stat-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .stat-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim); text-transform:uppercase; }
+  .stat-value { font-family:'JetBrains Mono',monospace; font-size:19px; font-weight:700; color:#f2efe8; margin-top:5px; }
+  .stat-value.gold { color:var(--gold); } .stat-value.cyan { color:var(--cyan); } .stat-value.danger { color:var(--danger); }
+
+  button.go { font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--gold); border:1px solid var(--gold-dim); border-radius:8px; padding:12px 28px; cursor:pointer; }
+  button.go:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+  button.go:disabled { opacity:0.35; cursor:not-allowed; color:var(--mist-dim); border-color:var(--line); }
+  .go-row { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:14px; }
+  .warn { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--danger); }
+
+  .loot { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; margin-bottom:6px; }
+  .loot-name { font-size:13px; color:#e8e4f0; }
+  .loot-qty { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--gold); font-weight:700; }
+  .raw { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); }
+  .empty { font-size:12.5px; color:var(--mist-dim); text-align:center; padding:22px; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+
+<header>
+  <div class="eyebrow">Dispatch</div>
+  <h1 id="title">파견 의뢰</h1>
+  <div class="desc">
+    의뢰권 한 장으로 <b style="color:var(--gold);">2,000턴</b> 분량의 장기 파견을 보냅니다.
+    용병단이 현지에서 전투를 반복하며, 빠르고 안정적으로 이길수록 같은 예산으로 더 많이 돌아요.<br />
+    파견 보상은 직접 다녀온 것의 <b style="color:var(--gold);">1/100</b>로 정산됩니다.
+  </div>
+</header>
+
+<main>
+  <div class="block">
+    <h2 class="section-title">파견할 용병 <span class="hint">최대 5명</span></h2>
+    <div id="memberList"></div>
+  </div>
+
+  <div class="block">
+    <h2 class="section-title">파견 지시</h2>
+    <div class="stat-grid" id="preGrid"></div>
+    <div class="go-row">
+      <div class="warn" id="warn"></div>
+      <button class="go" id="goBtn" disabled>파견 보내기</button>
+    </div>
+  </div>
+
+  <div id="resultArea"></div>
+</main>
+
+<script src="../src/resourceTypes.js"></script>
+<script src="../src/resourceManager.js"></script>
+<script src="../src/skillRegistry.js"></script>
+<script src="../src/combatFormulas.js"></script>
+<script src="../src/registries.js"></script>
+<script src="../src/character.js"></script>
+<script src="../src/prepState.js"></script>
+<script src="../src/skillResolution.js"></script>
+<script src="../src/importer.js"></script>
+<script src="../src/engine.js"></script>
+<script src="battle-encounters.js"></script>
+<script src="battle-themes.js"></script>
+<script src="exp-table.js"></script>
+<script src="battle-adapter.js"></script>
+<script>
+// ============================================================================
+// 파견 실행
+//
+// 의뢰권 1장 = TURN_BUDGET(2000)턴. 이 예산이 바닥날 때까지 같은 전투를
+// 반복 시뮬레이션하고, 그동안 쌓인 보상을 나눠서 지급함(경험치 1/8, 전리품 1/100).
+//
+// 왜 나누는가: 예산이 2000턴이면 짧은 전투를 수백 회 돌 수 있어서, 직접
+// 한 판 뛴 것과 보상 규모가 자릿수로 벌어짐. 나눠주면 "직접 도전은 온전히,
+// 파견은 축약해서"라는 규칙이 경험치·아이템·골드 전부에 일관되게 적용되고,
+// 희귀 아이템은 직접 도전이 유리하다는 역할 분담도 유지됨.
+//
+// 다만 "유리하다"이지 "독점한다"가 아님 — 파견은 게임에 시간을 많이 쓰기
+// 어려운 사람도 한 번 성취한 구간에서는 주기적으로 보상을 얻어, 액티브 유저와의
+// 격차가 지나치게 벌어지지 않게 하려고 만든 구획이다. 그래서 전리품 정산은
+// 단순 내림이 아니라 확률적 반올림을 쓴다(아래 finalLoot 참조).
+//
+// 8이라는 값의 근거: 파견 1장으로 "Lv10 → Lv15"가 대략 1.4장에 도달하도록
+// 역산한 값(실측 기준 2000턴 파견의 현지 경험치 약 76,000 ÷ 8 ≈ 9,500,
+// Lv10→15 필요량 13,210). 예전엔 100이었는데 그건 예산이 1만턴이던 시절의
+// 값이라, 2000턴으로 줄이면서 같이 조정함.
+// ============================================================================
+(function () {
+  const TURN_BUDGET = 2000;
+  // 경험치·골드와 아이템의 나눗값을 따로 둠.
+  //   EXP: 성장 속도 목표(파견 1.4장으로 Lv10→15)에 맞춘 값.
+  //   LOOT: 희귀 아이템은 직접 도전이 유리해야 한다는 역할 분담을 지키는 값.
+  // 같은 값을 쓰면 둘 중 하나가 반드시 어긋남 — 경험치에 맞추면 왕관 조각이
+  // 1장에 60개씩 쏟아지고(4세트가 20개), 아이템에 맞추면 레벨이 안 오름.
+  // 참고: LOOT 쪽 100은 EXP의 8과 달리 실측 역산이 아니라 위 역할 분담 의도만
+  // 보고 정한 값임(근거 강도가 다름 — CLAUDE.md의 API 검증 항목에도 적어둠).
+  const EXP_DIVISOR = 8;
+  const LOOT_DIVISOR = 100;
+  const TICKET_NAME = "파견 의뢰권";
+  const MAX_PARTY = 5;
+
+  const $ = (s) => document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  const battleId = params.get("battle") || "";
+  const themeId = params.get("theme") || "";
+
+  const getRoster = () => { try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; } catch { return []; } };
+  const getWarehouse = () => { try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; } catch { return []; } };
+  const saveWarehouse = (w) => localStorage.setItem("battleSim_warehouse", JSON.stringify(w));
+  // 배열로 저장된 로스터를 id 키 객체로 바꿔주는 공용 헬퍼(battle-encounters.js).
+  // 예전엔 여기서 배열을 그대로 넘겨 파견의 모든 몬스터 조회가 실패했음.
+  const getMonsterTable = () => window.BattleEncounters.getMonsterTable();
+
+  function ticketCount() {
+    const e = getWarehouse().find((w) => w.name === TICKET_NAME);
+    return e ? e.quantity : 0;
+  }
+  function consumeTicket() {
+    const w = getWarehouse();
+    const i = w.findIndex((x) => x.name === TICKET_NAME && x.quantity > 0);
+    if (i < 0) return false;
+    w[i].quantity -= 1;
+    if (w[i].quantity <= 0) w.splice(i, 1);
+    saveWarehouse(w);
+    return true;
+  }
+
+  const roster = getRoster();
+  const selected = new Set();
+
+  function renderMembers() {
+    $("#memberList").innerHTML = roster.length ? roster.map((c) => `
+      <div class="member ${selected.has(c.id) ? "on" : ""}" data-id="${c.id}">
+        <span class="member-name">${c.name}</span>
+        <span class="member-sub">${c.job || "-"} · Lv.${c.level || 1}</span>
+      </div>`).join("") : `<div class="empty">파견 보낼 용병이 없어요.</div>`;
+    document.querySelectorAll(".member").forEach((el) => el.onclick = () => {
+      const id = el.dataset.id;
+      if (selected.has(id)) selected.delete(id);
+      else if (selected.size < MAX_PARTY) selected.add(id);
+      renderMembers(); renderPre();
+    });
+  }
+
+  function renderPre() {
+    const tickets = ticketCount();
+    $("#preGrid").innerHTML = `
+      <div class="stat-card"><div class="stat-label">보유 의뢰권</div>
+        <div class="stat-value ${tickets > 0 ? "gold" : "danger"}">${tickets}</div></div>
+      <div class="stat-card"><div class="stat-label">턴 예산</div>
+        <div class="stat-value">${TURN_BUDGET.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">보상 정산</div>
+        <div class="stat-value cyan" style="font-size:15px;">경험치 1/${EXP_DIVISOR}<br/>전리품 1/${LOOT_DIVISOR}</div></div>
+      <div class="stat-card"><div class="stat-label">파견 인원</div>
+        <div class="stat-value">${selected.size}<span style="font-size:12px;color:var(--mist-dim);"> / ${MAX_PARTY}</span></div></div>`;
+    const problems = [];
+    if (tickets <= 0) problems.push("⚠ 파견 의뢰권이 없어요. 모험가 길드에서 수주해 오세요.");
+    if (selected.size === 0) problems.push("⚠ 파견할 용병을 1명 이상 선택해 주세요.");
+    $("#warn").textContent = problems.join("  ");
+    $("#goBtn").disabled = problems.length > 0;
+  }
+
+  $("#goBtn").addEventListener("click", () => {
+    if (!consumeTicket()) { renderPre(); return; }
+    const btn = $("#goBtn");
+    btn.disabled = true; btn.textContent = "파견 중…";
+
+    // 예산이 바닥날 때까지 반복. 각 판은 실제 전투 엔진을 그대로 태우므로
+    // 직접 도전과 완전히 같은 규칙으로 계산됨(별도 근사 공식 없음).
+    setTimeout(() => {
+      const monsterTable = getMonsterTable();
+      const party = roster.filter((c) => selected.has(c.id));
+      let spent = 0, runs = 0, wins = 0;
+      let exp = 0, gold = 0;
+      const loot = new Map();
+
+      while (spent < TURN_BUDGET) {
+        const enemyKeys = window.BattleEncounters.spawnEnemies(battleId).map((e) => e.monsterId);
+        const r = window.BattleAdapter.runBattle({
+          allyRosterChars: party, monsterTable, enemySpawnKeys: enemyKeys,
+          maxTurns: 100, username: "파견", logger: () => {},
+        });
+        spent += r.turnsElapsed; runs += 1;
+        if (r.outcome === "allyWin") {
+          wins += 1;
+          exp += r.expGained || 0;
+          gold += r.goldGained || 0;
+          (r.lootGained || []).forEach((l) => {
+            const key = l.name;
+            const cur = loot.get(key) || { ...l, quantity: 0 };
+            cur.quantity += l.quantity;
+            loot.set(key, cur);
+          });
+        }
+      }
+
+      // 경험치/골드는 원본 누적량이 커서(수만 단위) 내림 손실이 무시할 수준이라
+      // 그냥 버림.
+      const finalExp = Math.floor(exp / EXP_DIVISOR);
+      const finalGold = Math.floor(gold / EXP_DIVISOR);
+      // 전리품은 확률적 반올림 — 몫만 주고 나머지는 그 비율만큼의 확률로 1개 더.
+      // 예전엔 그냥 내림이라, 파견 한 번의 원본 누적량이 100을 못 넘는 아이템은
+      // 영구히 0개가 됐음(왕관 조각·섭정의 인장·바퀴 자국 등이 파견으로는 아예
+      // 안 나왔음 — 확률이 낮은 게 아니라 구조적으로 불가능했음). 파견은 시간을
+      // 많이 못 쓰는 사람도 주기적으로 성취를 얻으라고 만든 구획이므로 "희귀할
+      // 뿐 불가능하지는 않게" 바꿈. 기댓값은 정확히 1/LOOT_DIVISOR로 보존되고
+      // (내림으로 버려지던 최대 99개분 손실도 사라짐 — 흔한 재료 실측 1.75→2.10),
+      // 흔한 재료의 분산은 그대로 낮게 유지됨(±1개).
+      const finalLoot = [...loot.values()]
+        .map((l) => {
+          const exact = l.quantity / LOOT_DIVISOR;
+          let quantity = Math.floor(exact);
+          if (Math.random() < exact - quantity) quantity += 1;
+          return { ...l, rawQuantity: l.quantity, quantity };
+        })
+        .filter((l) => l.quantity > 0);
+
+      applyRewards(party, finalExp, finalGold, finalLoot);
+      renderResult({ runs, wins, spent, exp, gold, loot: [...loot.values()], finalExp, finalGold, finalLoot });
+
+      btn.textContent = "파견 보내기";
+      renderPre(); renderMembers();
+    }, 30);
+  });
+
+  function applyRewards(party, exp, gold, lootList) {
+    // 경험치 — 파견에 나간 용병 전원에게 동일 지급(전투 결과와 같은 규칙).
+    // exp-table.js의 grantExp를 거쳐야 레벨업까지 반영됨 — 예전엔 여기서 exp만
+    // 더하고 레벨업 판정을 안 해서, 파견으로 쌓은 경험치가 레벨로 전환되지
+    // 않고 숫자만 계속 불어났음.
+    const fresh = getRoster();
+    party.forEach((p) => {
+      const c = fresh.find((x) => x.id === p.id);
+      if (c) window.ExpTable.grantExp(c, exp);
+    });
+    localStorage.setItem("battleSim_roster", JSON.stringify(fresh));
+
+    localStorage.setItem("battleSim_gold", String(Number(localStorage.getItem("battleSim_gold") || 0) + gold));
+
+    const w = getWarehouse();
+    lootList.forEach((l) => {
+      const { name, category, quantity, rawQuantity, ...spec } = l;
+      const stack = w.find((x) => x.name === name && x.category === category
+        && !x.heldBy && !x.enhanceLevel && !x.craftMaterial);
+      if (stack) stack.quantity += quantity;
+      else w.push({ name, category, quantity, ...spec });
+    });
+    saveWarehouse(w);
+  }
+
+  function renderResult(r) {
+    $("#resultArea").innerHTML = `
+      <div class="block">
+        <h2 class="section-title">파견 결과 <span class="hint">${r.runs}회 전투 · ${r.spent.toLocaleString()}턴 소모</span></h2>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">전투 횟수</div><div class="stat-value">${r.runs}</div></div>
+          <div class="stat-card"><div class="stat-label">승률</div>
+            <div class="stat-value ${r.wins/r.runs >= 0.7 ? "cyan" : "danger"}">${(r.wins/r.runs*100).toFixed(1)}%</div></div>
+          <div class="stat-card"><div class="stat-label">획득 경험치</div>
+            <div class="stat-value gold">${r.finalExp.toLocaleString()}</div>
+            <div class="raw">현지 ${r.exp.toLocaleString()} ÷ ${EXP_DIVISOR}</div></div>
+          <div class="stat-card"><div class="stat-label">획득 골드</div>
+            <div class="stat-value gold">${r.finalGold.toLocaleString()}</div>
+            <div class="raw">현지 ${r.gold.toLocaleString()} ÷ ${EXP_DIVISOR}</div></div>
+        </div>
+      </div>
+      <div class="block">
+        <h2 class="section-title">전리품 <span class="hint">현지 수급량을 ${LOOT_DIVISOR}로 나눠 정산했어요</span></h2>
+        ${r.finalLoot.length ? r.finalLoot.map((l) => `
+          <div class="loot">
+            <span class="loot-name">${l.name}</span>
+            <span><span class="raw">현지 ${l.rawQuantity} → </span><span class="loot-qty">×${l.quantity}</span></span>
+          </div>`).join("")
+        : `<div class="empty">이번엔 가져온 전리품이 없어요.<br />
+             희귀한 물건은 직접 다녀오시는 편이 확실합니다.</div>`}
+      </div>`;
+  }
+
+  $("#title").textContent = `파견 의뢰 — ${window.BattleThemes.battleNameById(battleId)}`;
+
+  renderMembers(); renderPre();
+})();
+</script>
+</body>
+</html>

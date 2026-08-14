@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>용병단 · Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:32px 40px 22px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:560px; line-height:1.6; margin-top:10px; }
+
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .header-actions { display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .gold-display { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold); white-space:nowrap; }
+  .village-link {
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em; color:var(--mist-dim);
+    text-decoration:none; border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
+  }
+  .village-link:hover { border-color:var(--gold); color:var(--gold); }
+
+  main { flex:1; padding:24px 40px 48px; }
+  .grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px;
+  }
+
+  a.card { text-decoration:none; color:inherit; }
+  .card {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+    transition:border-color 0.15s ease, transform 0.1s ease;
+  }
+  .card:hover { border-color:var(--gold); transform:translateY(-2px); }
+
+  .card-top { display:flex; align-items:center; gap:12px; }
+  .thumb {
+    width:52px; height:52px; border-radius:8px; flex-shrink:0;
+    background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .card-name { font-family:'Cinzel',serif; font-size:15px; color:#f2efe8; line-height:1.3; }
+  .card-job { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); margin-top:2px; }
+
+  .lv-row { display:flex; align-items:baseline; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .lv-row .lv { color:var(--gold); }
+
+  .mini-bar-row { display:flex; flex-direction:column; gap:5px; }
+  .mini-bar-label { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); }
+  .mini-bar { height:5px; border-radius:3px; background:var(--panel-raised); border:1px solid var(--line); overflow:hidden; }
+  .mini-bar > i { display:block; height:100%; }
+  .mini-bar.hp > i { background:var(--ember); }
+  .mini-bar.sp > i { background:var(--cyan); }
+
+  .card-footer { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
+  .pattern-count { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+  .open-hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); opacity:0; transition:opacity 0.15s ease; }
+  .card:hover .open-hint { opacity:1; }
+
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:14px;
+  }
+
+  .empty-state {
+    grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; padding:90px 20px; text-align:center; border:1px dashed var(--line); border-radius:12px;
+  }
+  .empty-state .e-icon { font-size:32px; }
+  .empty-state .e-title { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; }
+  .empty-state .e-desc { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); max-width:320px; line-height:1.6; }
+  .empty-state .e-cta {
+    margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold);
+    text-decoration:none; border:1px solid var(--gold-dim); padding:8px 18px; border-radius:6px;
+  }
+  .empty-state .e-cta:hover { border-color:var(--gold); background:#d9b45c14; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Mercenary Guild · Index</div>
+      <h1>용병단</h1>
+    </div>
+    <div class="header-actions">
+      <div class="gold-display">💰 <span id="goldVal">0</span> G</div>
+      <a class="village-link" href="village.html">마을로 이동 →</a>
+    </div>
+  </div>
+  <div class="desc">보유한 모든 용병을 한눈에 확인하세요. 카드를 클릭하면 해당 캐릭터의 정보창(Sheet)으로 이동해서 스탯을 배분하고, 장비를 갈아입히고, 패턴을 짤 수 있습니다.</div>
+  <div class="mock-badge">⚠ 정적 목업 — 고용소에서 고용한 용병만 브라우저에 임시 저장됩니다(서버 연동 없음)</div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  // 로스터는 고용소(hire.html)에서 고용한 용병이 브라우저 저장소에 쌓이는 구조.
+  // 처음 방문했거나 아직 아무도 고용하지 않았다면 빈 상태가 정상입니다.
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+
+  document.getElementById("goldVal").textContent = getGold().toLocaleString();
+
+  const grid = document.getElementById("grid");
+  const roster = getRoster();
+
+  function render() {
+    if (roster.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="e-icon">🏕️</div>
+          <div class="e-title">보유한 용병이 없습니다</div>
+          <div class="e-desc">마을의 고용소에서 첫 용병을 영입해보세요.</div>
+          <a class="e-cta" href="village.html">마을로 이동 →</a>
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = "";
+    // character-sheet.html과 동일한 기본 공식(1+⌊INT/10⌋) + 장착 장비의
+    // patternSlotBonus. 세트 보너스까지는 카드 요약에서 생략(정확한 값은 정보창에서).
+    function estimateMaxPatternSlots(r) {
+      const base = 1 + Math.floor((r.realStats?.int || 0) / 10);
+      const itemBonus = Object.values(r.equipment || {}).reduce((sum, it) => sum + ((it && it.patternSlotBonus) || 0), 0);
+      return base + itemBonus;
+    }
+    // Max HP/SP도 마찬가지로 공식(JOB_BASE_HP+STR×20 등) + 장비의 real형 스탯
+    // 보너스(statRealBonus)까지 반영해 추정(세트 보너스는 카드 요약에서 생략).
+    function estimateEquipRealBonus(r, key) {
+      return Object.values(r.equipment || {}).reduce((sum, it) => sum + ((it && it.statRealBonus && it.statRealBonus[key]) || 0), 0);
+    }
+    function estimateMaxHp(r) {
+      const str = (r.realStats?.str || 0) + estimateEquipRealBonus(r, "str");
+      return 200 + Math.floor(str * 20);
+    }
+    function estimateMaxSp(r) {
+      const int = (r.realStats?.int || 0) + estimateEquipRealBonus(r, "int");
+      return 50 + Math.floor(int * 10);
+    }
+
+    roster.forEach(r => {
+      const rows = (r.presets && r.presets[0] && r.presets[0].rows.length) || 0;
+      const maxPatternSlots = estimateMaxPatternSlots(r);
+      const a = document.createElement("a");
+      a.className = "card";
+      a.href = `character-sheet.html?id=${encodeURIComponent(r.id)}`;
+      a.innerHTML = `
+        <div class="card-top">
+          <div class="thumb">${r.portrait}</div>
+          <div>
+            <div class="card-name">${r.name}</div>
+            <div class="card-job">${r.job}</div>
+          </div>
+        </div>
+        <div class="lv-row"><span>레벨</span><span class="lv">Lv. ${r.level}</span></div>
+        <div class="mini-bar-row">
+          <div class="mini-bar-label"><span>Max HP</span><span>${estimateMaxHp(r)}</span></div>
+          <div class="mini-bar-label"><span>Max SP</span><span>${estimateMaxSp(r)}</span></div>
+        </div>
+        <div class="card-footer">
+          <span class="pattern-count">패턴 ${Math.min(rows, maxPatternSlots)}/${maxPatternSlots} 활성 · 저장 ${rows}줄</span>
+          <span class="open-hint">정보창 열기 →</span>
+        </div>
+      `;
+      grid.appendChild(a);
+    });
+  }
+  render();
+</script>
+
+</body>
+</html>

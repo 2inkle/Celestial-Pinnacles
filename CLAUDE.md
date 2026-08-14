@@ -1,0 +1,490 @@
+# 이 프로젝트
+
+JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬 발동 조건을 짜는
+"패턴 퍼즐"과, 레벨·장비·강화로 쌓는 "RPG 성장"을 둘 다 게임의 본분으로
+삼는다는 설계 방향. 지금은 테스트 빌드 단계 — 레벨 상한 30, 고블린
+테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
+유효한지 검증하는 게 목표.
+
+## 절대 잊지 말 것 — 데이터가 두 군데 있다
+
+**`skill-table.json` / `job-table.json`은 게임이 안 읽는다.** 이 파일들은
+`web/*-editor.html`의 "다운로드" 버튼이 내보내는 산출물일 뿐이다.
+
+게임이 실제로 읽는 건 **localStorage**:
+- `battleSim_skillTable` ← `web/skill-table-editor.html`의 `LEGACY_SKILL_SEED`가 심음
+- `battleSim_jobTable` ← `web/job-table-editor.html`의 `LEGACY_JOB_SEED`가 심음
+- `battleSim_monsterRoster` ← `web/monster-roster.html`의 `LEGACY_MONSTER_SEED`가 심음
+- `battleSim_shopTable` ← `web/shop.html`의 `LEGACY_SHOP_SEED`가 심음
+
+**스킬/직업/몬스터/상점 데이터를 고칠 때는 반드시 두 곳에 다 반영한다**:
+1. 위 4개 HTML 파일 안의 `LEGACY_*_SEED` (게임이 실제로 쓰는 원본)
+2. 프로젝트 루트의 `skill-table.json` / `job-table.json` (참고용 사본,
+   `python3 -c "..."`로 정규식 파싱해서 시드 블록과 동기화해왔음 — 이 방식이
+   번거로우면 아예 JSON을 단일 진실 공급원으로 만들고 에디터가 fetch해서
+   읽도록 바꾸는 것도 검토해볼 만함)
+
+시드를 갱신하면 **`*_SEED_VERSION` 문자열을 반드시 올릴 것**(각 파일에
+`SEED_VERSION = "2026-08-09a"` 형태로 있음). 버전을 안 올리면 이미
+localStorage에 데이터가 있는 브라우저에는 새 시드가 절대 반영되지 않는다
+(예전엔 `*Migrated === "1"` 플래그 방식이라 이 문제로 한 번 크게 고생함 —
+스킬을 182개로 늘려도 오래된 24개짜리 시드가 계속 쓰였던 사고가 있었음).
+갱신 직전 값은 자동으로 `*SeedVersionBackup` 키에 백업됨.
+
+## 아키텍처
+
+```
+src/            엔진 코어. Node(require)와 브라우저(<script>) 양쪽에서 그대로 돎
+  character.js       BattleCharacter — 스탯/전투수치, real/bonus/effective 3단 구조
+  engine.js           BattleEngine — 틱 기반 시간축, 행동 게이지, 전투 루프
+  skillResolution.js  스킬 효과 전체(약 40종 effect type), 타겟팅, 크리티컬
+  combatFormulas.js   데미지 계산, 스탯 감쇠(STAT_DAMPING_*)
+  prepState.js        선딜레이 준비 상태, 코스트 확인/차감, 딜레이 저항
+  registries.js       SkillRegistry/ActionRegistry/ConditionRegistry, 몬스터 전용 액션
+  resourceManager.js  진영 공유 자원(마법진 등)
+  resourceTypes.js    개인/팀 자원 카탈로그
+  importer.js         레벨업 스탯 배분 등 저장 데이터 → 캐릭터 변환
+
+web/            브라우저 UI. 순수 HTML+vanilla JS, 빌드 스텝 없음
+  battle-adapter.js     로스터/몬스터 데이터 → src/ 엔진 객체로 변환하는 유일한 다리
+  battle-encounters.js  전투별 몬스터 편성(BATTLE_MONSTER_POOLS), 가중치 추첨,
+                        getMonsterTable()(로스터 배열 → id 키 객체 변환 공용 헬퍼)
+  battle-themes.js      던전/전투 정의(BATTLE_THEMES) + findBattleById/battleNameById.
+                        battle-select.html과 dispatch.html이 공유
+  nav.js                전 페이지 공용 상단 네비게이션(각 페이지는 <body> 직후
+                        <script src="nav.js">만 두면 됨 — 하드코딩 <nav> 금지)
+  village.html / roster-index.html / hire.html    캐릭터 관리
+  character-sheet.html  스탯/장비/스킬/패턴 편집(가장 큰 파일)
+  battle-select.html    던전 선택. 파견의뢰/특수의뢰 탭, 해금조건 판정
+  roster-select.html    파티 편성 → 전투 진입(연습모드 분기 포함)
+  battle-view.html      실제 전투 실행, 결과 화면, 보상 지급
+  dispatch.html         파견 실행(수주권 소모, 반복 시뮬레이션, 축약 정산)
+  guild.html            파견 수주권 발급/수령
+  workshop.html          장비 개조/소재 감정
+  refinery.html          장비 강화
+  monster-roster.html / monster-sheet.html   몬스터 정의/편집(=시드 소스)
+  *-table-editor.html    스킬/직업/상점 편집기(=시드 소스)
+
+simulate.js      밸런스 시뮬레이터. loadAdapterEnv()로 vm 샌드박스에 web/ 스크립트를
+                 얹어서 실제 게임과 동일 경로로 캐릭터를 만들고 N회 반복 시뮬
+demo-*.js        개별 메커니즘 검증용 데모(25개). "이 기능이 명세대로 도는가"를
+                 결정적으로 확인 — simulate.js(확률적 통계)와 목적이 다름, 서로
+                 대체 불가
+index.js         엔진 기본 동작 스모크 테스트
+```
+
+### 몬스터 로스터는 "배열"로 저장된다 (조회 시 반드시 변환)
+
+`battleSim_monsterRoster`는 **배열**로 저장되는데 `battle-adapter`는
+`monsterTable[monsterId]`로 조회한다. 그래서 항상
+`window.BattleEncounters.getMonsterTable()`을 거쳐야 한다(배열 → id 키 객체).
+
+예전엔 이 변환이 `battle-view.html`에만 있었고 `dispatch.html`과
+`battle-encounters.js`는 배열을 그대로 넘겨서, **파견은 모든 몬스터 조회가
+undefined → 적이 하나도 안 생성 → 매 전투 1턴 부전승 → 2000턴 파견이 경험치 0 ·
+골드 0 · 전리품 0으로 끝났다**(승률만 100%로 표시돼서 정상처럼 보였음). 기능
+자체가 동작한 적이 없었던 셈. 2026-08-13에 공용 헬퍼로 일원화해 수정함.
+
+## 핵심 설계 결정 (수치를 왜 이렇게 잡았는지)
+
+- **틱 시간축**: `GAUGE_THRESHOLD=100000`, `effectiveSpeed = 10×√(baseSpeed+SPD×2)`.
+  SPD는 제곱근 감쇠라 투자 효율이 완만함(의도됨 — 극단 스탯 20배 버프 환경에서
+  SPD만 그대로 두면 행동 수가 폭증하기 때문).
+- **데미지 스탯 감쇠**(`src/combatFormulas.js`의 `STAT_DAMPING_*`): 위력공식이
+  `ATK × STAT × 계수`라 성장 요소가 곱연산으로 겹쳐 폭발함(Lv1→30에 81배).
+  `contribution = 10 × (stat/10)^0.6`으로 스탯 기여만 완만하게 누름. ATK(장비)는
+  안 건드림 — "장비를 통한 성장" 축을 살리기 위해. **아직 테스트 단계 잠정값**,
+  `STAT_DAMPING_EXPONENT`를 1.0으로 두면 감쇠 해제.
+- **무게(handle) 시스템**: `weightCapacity = 5 + DEX/5`. 예전엔 기본치 10이라
+  DEX 투자 없이도 상점 풀세트가 다 들어가서 무게 제한이 무의미했음. 장비의
+  `weight` 필드는 순수 코스트(예전엔 `handleReduction`이 반대로 용량을
+  늘려주는 필드였는데 삭제하고 통일함).
+- **크리티컬**: 확률은 `min(100, realLUK×0.5 + 장비/패시브 합산)`, 배율은
+  `max(1.5, 장비/패시브 중 최댓값)` — 확률은 더하고 배율은 최댓값만(중첩 시
+  폭발 방지). 히트마다 독립 판정.
+- **스탠스 시스템**(`character.stances`, 맵 구조): 여러 스탠스 동시 보유 가능.
+  `exclusiveGroup` 지정 시에만 그 그룹 안에서 상호배타. 배율형 필드는 스탠스
+  여러 개에 걸쳐 곱연산, %형은 합산.
+- **등급별 데미지 증감**: `damageDealtTo_{tier}Pct` / `damageTakenFrom_{tier}Pct`
+  (tier: normal/elite/boss/creature/user). 소환된 개체는 `creatureTier`가
+  강제로 `"creature"`가 됨(원본 몬스터가 normal이어도).
+- **딜레이 저항 캡**: 방해효과로 밀리는 선딜레이는 원래 값의 250%가 상한
+  (추가 가능분은 150%). 무한 방해로 봉쇄 불가.
+- **파견/직접도전 이원화**: 직접 전투는 온전한 보상, 파견(수주권 소모,
+  2000턴 예산 반복시뮬)은 경험치/골드 1/8, 아이템 1/100로 축약 정산 — 희귀
+  아이템은 직접 도전이 유리하도록 의도적으로 배율을 분리함. 연습 모드는
+  보상/기록 없음, Aftermath 구획에는 연습 모드 자체가 없음(한 번의 시도가
+  신중해야 한다는 설계).
+- **파견 전리품은 확률적 반올림**(2026-08-13): `floor(raw/100)`만 주면, 파견
+  1회의 원본 누적량이 100을 못 넘는 아이템은 **영구히 0개**가 됨(왕관 조각·
+  섭정의 인장·바퀴 자국 등이 파견으로는 아예 안 나왔음 — 확률이 낮은 게 아니라
+  구조적으로 불가능). 그래서 몫을 주고 **나머지는 그 비율만큼의 확률로 1개 더**
+  주는 방식으로 바꿈. 파견은 게임에 시간을 많이 쓰기 어려운 사람도 한 번 성취한
+  구간에서는 주기적으로 보상을 얻어 액티브 유저와의 격차가 지나치게 벌어지지
+  않게 하려는 구획이므로, 희귀 아이템도 "희귀할 뿐 불가능하지는 않게" 두는 게
+  맞다는 판단. 20만 회 몬테카를로 실측: 흔한 재료 평균 1.75→2.10개(내림으로
+  버려지던 손실이 사라짐)이면서 0개가 나오는 경우는 없고(±1개로 분산 유지),
+  왕관 조각은 0%→18.1%로 획득 가능해짐. **드랍율 자체를 1/100로 줄이는 대안은
+  기각** — 기댓값은 같지만 분산이 폭증해 흔한 재료조차 절반은 0개가 되어
+  "주기적 보상"이라는 목적을 해침.
+
+## 작업 흐름
+
+1. **스킬/밸런스 수치를 바꿀 때**: 먼저 `simulate.js`로 실제 파티 시뮬을
+   돌려서 승률/턴수를 확인하고 나서 확정한다. "이론상 이래야 한다"만으로
+   끝내지 말 것 — 이번 프로젝트에서 여러 번 이론값과 실측이 어긋났음
+   (예: 왕관 세트 초기 설계가 무게 페널티 때문에 오히려 손해였던 사례).
+2. **엔진 로직을 바꿀 때**: 관련 `demo-*.js`를 반드시 돌리고, 없으면 새로
+   만든다. 최소한 전체 `demo-*.js` + `index.js`가 다 통과하는지 확인 후 커밋.
+3. **HTML 편집기의 `<script>` 블록을 고칠 때**: 브라우저 없이도
+   `node --check`로 구문만은 미리 잡을 수 있다(정규식으로 `<script>` 내용을
+   추출해서 임시 .js로 저장 후 확인하는 방식을 계속 써왔음).
+4. **새 스킬 effect type을 추가할 때**: `src/skillResolution.js`의 `applyEffect`
+   switch문에 추가하고, 대응하는 `demo-*.js`를 하나 만들어 검증한다.
+
+## 알려진 버그 — 스킬에 stat/coefficient가 없으면 정보창이 크래시 (2026-08-14, 수정됨)
+
+`character-sheet.html`의 `renderSkillCard()`가 `s.stat.toUpperCase()`를 무조건
+호출해서, `stat`(=`coefficient`도 항상 같이 없음 — 183개 스킬 중 47개, 약 26%가
+해당) 필드가 없는 힐/버프 계열 스킬을 보유한 캐릭터는 정보창 전체(스탯/패턴
+섹션)가 렌더링되다 만 채로 크래시했음. 특히 방금 위에서 사제의 시작 스킬로
+지정한 `Healing`이 바로 이 케이스라, 사제를 고용하면 곧바로 재현됐음.
+
+`(s.stat || "").toUpperCase()`로만 고치면 크래시는 멈추지만 `" ×undefined"`가
+그대로 화면에 노출됨(실측 확인함) — `coefficient`도 같이 없기 때문. 최종
+수정은 `s.stat !== undefined`일 때만 스탯 줄 자체를 그리고, 아니면 그 줄을
+생략(지연시간 정보만 있으면 그것만 표시)하는 방식으로 함 — 이 함수가 이미
+쓰던 "값 없으면 줄 자체를 안 그린다"는 패턴(`target ? ... : ""`)과 통일.
+
+## 알려진 버그 — [발동 실패] 로그의 블록 오귀속 (2026-08-14, 미수정)
+
+`src/engine.js`의 `resolvePreparedSkill`에서 스킬 발동 성공 분기는 이번에
+`{이름}, {스킬명}` 형태로 고치면서 `web/battle-view.html`의 블록 분리 로직도
+이 줄을 새 블록 시작으로 인식하도록 같이 고쳤다(아래 "전투 로그 포맷" 항목
+참조). 그런데 **바로 옆의 실패 분기(`if (!result.activated)`)는 그대로 뒀다**
+— `❌ [발동 실패] {이름}의 "{스킬}" 발동 실패! (...)` 형태라 `"행동!"` 마커도
+없고, 새로 추가한 `{이름}, ...` 콤마 패턴도 아니라서 여전히 직전에 "행동!"을
+낸 다른 유닛의 블록 밑에 잘못 묶인다. 수치 변화가 없는 케이스라 이번 스타일
+변경 대상은 아니었지만(사용자 요청이 "수치 증감이 일어나는 행동"에 한정),
+구조적으로는 같은 버그다. 체감되는 문제가 생기면 성공 분기와 같은 방식(새
+블록 시작으로 인식되는 안정적인 패턴 사용)으로 고칠 것.
+
+## 알려진 버그 — battle-log-view.html의 로그 파서가 낡음 (2026-08-14, 미수정)
+
+`battle-log-view.html`은 `battle-view.html`에서 로그 파서(`classifyLine`/
+`splitNarrativeIntoBlocks`/`renderBlock`)를 그대로 복사해온 독립 프리뷰
+페이지다(주석에도 명시돼 있음). 지금은 실제 게임 데이터가 아니라 파일 안에
+하드코딩된 `FORCED_LOG_LINES` 픽스처 하나만 그리므로 당장 문제는 없다.
+다만 그 사본은 옛날 버전이라 이번에 엔진 로그 포맷이 바뀐 것(스킬 발동 줄이
+`{이름}, {스킬명}`, 수치 증감 줄이 `{값} {유형} ▷ {대상} (전 > 후)`)이 전혀
+반영돼 있지 않다 — `FORCED_LOG_LINES` 픽스처 자체도 예전 포맷("...에게 N의
+데미지. (전 > 후)")으로 박혀 있음. 나중에 이 페이지에 실제 전투 로그를
+연결하거나 픽스처를 갱신할 일이 생기면, `battle-view.html`의 최신 파서로
+다시 동기화해야 한다.
+
+## 전투 로그 포맷 — 스킬 발동 줄 / 수치 증감 줄 (2026-08-14)
+
+두 가지 로그 문구가 명시적인 표시 규칙을 갖는다 — 새 효과/스킬을 추가할 때
+이 모양을 벗어나면 `web/battle-view.html`의 강조 렌더링이 안 먹는다.
+
+- **행동 발동**(캐릭터/몬스터 공용, `{이름}, {행동명}` 형태 — 화면에서는
+  `{행동명}` 부분에만 볼드+밑줄, `{이름}, ` 부분은 일반 텍스트):
+  - 캐릭터 스킬: `src/engine.js`의 `resolvePreparedSkill`. 선딜레이 스킬의
+    발동은 게이지 루프의 `"행동!"` 마커가 안 붙는 별도 경로(readyAtTick
+    도래 시점)라, 이 줄 자체가 `battle-view.html`에서 새 로그 블록의 시작
+    역할을 겸한다 — 안 그러면 직전에 "행동!"을 낸 다른 유닛 블록에 잘못
+    섞임(실제로 그랬던 버그를 고치면서 같이 잡음).
+  - 몬스터 기본 공격(및 `SkillRegistry`에 등록 안 된 모든 즉발 액션 공용):
+    `src/registries.js`의 `ActionRegistry.register("ATTACK", ...)`. 이
+    경로는 정상 게이지 루프를 타서 `"행동!"` 마커가 먼저 나오므로, 예전엔
+    `${actor.name}의 공격.`을 따로 로그해서 이름이 "행동!" 헤더와 본문에
+    두 번 나오는 2줄 구조였음(2026-08-14에 발견·수정) — 지금은 캐릭터와
+    똑같이 `${actor.name}, 공격`으로 로그하고, `battle-view.html`의
+    `splitNarrativeIntoBlocks`가 `"행동!"` 마커 바로 다음 줄이 같은
+    유닛의 `{이름}, {행동명}` 줄이면 하나의 블록으로 합쳐서 캐릭터와
+    동일한 한 줄짜리 헤더를 만든다(다음 줄이 이 형태가 아니면 예전처럼
+    "행동!" 단독 plain 헤더로 폴백 — `USE_POTION`/`CREATE_MAGIC_CIRCLE`/
+    `DETONATE_MAGIC_CIRCLE`/`SUMMON` 등 아직 이 컨벤션으로 안 옮긴
+    액션들은 이 폴백으로 동작함, 회귀 없음).
+  - `{이름}`과 `{행동명}`을 가르는 구분자가 콤마 하나뿐이므로, 캐릭터/몬스터
+    이름이나 스킬·행동명에 콤마가 들어가면 파싱이 깨진다(현재 시드 데이터엔
+    없음, 앞으로도 피할 것). `ActionRegistry`는 "몬스터 전용"이 아니라
+    `SkillRegistry.has(slot.act)`가 거짓인 모든 액션이 타는 공용 경로라
+    (`engine.js`의 `executeAction`), 캐릭터 패턴이 `act`로 액션 키를 직접
+    가리켜도 같은 템플릿을 자동으로 씀.
+- **수치 증감**(데미지/SP피해/회복 — `src/skillResolution.js`·`src/registries.js`의
+  `statChangeLine(name, amount, label, before, after)` 헬퍼): `{증감량} {유형}
+  ▷ {대상} (전 > 후)` 형태. 예: `16 데미지 ▷ 아렌 (304 > 288)`,
+  `30 SP피해 ▷ 아렌 (150 > 120)`, `40 회복 ▷ 아렌 (250 > 290)`. 치명타는
+  `치명타! ` 접두사를 statChangeLine 앞에 붙임(맨 앞에 오도록 — "N 데미지
+  치명타!"가 아니라 "치명타! N 데미지"). `battle-view.html`의
+  `classifyLine()`이 `" ▷ "` 포함 여부로 이 줄을 감지해 강조색을 입힌다.
+  적용 범위: HP 데미지(스킬 메인 히트 + 몬스터 기본 공격/연계 필살기),
+  SP피해(`spDamage`), 회복(`heal`/`scaledHeal`/`healMissingPercent`) —
+  `spUp`/`spDown`·DOT 틱(출혈/재생 등)·흡혈은 의도적으로 미적용(아래 참조).
+  필요해지면 `statChangeLine`을 그대로 재사용하면 됨(각 파일에 로컬
+  중복돼 있음 — `josa` 헬퍼와 같은 관리 방식).
+- **버프/디버프/자원**(2026-08-14 확정 — "정확한 효과·수치를 알려줄 생각은
+  없다"는 원칙으로 통일함, 스크린샷 리뷰 세션 참고):
+  - 고정치 스탯 변화(`atkUp`/`defUp`/`mdefUp`/`maxHpUp`/`maxSpUp`/`statUp`
+    등): `{대상}의 {스탯} {+/-}{값}.` 그대로 유지(고정치라 값을 감춰도
+    체감상 의미가 없어서 유지).
+  - **비율(%) 기반** 스탯 변화(`combatStatUpPercent`/`statUpPercent`/
+    `statDownPercent`): 계산된 실증가량(`increase`/`reduction`) 대신
+    **`effect.value`(적용 %)를 그대로 표시** — `{대상}의 {스탯} {+/-}{value}%.`
+    실제 증감량은 대상의 그 순간 effective 스탯에 따라 매번 달라지므로
+    노출 안 함.
+  - `guard`/`shield`: 차단 범위(물리/마법/전체)·횟수를 로그에서 제거 —
+    `{대상}이(가) 방어를 굳혔다.` / `{대상}이(가) 보호막을 둘렀다.`만
+    남김(상대가 로그만 보고 정확한 대응 수를 짜지 못하게 하려는 의도).
+  - `actionDelay`/`castDelay`: 추가/저항된 정확한 틱 수 대신 세 갈래
+    문구로만 알림 — `addedDelay < 0`(가속)이면 `{대상}의 행동이 빨라졌다.`,
+    `actionDelay`형 방해면 `{대상}의 자세가 무너졌다.`, `castDelay`형
+    방해면 `{대상}이(가) 방해를 받았다.`(저항으로 일부만 적용됐어도 같은
+    문구 — 그 구분도 안 알려줌). **발견**: `applyDelayEffect`(`src/prepState.js`)는
+    원래 방해(양수 값) 전용으로 보였지만 실제로는 부호를 안 가리는
+    구조라 `effect.value`를 음수로 주면 이미 가속으로 동작한다 — 다만
+    **지금 시드 데이터엔 음수 value를 쓰는 스킬이 하나도 없어서 실전
+    경로가 없고, 딜레이 저항 캡(`DELAY_RESISTANCE_CAP_RATIO`) 수학도
+    반복 가속까지 고려해서 설계된 게 아니므로**, 실제로 가속형 스킬을
+    추가하게 되면 `remainingCapacity` 계산이 의도대로 동작하는지 별도
+    검토 필요.
+  - `refillPersonalResource`/`teamResourceGain`은 그대로 유지
+    (`{대상}의 {자원} 재충전. (현재/최대)` / `{대상}이(가) {자원}을(를)
+    {개수}개 그렸다.`).
+  - 리뷰용 스크립트: 회복/버프/디버프/자원 계열 effect를 한 번씩 직접
+    호출해서 지금 문구를 한눈에 모아 보는 스크립트를 세션 중 스크래치패드에
+    만들어 씀(`BattleCharacter`를 실제로 생성해 `applyEffect`를 직접
+    호출) — 새 effect type을 추가하거나 문구를 또 바꿀 때 같은 방식으로
+    빠르게 훑어볼 수 있음. 파일 자체는 임시 산출물이라 리포에는 없음.
+
+## 알려진 기능 공백 — teamResourceConsume 이펙트가 없음 (2026-08-14)
+
+`teamResourceGain`(스킬 `effects` 배열에서 아무 스킬이나 팀 자원을 채울 수
+있게 하는 범용 이펙트)의 반대인 **"팀 자원을 소모하는" 범용 이펙트가
+없다.** 지금 팀 자원 소모는 `src/registries.js`의 `DETONATE_MAGIC_CIRCLE`
+(`ActionRegistry`에 하드코딩된 액션, 마법진 3개 고정 소모)에서만
+`ctx.resourceManager.consumeResource()`를 직접 호출하는 식으로 존재함 —
+스킬 테이블 쪽 `effects` 배열에는 이 기능이 아예 노출돼 있지 않아서, 새
+스킬을 만들 때 "이 스킬을 쓰려면 팀 자원 N개가 필요하다"를 표현할 방법이
+`costs`의 `teamResource` 타입(소모, 이미 있음)뿐이고 "발동 결과로 팀
+자원을 소모시키는" 효과는 못 만든다. 필요해지면 `teamResourceGain`
+바로 옆에 대칭으로 추가하면 됨 — 의도된 로그 포맷도 이미 정해둠:
+`{대상}은(는) {자원}을(를) {개수}개 사용했다.`(teamResourceGain의
+`{대상}이(가) ... 그렸다.`와 대구를 이루는 형태).
+
+## 알려진 버그 — 전직 UI가 있었지만 안 보이던 문제 (2026-08-14, 수정됨)
+
+`character-sheet.html`에 전직(승급) 기능 자체는 이미 구현돼 있었다
+(`getAvailableAdvancements`가 조건을 만족한 전직만 골라내고, "전직하기"
+버튼도 정상 동작함 — 로직 자체엔 버그가 없었음, Lv15로 강제 설정해 실측
+확인함). 문제는 **위치**였다 — `profileSection`(왼쪽 280px 칼럼) 안에 작은
+항목 하나로 끼어 있어서, 조건을 만족해도 눈에 잘 안 띄어서 "전직할 방법이
+없다"고 느껴졌음.
+
+`<main>`은 `profileSection`(280px) / `statSection`(1fr) / `patternSection`
+(420px) 3칼럼 그리드다(`main { grid-template-columns:280px 1fr 420px; }`).
+새로 `advancementSection`을 4번째 요소로 추가하고 `grid-column:1/-1`로
+3칼럼 전체 폭을 차지하게 해서 Sheet 최하단에 눈에 띄게 배치함 — 렌더링
+함수(`renderAdvancementSection`)와 클릭 핸들러도 `renderProfile()`에서
+분리해서 옮김(전직 시 `renderProfile`/`renderStatSection`/
+`renderPatternSection`과 함께 자기 자신도 다시 그려서, 다음 전직 조건이
+새로 열렸는지 바로 반영됨 — 대부분은 방금 전직한 직업의 다음 단계 레벨
+조건이 더 높아서 곧바로 비워짐, 정상 동작).
+
+**부수적으로 발견한 더 큰 버그**: `<main>`이 `display:grid`라 직계 자식은
+전부 grid item이 된다 — `profileSection` 앞에 있는 `<div id="spectateBanner">`
+(관전 모드 아니면 항상 빈 채로 있음)도 예외가 아니라서, 비어있어도 grid
+auto-placement 1번 칸(280px)을 차지해버렸음. 그 결과 **1200px보다 넓은
+화면에서 profileSection/statSection/patternSection이 전부 한 칸씩 밀려서
+엉뚱한 폭으로 렌더링되고 있었다**(profileSection이 statSection 자리에
+1183px로, statSection이 patternSection 자리에 420px로, patternSection은
+4번째 아이템이라 다음 줄로 밀려나 1번 칸만 차지). 좁은 화면(<1200px, 반응형
+1열 전환)에서는 애초에 grid-template-columns가 1fr 하나뿐이라 이 버그 자체가
+안 드러나서, 넓은 화면에서만 재현되는 바람에 오래 발견되지 않은 것으로 보임.
+`#spectateBanner:empty { display:none; }` + `#spectateBanner { grid-column:1/-1; }`
+로 수정 — 비어있으면 grid 흐름에서 아예 빠지고, 내용이 있을 때(관전 모드)는
+칼럼 하나가 아니라 전체 폭 배너로 나오게 함.
+
+## 습득 가능 스킬 표시 규칙 — 조건 미충족은 아예 숨김 (2026-08-14)
+
+`learnableSkillObjs()`(레벨 조건만 거름)로 뽑은 목록을 `renderStatSection()`
+쪽에서 한 번 더 `meetsSkillPrereq(s) && !violatesExclusion(s)`로 필터링함.
+예전엔 선행 스킬 미충족(`🔒`)·상호배타 위반(`🚫`)인 스킬도 카드는 그대로
+보여주고 "배우기" 버튼만 비활성화했는데, 이제 그 두 조건을 못 채우면 카드
+자체가 안 뜬다. **스킬 포인트 부족은 이 필터에 안 넣음** — 카드는 보이고
+버튼만 비활성화되는 예전 방식 유지(포인트는 나중에 모으면 되는 값이라 "뭘
+위해 모으는지" 미리 보여주는 게 나음 — 레벨/선행/배타처럼 구조적으로 막힌
+것과는 성격이 다르다고 판단함).
+
+## 알려진 버그 — hire.html/village.html의 직업 목록이 더미데이터 (2026-08-14)
+
+`hire.html`의 `JOB_META`와 `village.html`의 `RANDOM_JOB_META`가 똑같이
+검사·궁수·사제·도적·마도사·연금술사·전사 7개 직업을 하드코딩하고 있는데,
+**실제 `job-table`(`job-table-editor.html`의 `LEGACY_JOB_SEED`)에 존재하는
+최하위(1차) 직업은 사제·전사·마법사·헌터 4개뿐**이다. 검사·궁수·도적·마도사·
+연금술사는 job-table/skill-table 어디에도 없는 완전한 더미 — 초기 예제
+데이터를 만들 때 넣은 값이 그대로 남은 것으로 보인다. 판별 방법: job-table의
+`advancement` 키(전직 가능한 직업) 중에서 **다른 항목의 `toJob`으로 한 번도
+등장하지 않는 이름**이 최하위 직업이다(전직 결과물이 아니라 시작 직업이므로).
+
+부수 피해: `hire.html`의 시작 스킬 이름도 실제 스킬 테이블과 어긋난다
+(`사제`→"치유"라고 돼 있지만 실제 스킬 테이블엔 "Attack (Priest)". `전사`도
+"강타"가 아니라 "Bash"). 시작 스킬은 `skill-table-editor.html`의
+`LEGACY_SKILL_SEED.jobSkills[직업명]`에서 `requiredLevel===1 &&
+skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
+
+**해결 방향**: `JOB_META`/`RANDOM_JOB_META`를 job-table의 진짜 최하위 4개
+직업(사제·전사·마법사·헌터)으로 교체하고, 시작 스킬 이름도 skill-table의
+실제 값으로 맞춘다. 초상화(portrait)는 job-table에 필드 자체가 없으므로
+(전직 후 직업에만 `portrait`가 붙음) 직업 역할에 맞게 새로 고른다.
+
+## 아이템 스키마 통일 + 강화 가능 여부 필드 (2026-08-14)
+
+**문제**: `refinery.html`이 강화 가능 여부를 `findShopPrice(name)`(상점
+테이블에서 name으로 찾아 price 존재 여부)로 판정했다. 드랍 전용 장비는
+상점 테이블에 대응 항목이 아예 없어서 무조건 "상점가 정보 없음 — 강화
+불가"였음 — 강화 가능 여부가 "상점에서 파는가"에 우연히 종속돼 있었던
+구조적 문제.
+
+**해결**:
+1. **드랍 테이블의 아이템명 필드를 `itemName`→`name`으로 통일**(상점/창고
+   테이블과 동일 스키마). 영향받은 곳: `monster-roster.html`(시드 24곳),
+   `monster-sheet.html`(에디터 폼 + 저장 로직), `src/engine.js`(`grantKillReward`/
+   `addLoot`/`battleLootGained`), `src/character.js`(주석),
+   `battle-view.html`/`dispatch.html`(전리품 집계·창고 병합·표시),
+   `battle-result.html`/`battle-log-view.html`(표시 — 둘 다 예시/미연결
+   데이터라 영향 적음), `demo-kill-rewards.js`/`demo-reset-and-result.js`
+   (픽스처). `MONSTER_SEED_VERSION`을 `2026-08-14a`로 올림.
+2. **`enhanceable` 필드 도입**: 상점 테이블의 기존 equipment 항목 32개
+   전부에 명시적으로 `"enhanceable": true` 추가(`SHOP_SEED_VERSION`을
+   `2026-08-14a`로 올림). 드랍 테이블의 equipment 항목 9개에도 동일하게
+   추가. 앞으로 새 아이템을 만들 때 강화 가능하게 하려면 이 필드를 직접
+   켜야 함(암묵적 기본값 없음 — 사용자가 명시적으로 결정하겠다고 함).
+3. **`refinery.html`의 판정 로직 교체**: `findShopPrice()` →
+   `findItemDef(name)`(상점 테이블 우선, 없으면 모든 몬스터의 드랍
+   테이블을 훑어서 찾음) + `refineCostBasis(name)`(`enhanceable !== true`면
+   null=강화 불가, `price`가 있으면 그 값, 없으면 `FALLBACK_REFINE_PRICE`
+   = 100골드). 실측 확인: 상점 아이템("아밍 소드", price 3000)은 시행비용
+   300G, 드랍 전용 아이템("이 빠진 도끼", price 없음)은 fallback 100 →
+   시행비용 10G로 정상 표시되고 실제 강화(+3, 30G 지출)까지 성공함.
+
+**부수 발견(수정함)**: `monster-sheet.html`의 드랍 테이블 저장 함수
+(`readDropRows`)가 폼이 관리하는 4개 필드(name/category/chance/quantity)만
+으로 객체를 새로 만들어서, 저장할 때마다 `combatReal`/`weight`/
+`equipmentType`/`enhanceable`/`price` 같은 폼에 없는 필드가 전부 날아가는
+문제가 있었음 — 오늘 추가한 `enhanceable`이 바로 이 경로로 삭제될 뻔함.
+기존 항목(`data.dropTable[i]`)에 spread로 얹어서 폼이 관리하는 필드만
+덮어쓰는 방식으로 고침.
+
+## 재강화(이미 강화된 아이템의 추가 강화) 허용 (2026-08-14)
+
+"이미 강화한 아이템도 강화가 안 된다"는 증상은 위 스키마 문제와는 **다른
+원인**이었다 — `refinery.html`의 `poolEquipmentBase()`가 `!w.enhanceLevel`로
+걸러서, 한 번이라도 강화된 장비는 재강화 후보 풀에 영구히 안 들어갔다
+(상점가/enhanceable과는 무관한 별개 필터). 원래 의도가 "재강화도 가능해야
+한다"는 것으로 확인돼서 허용하도록 고쳤다.
+
+**핵심 결정**: 재강화 중 실패하면 지금까지 쌓아둔 등급까지 포함해서 **전체
+파괴**(기존 "+0 아이템 강화 실패 시 완전 파괴" 원칙을 그대로 확장 — 안전하게
+등급을 유지하는 옵션은 기각함).
+
+**구현**:
+- `poolEquipmentBase()`: `!w.enhanceLevel` 필터 제거, 대신 `enhanceLevel < MAX_ENHANCE_LEVEL(20)`로 교체(이미 최고 등급이면 더 올릴 데가 없으니 제외).
+- `attemptOne(fromLevel, targetLevel)`: 예전엔 항상 레벨 1부터 시작했는데 시작점을 매개변수화. `fromLevel+1`부터 성공률 판정 시작, 중간 실패 시 `survived:false`(= 목표 미도달 = 완전 파괴, 기존 로직 그대로 재사용).
+- `pristineSpecFor(name)`: **강화 배율은 항상 원본(+0) 수치 기준의 절대값**이라(`statMultiplier(level)`이 절대 배율, 이전 등급의 스탯에 또 곱하는 게 아님), 재강화 시에도 매번 상점/드랍 테이블의 원본 정의에서 순수 +0 스탯을 새로 가져와야 함 — 이미 강화된 인스턴스 자신의 `combatReal`을 base로 쓰면 중첩 배율이 걸려버림(예: +3 스펙 위에 +5 배율을 곱하는 실수). `findItemDef()`를 재사용해서 항상 원본에서 계산하도록 함. 실측: +0(atk22) 아이템을 +3으로 강화(atk23) 후 다시 +5까지 재강화했을 때 atk24(원본 기준 재계산)가 나옴을 확인 — 만약 +3 스펙 위에 또 곱했다면 25가 나왔을 것.
+- 같은 이름이라도 등급이 다르면 완전히 다른 스택(+0 재고와 +3 재고가 동시에 있을 수 있음)이라, 카드/조회 전부 `name` + `enhanceLevel` 조합으로 식별하도록 바꿈(`data-level` 속성 추가, `updatePreview`/`openConfirm`/`runEnhancement` 전부 `fromLevel` 매개변수 추가).
+- UI: 목표 강화수치 드롭다운이 `현재등급+1`부터 시작(전엔 항상 1부터). 이미 강화된 아이템은 이름 옆에 `+N` 배지 표시. 확인 모달에 "(현재 +N)"과 "완전 파괴(현재 +N 포함)" 경고 추가.
+
+실측 검증: +3 상태 "이 빠진 도끼"를 +5로 재강화 성공(20G, 2회 시행), 창고에
+`enhanceLevel:5`로 정확히 반영, 콘솔 에러 없음, 전체 회귀 27/27 통과.
+
+## 알려진 미구현 / 보류 항목
+
+- 스킬 데이터 안 `note` 필드에 미구현 사유가 개별로 적혀 있음(약 76건, 대부분
+  근사 구현되어 있고 크래시는 없음) — 속성 태그, 몬스터 종족 태그, 상태이상,
+  일부 이벤트 트리거 패시브 등.
+- 제작공방(`workshop.html`)은 "개조"(드랍 장비 + 소재 1개)와 "감정"만 구현.
+  "신규 제작"(기본 소재로 처음부터 장비 제작)은 레시피 테이블 미정으로 보류.
+- 직업별 착용 가능 장비(`allowedEquipmentTypes`)는 HOF 원본 기준으로 19개
+  직업 전부 채워져 있음(job-table.json).
+- 로그 접기/요약 UI는 아직 없음(우선순위 낮음으로 보류 중).
+- 티어(장비 등급) 개념은 데이터 필드로 존재하지 않음 — "같은 handle 대비
+  성능"이라는 설계자 머릿속 개념일 뿐, 코드가 참조하는 값이 아님.
+
+## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-13, 아직 구현 안 함)
+
+지금은 전부 `localStorage` 단일 브라우저 저장이라 로그인이 없다(`battleSim_username`은
+`"2inkle"` 문자열 비교로 개발자 여부만 가르는 임시 장치). 실제 다중 사용자
+서비스로 갈 때 다음을 API/DB 설계 단계에서 결정해야 한다. **README.md는 낡은
+내용이라 참고하지 말 것** — 아래는 현재 코드(`web/*.html`)를 직접 훑어서 낸 결론.
+
+- **유저별 DB가 필요한 데이터**: `battleSim_roster`(캐릭터), `battleSim_gold`,
+  `battleSim_warehouse`(미장착 장비/소재/파견 티켓 — 파견 티켓도 그냥 warehouse
+  안의 아이템 하나로 취급됨, 별도 테이블 아님), `battleSim_hiredPoolIds`(고용
+  중복방지), `battleSim_clearedBattles`/`battleSim_battleClearTimes`/
+  `battleSim_battleAttemptTimes`(던전별 클리어여부·클리어시각·도전시각 — 세
+  개를 `battle_progress(user_id, battle_id, ...)` 한 테이블로 합치는 게 자연스러움),
+  `battleSim_lastTicketClaimAt`.
+- **전역 콘텐츠 테이블(사용자별 아님, 관리자 권한)**: `battleSim_skillTable`/
+  `jobTable`/`monsterRoster`/`shopTable`(기존 4개 에디터 산출물)에 더해
+  **`battle-select.html`의 `BATTLE_THEMES`도 같은 그룹**(던전/전투 정의 —
+  `web/battle-themes.js`로 분리함, 아래 참조). `requirements` 필드는 타입마다
+  모양이 달라서(`clearedBattle`/`consumesItem`/`cooldownHours`/
+  `attemptCooldownHours` 등) 정규화 컬럼보다 JSONB 한 덩어리가 실용적.
+- **DB로 옮길 필요 없는 것**: `battleSim_lastResult`(sessionStorage, 전투→결과
+  페이지 전달용 1회성 값), `battleSim_featureRequests`(전체 유저가 같은 목록을
+  보는 공용 게시판 — user_id는 작성자 표시 정도로만 필요, 유저별로 나누는
+  대상이 아님).
+- **비동기 전환 필요**: 지금 `getX()/saveX()` 패턴은 전부 동기(`localStorage`는
+  즉시 반환)고, 스크립트 최상단에서 `const jobData = getJobTable();` 식으로
+  파싱 시점에 바로 읽는 코드가 많음. `fetch` 기반 API로 바꾸면 이 호출부들을
+  전부 `await`/콜백 흐름으로 재구성해야 함 — 단순히 저장 함수 내부만 바꿔서
+  끝나지 않음.
+- **시딩 로직 이전**: `*_SEED_VERSION` 재시딩(페이지 로드마다 버전 비교 후
+  재삽입)은 클라이언트 단일 저장소 전제 설계라, 서버 DB로 가면 "신규 계정
+  생성 시 서버가 초기 데이터를 심는" 방식으로 완전히 옮겨야 함(그대로 재사용 불가).
+- **해금 판정 위치 미정**: `isBattleUnlocked`가 전역 `requirements` 정의와
+  유저별 `battle_progress`를 같이 봐야 계산됨. 클라이언트가 두 데이터를 받아
+  직접 계산할지, 서버가 계산해서 "지금 열린 전투 목록"만 내려줄지는 API
+  설계 시점에 정할 것 — 아직 미결정.
+
+## API 단계에서 검증/방어가 필요한 지점 (아직 구현 안 함, 계속 추가할 것)
+
+- **파견(`dispatch.html`) 보상 지급이 전부 클라이언트 계산 → 클라이언트가 그대로
+  DB에 씀**: `applyRewards()`(dispatch.html:231)가 2000턴 예산 반복 시뮬레이션
+  (`window.BattleAdapter.runBattle`을 클라이언트에서 직접 반복 호출)의 결과를
+  그대로 exp/gold/warehouse에 반영함. 서버 DB로 가면 "클라이언트가 계산한 숫자를
+  그대로 믿고 커밋"하는 구조가 되면 안 됨 — 시뮬레이션 자체를 서버에서 돌리거나,
+  최소한 서버가 결과값의 상한(턴 예산·파티 구성 기준 최대 가능치)을 검증해야 함.
+  `consumeTicket()`(티켓 차감)도 같은 요청 안에서 원자적으로 처리돼야 이중 사용을
+  막을 수 있음.
+- **파견 보상 나눗값의 근거 불균질**: `EXP_DIVISOR = 8`(경험치·골드 공용)은
+  `dispatch.html:106~108` 주석에 실측 기반 역산 근거가 있음("2000턴 현지
+  경험치 약 76,000 ÷ 8 ≈ 9,500 ≈ Lv10→15 필요량 13,210의 1.4장 분"). 하지만
+  **골드는 경험치와 같은 변수를 재사용할 뿐 독립적인 근거가 없고**,
+  `LOOT_DIVISOR = 100`은 "희귀 아이템은 직접 도전이 유리해야 한다"는 의도만
+  적혀 있을 뿐 경험치처럼 "현지 수급량 ÷ 100 ≈ 목표치" 식의 역산이 없는 감으로
+  정한 값. 서버가 보상의 타당성을 검증하려면(위 항목과 연결) 골드·전리품도
+  경험치처럼 명시적인 목표치 기반 공식이 먼저 있어야 "이 결과가 정상 범위인지"
+  판정할 수 있음 — 지금은 그 공식 자체가 없음.
+  (참고: 나눗값 100은 그대로지만 **정산 방식은 2026-08-13에 확률적 반올림으로
+  바뀜** — 아래 항목 참조. 서버 검증 로직을 짤 때 "결과가 정수 몫으로 딱
+  떨어져야 한다"고 가정하면 안 됨.)
+- **파견 전리품은 확률적 반올림이라 결과가 매번 다름**: `floor(raw/100)` 후
+  나머지를 확률로 굴려 1개를 더 줄지 정함(`dispatch.html`의 `finalLoot`).
+  같은 입력이라도 결과가 달라지므로, 서버가 "클라이언트가 보낸 전리품 수량"을
+  재계산으로 1:1 대조하는 방식의 검증은 불가능함 — 기댓값 대비 상한/분포로
+  판정해야 함.
+
+## 검증 도구
+
+```bash
+node index.js                    # 엔진 스모크 테스트
+node demo-<이름>.js               # 개별 메커니즘 결정적 검증
+node simulate.js --runs 200      # 내장 샘플 매치업 확률적 시뮬
+```
+
+`simulate.js`의 `loadAdapterEnv({ skillTablePath })`는 실제 `web/battle-adapter.js`와
+스킬 테이블을 vm 샌드박스에 얹어서, 브라우저 없이도 게임과 완전히 같은 경로로
+캐릭터를 만들어 반복 시뮬을 돌릴 수 있게 해준다. 밸런스 조정 시 기본 도구.

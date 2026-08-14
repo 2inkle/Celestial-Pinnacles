@@ -1,0 +1,4904 @@
+{
+  "commonSkills": [
+    {
+      "name": "공격",
+      "requiredLevel": 1,
+      "skillPointCost": 0,
+      "stat": "str",
+      "coefficient": 1,
+      "costs": [],
+      "skillType": "physical",
+      "targetFaction": "enemy",
+      "targetCount": "single",
+      "preDelayType": "action",
+      "effects": [],
+      "preDelay": 10,
+      "postDelay": 30
+    }
+  ],
+  "jobSkills": {
+    "사제": [
+      {
+        "name": "Attack (Priest)",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Healing",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "single",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ]
+      },
+      {
+        "name": "Blessing",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spUp",
+            "value": 30
+          }
+        ],
+        "note": "'SP회복' 수치가 이미지에 명시 안 돼있어서 임의로 30 넣어둠 - 조정 필요"
+      },
+      {
+        "name": "Benediction",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spUp",
+            "value": 30
+          }
+        ],
+        "note": "SP회복 수치 임의값(30) - 조정 필요"
+      },
+      {
+        "name": "QuickHeal",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "targetCount 'multi'를 'all'로 근사(정확한 다수 인원수 미지정)"
+      },
+      {
+        "name": "PowerHeal",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "targetCount 'multi'를 'all'로 근사"
+      },
+      {
+        "name": "SmartHeal",
+        "requiredLevel": 1,
+        "skillPointCost": 10,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "hits": 3,
+        "targetPriority": "lowestHpPct",
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "선행조건[QuickHeal OR PowerHeal]은 스킬트리(전직/습득 UI) 몫이라 안 걸어둠. targetPriority:lowestHpPct로 '가장 낮은 대상 우선' 재현 시도했는데, targetCount:'all'과 조합되면 매번 같은 최저HP 대상만 계속 맞을 수 있음(원문이 'multi'라 정확한 인원수 불명)",
+        "requiredSkills": [
+          "QuickHeal",
+          "PowerHeal"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Party Heal",
+        "requiredLevel": 1,
+        "skillPointCost": 12,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ]
+      },
+      {
+        "name": "Refresh",
+        "requiredLevel": 1,
+        "skillPointCost": 2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "CurePoison(독 등 상태이상 회복)과 '독 데미지(-300)'는 상태이상 시스템이 없어서 미구현 - HP회복만 반영"
+      },
+      {
+        "name": "MagicCircle",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [],
+        "note": "'마법진+1'(자원 증가)은 자원 증가 효과 자체가 없어서 미구현 - 스킬 틀만 만들어둠"
+      },
+      {
+        "name": "Healing Shower",
+        "requiredLevel": 1,
+        "skillPointCost": 15,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 3,
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 80,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "선행조건[Regene Heal + Resurrection]은 스킬트리 몫이라 안 걸어둠. '적중시 3회 회복'은 hits:3으로 재현(매 히트마다 heal 발동)",
+        "requiredSkills": [
+          "Regene Heal",
+          "Resurrection"
+        ],
+        "requiredSkillMode": "all"
+      },
+      {
+        "name": "Sanctuary",
+        "requiredLevel": 1,
+        "skillPointCost": 8,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          },
+          {
+            "type": "spUp",
+            "value": 30
+          }
+        ],
+        "note": "선행조건[ProtectionField+ForceShield+Benediction]은 스킬트리 몫이라 안 걸어둠. CurePoison/독데미지(-1500)는 상태이상 시스템 없어서 미구현. MagicCircle x1(자원 소모)은 아직 안 걸어둠 - teamResource 소모 방식 확인 필요해서 보류",
+        "requiredSkills": [
+          "ProtectionField",
+          "Force Shield",
+          "Benediction"
+        ],
+        "requiredSkillMode": "all"
+      },
+      {
+        "name": "Holy",
+        "requiredLevel": 1,
+        "skillPointCost": 1,
+        "stat": "int",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Rabbit",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -9999,
+        "effects": [],
+        "note": "'위안토끼 소환'은 SUMMON 액션과 연결 필요(summonPool 지정 등 추가 설정 필요) - 지금은 postDelay만 극단적 음수로 'Quick' 근사, 실제 소환 로직은 비워둠"
+      },
+      {
+        "name": "Encourage",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 50
+          }
+        ]
+      },
+      {
+        "name": "Charm",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": 50
+          }
+        ]
+      },
+      {
+        "name": "Regeneration",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "applyTick",
+            "name": "HP리젠",
+            "kind": "hp",
+            "percentOfMax": 5,
+            "duration": 1
+          }
+        ]
+      },
+      {
+        "name": "Force Shield",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 20
+          }
+        ]
+      },
+      {
+        "name": "ManaRegen",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "applyTick",
+            "name": "SP리젠",
+            "kind": "sp",
+            "percentOfMax": 5,
+            "duration": 1
+          }
+        ]
+      },
+      {
+        "name": "Grand Cross",
+        "requiredLevel": 1,
+        "skillPointCost": 8,
+        "stat": "int",
+        "coefficient": 4.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 3,
+        "preDelay": 150,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [],
+        "note": "MagicCircle x1(자원 소모)은 Sanctuary와 같은 이유로 보류"
+      }
+    ],
+    "드루이드": [
+      {
+        "name": "HolyShield",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "shield",
+            "charges": 1,
+            "shieldType": "all"
+          }
+        ]
+      },
+      {
+        "name": "Quick (Druid)",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 200,
+        "preDelayType": "action",
+        "postDelay": -9999,
+        "effects": [],
+        "note": "'즉발동' 근사(postDelay 극단적 음수) - Rabbit/Advent Angel과 동일 방식"
+      },
+      {
+        "name": "CastAsist",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -50,
+        "effects": [
+          {
+            "type": "clearCastDelay",
+            "requiresPreDelayType": "casting"
+          }
+        ]
+      },
+      {
+        "name": "Nature Defence",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "shield",
+            "charges": 1,
+            "shieldType": "all"
+          }
+        ],
+        "note": "'데미지 1회 무효화'가 패시브+액티브 겸용 표기였는데 지금은 액티브(캐스팅)로만 구현"
+      },
+      {
+        "name": "WindShield",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [],
+        "note": "'스킬을 확률적으로 막는다'는 완전히 새로운 메커니즘(확률형 스킬 무효화, 지금 있는 Guard/Shield는 전부 결정적으로 발동함) - 미구현, 틀만 만들어둠"
+      },
+      {
+        "name": "ProgressiveHeal",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "hits": 3,
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "'대상 HP30%이하라면 회복량 2배' 조건부 배율은 미구현(heal류 효과가 아직 대상 상태에 따라 배율이 달라지는 기능이 없음) - 기본 회복량만 반영"
+      },
+      {
+        "name": "MasterHeal",
+        "requiredLevel": 15,
+        "skillPointCost": 14,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 6,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "ProgressiveHeal과 동일한 이유로 조건부 배율(HP30%이하 2배) 미구현"
+      },
+      {
+        "name": "Naturopathy",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 60,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ],
+        "note": "'행동 시 지속적으로 HP 회복(일정 확률로 해제)'은 미구현(행동 트리거형 지속효과 + 확률적 해제라는 새 상태 시스템 필요) - 즉발 회복만 반영"
+      },
+      {
+        "name": "Power Assist",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 80
+          }
+        ]
+      },
+      {
+        "name": "Magic Assist",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": 80
+          }
+        ]
+      },
+      {
+        "name": "Speed Assist",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": 60
+          }
+        ],
+        "requiredSkills": [
+          "Power Assist",
+          "Magic Assist"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "FullAssist",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 60,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 40
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": 40
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": 40
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": 40
+          }
+        ],
+        "requiredSkills": [
+          "Power Assist",
+          "Magic Assist",
+          "Speed Assist"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'치유숙련에 비례하여 효과 증가, 초기 INT와 치유숙련에 비례하여 한계 증가'는 미구현(스탯 기반 버프 배율 스케일링 + 상한 시스템 필요) - 고정 40%만 반영"
+      }
+    ],
+    "전사": [
+      {
+        "name": "Bash",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "str",
+        "coefficient": 3.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 8
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 20,
+        "effects": []
+      },
+      {
+        "name": "Double Attack",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Weapon Break",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -30
+          }
+        ]
+      },
+      {
+        "name": "Armor Break",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -30
+          }
+        ]
+      },
+      {
+        "name": "Break Down",
+        "requiredLevel": 1,
+        "skillPointCost": 5,
+        "stat": "str",
+        "coefficient": 5.7,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 35
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -30
+          }
+        ]
+      },
+      {
+        "name": "Raging Blow",
+        "requiredLevel": 1,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.3,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 40
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 5,
+        "diminishPerHit": 20,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 60,
+        "effects": []
+      },
+      {
+        "name": "Indiscriminate",
+        "requiredLevel": 1,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 1.2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 65
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 8,
+        "diminishPerHit": 20,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": []
+      },
+      {
+        "name": "Charge Attack",
+        "requiredLevel": 1,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 2.6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "rowMultiplier": {
+          "who": "self",
+          "row": "back",
+          "multiplier": 4
+        },
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "front",
+            "target": "self"
+          }
+        ]
+      },
+      {
+        "name": "Ultimate Strike",
+        "requiredLevel": 1,
+        "skillPointCost": 12,
+        "stat": "str",
+        "coefficient": 2.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 95
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "preDelay": 25,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "rowMultiplier": [
+          {
+            "who": "self",
+            "row": "back",
+            "multiplier": 3
+          },
+          {
+            "who": "target",
+            "row": "front",
+            "multiplier": 3
+          }
+        ],
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "front",
+            "target": "self"
+          }
+        ]
+      }
+    ],
+    "가드": [
+      {
+        "name": "Quick Slash",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -30,
+        "effects": []
+      },
+      {
+        "name": "Double Quick Slash",
+        "requiredLevel": 15,
+        "skillPointCost": 8,
+        "stat": "str",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 25
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -20,
+        "effects": []
+      },
+      {
+        "name": "Knock Back",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 4.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ]
+      },
+      {
+        "name": "Armor Pierce",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "ignoreBonusDefPct": 100,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": []
+      },
+      {
+        "name": "Pierce Rush",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 1.1,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 80
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 6,
+        "diminishPerHit": 20,
+        "ignoreBonusDefPct": 100,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 90,
+        "effects": []
+      },
+      {
+        "name": "Double Pierce",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 2.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 2,
+        "ignoreBonusDefPct": 100,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": []
+      },
+      {
+        "name": "Hit&Away",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 2.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "rowMultiplier": {
+          "who": "self",
+          "row": "front",
+          "multiplier": 3
+        },
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "back",
+            "target": "self"
+          }
+        ]
+      },
+      {
+        "name": "Reinforce",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "name": "OverLimit",
+        "requiredLevel": 15,
+        "skillPointCost": 8,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 80
+          },
+          {
+            "type": "maxHpUpPercent",
+            "value": -20
+          }
+        ]
+      },
+      {
+        "name": "Defensive",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -20
+          },
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ]
+      },
+      {
+        "name": "First Aid",
+        "requiredLevel": 15,
+        "skillPointCost": 1,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "heal",
+            "value": 50
+          }
+        ]
+      },
+      {
+        "name": "Self Recovery",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "heal",
+            "value": 150
+          }
+        ]
+      },
+      {
+        "name": "Hyper Recovery",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": [
+          {
+            "type": "healMissingPercent",
+            "value": 60
+          }
+        ]
+      },
+      {
+        "name": "Self Regeneration",
+        "requiredLevel": 15,
+        "skillPointCost": 3,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 20,
+        "effects": [
+          {
+            "type": "applyTick",
+            "name": "재생",
+            "kind": "hp",
+            "percentOfMax": 7,
+            "duration": 1
+          }
+        ]
+      },
+      {
+        "name": "Parrying",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -30,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": 20
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 20
+          },
+          {
+            "type": "shield",
+            "charges": 1,
+            "shieldType": "all"
+          }
+        ]
+      }
+    ],
+    "로열가드": [
+      {
+        "name": "Neck Attack",
+        "requiredLevel": 30,
+        "skillPointCost": 8,
+        "stat": "str",
+        "coefficient": 3.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "targetPriority": "preparing",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 25,
+        "effects": [
+          {
+            "type": "castDelay",
+            "value": 105
+          }
+        ]
+      },
+      {
+        "name": "Marduk Strength",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "passive": true,
+        "statBonus": {
+          "str": 35
+        },
+        "maxHpBonus": 350,
+        "conditionalPassiveMods": [
+          {
+            "key": "physicalDamageDealtPct",
+            "value": 100,
+            "condition": {
+              "type": "isGuarding"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Job Master: Royal Guard",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "passive": true,
+        "conditionalPassiveMods": [
+          {
+            "key": "physicalDamageTakenPct",
+            "value": 15,
+            "condition": {
+              "type": "guardAlliesIs",
+              "value": true
+            }
+          }
+        ]
+      }
+    ],
+    "위치헌터": [
+      {
+        "name": "Quick Slash (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -30,
+        "effects": []
+      },
+      {
+        "name": "Double Quick Slash (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 8,
+        "stat": "str",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 25
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -20,
+        "effects": []
+      },
+      {
+        "name": "Armor Pierce (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "ignoreBonusDefPct": 100,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": []
+      },
+      {
+        "name": "Double Attack (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Weapon Break (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -30
+          }
+        ]
+      },
+      {
+        "name": "DeathStrike",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 9.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 80
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "ignoreEvade": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "clearTicks"
+          }
+        ],
+        "note": "HP&SP Regen=0(일부 보스 제외)은 근사 구현 - 기존 재생 tick을 지우는 정도로만 처리, '일부 보스 예외' 로직은 미구현"
+      },
+      {
+        "name": "FullBreak",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 2.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 75
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -20
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -20
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -20
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -20
+          }
+        ]
+      },
+      {
+        "name": "Mana Break",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "str",
+        "coefficient": 1.2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 20
+          }
+        ]
+      },
+      {
+        "name": "Soul Break",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 25
+          }
+        ]
+      },
+      {
+        "name": "Soul Storm",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "str",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "name": "Punishing Blow",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "str",
+        "coefficient": 1.3,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 40
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 5,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 48,
+        "effects": [],
+        "note": "'무기 딜레이 감소 20%'는 postDelay(60->48)에 미리 반영해서 표현. 진짜 무기 딜레이 시스템이 생기면 재검토 필요"
+      },
+      {
+        "name": "Reinforce (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "name": "First Aid (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 1,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "heal",
+            "value": 50
+          }
+        ]
+      },
+      {
+        "name": "Self Recovery (WH)",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "str",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "heal",
+            "value": 150
+          }
+        ]
+      },
+      {
+        "name": "EnergyRob",
+        "requiredLevel": 15,
+        "skillPointCost": 3,
+        "stat": "int",
+        "coefficient": 1.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 15,
+            "casterSpRestorePct": 100
+          }
+        ]
+      },
+      {
+        "name": "EnergyCollect",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0.7,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "preDelay": 100,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 10,
+            "casterSpRestorePct": 100
+          }
+        ]
+      },
+      {
+        "name": "ChargeDisturb",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 4.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "ignoreEvade": true,
+        "ignoreBonusDefPct": 100,
+        "targetPriority": "preparing",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": [
+          {
+            "type": "clearCastDelay",
+            "requiresPreDelayType": "casting"
+          },
+          {
+            "type": "castDelay",
+            "value": 200
+          }
+        ]
+      },
+      {
+        "name": "ChargeDisturb(all)",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 2.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "ignoreEvade": true,
+        "ignoreBonusDefPct": 100,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": [
+          {
+            "type": "castDelay",
+            "value": 100
+          }
+        ]
+      },
+      {
+        "name": "ForceShield[self]",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 35
+          }
+        ]
+      },
+      {
+        "name": "MindBreak",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -40
+          }
+        ]
+      },
+      {
+        "name": "Mana Burn",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 5.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "targetPriority": "preparing",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 55,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 40
+          }
+        ]
+      },
+      {
+        "name": "Magic Jammer",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 65,
+        "effects": [
+          {
+            "type": "castDelay",
+            "value": 55
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -30
+          }
+        ]
+      },
+      {
+        "name": "ResistDown",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -20
+          }
+        ]
+      },
+      {
+        "name": "ForceShield",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 20
+          }
+        ]
+      },
+      {
+        "name": "Pray",
+        "requiredLevel": 15,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUp",
+            "stat": "luk",
+            "value": 10
+          }
+        ],
+        "note": "'100까지'라는 상한 캡은 미구현 - 지금은 그냥 계속 누적됨"
+      }
+    ],
+    "인퀴지터": [
+      {
+        "name": "Light of Order",
+        "requiredLevel": 30,
+        "skillPointCost": 8,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "support",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 15
+          }
+        ],
+        "note": "'자신의 사용 위치와 이후 위치가 같을 때 위력 증가'는 미구현(위치 기억 상태값 필요) - 마법받는피해감소만 근사 반영"
+      },
+      {
+        "name": "Justice Craft",
+        "requiredLevel": 30,
+        "skillPointCost": 18,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": 100
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": 100
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": 55
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 55
+          },
+          {
+            "type": "heal",
+            "value": 99999
+          }
+        ],
+        "note": "'HP 25%이하일때만 사용 가능(1회 제한)'은 스킬 자체가 아니라 이 스킬을 쓰는 패턴 쪽에 조건(hp<=25%)과 maxUses:1을 걸어서 표현해야 함 - 스킬 데이터 자체엔 그 제약이 안 걸려있음"
+      },
+      {
+        "name": "Excorsism",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 4.0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -25
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -25
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": -25
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -25
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -25
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -25
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -25
+          }
+        ],
+        "note": "'보스타입 면역'은 tierMultiplier:{boss:0}으로 구현됨. '소환 캐릭터에게 추가 데미지'도 tierMultiplier로 표현 가능하나 정확한 배율이 이미지에 없어서 미설정",
+        "tierMultiplier": {
+          "boss": 0
+        }
+      },
+      {
+        "name": "Holy Sprit",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "passive": true,
+        "maxHpBonus": 150,
+        "maxSpBonus": 150,
+        "passiveMods": {
+          "completeDefenseChancePct": 3
+        }
+      },
+      {
+        "name": "Will of Light",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "passive": true,
+        "note": "'흑색&메이지 타입에게 받는 데미지-5%'는 몬스터 속성/타입 태그가 없어서 미구현. ATK+15/MATK+15 고정치는 정상 반영됨.",
+        "combatBonus": {
+          "atk": 15,
+          "matk": 15
+        }
+      }
+    ],
+    "데몬헌터": [
+      {
+        "name": "DemonHunter",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "passive": true,
+        "note": "'흑색&데몬&언데드 타입에게 받는/주는 데미지 증감'은 몬스터 종족 태그 시스템이 없어서 미구현. ATK+10/MATK+10 고정치는 정상 반영됨.",
+        "combatBonus": {
+          "atk": 10,
+          "matk": 10
+        }
+      },
+      {
+        "name": "HolyEnchant",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": [],
+        "note": "'흑색&악마&언데드 타입에게 주는 데미지 증가, 받는 데미지 감소'는 몬스터 종족 태그가 없어서 미구현 - 스킬 틀만 만들어둠"
+      },
+      {
+        "name": "ExorcismGospel",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": 20
+          }
+        ],
+        "note": "원래는 유저타입에게만 상승, 악마&언데드에게는 감소(대상 다르게 갈라짐) - 지금은 ally 전체 일괄 상승만 반영, enemy측 감소 버전은 없음"
+      },
+      {
+        "name": "Avenger",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "passive": true,
+        "passiveMods": {
+          "completeDefenseChancePct": 5
+        },
+        "note": "크리티컬(10%,1.3배)과 데미지반사(100)는 아직 없는 메커니즘이라 미구현. ATK/MATK 고정치는 정상 반영. 완전방어5%는 확률형(completeDefenseChancePct)으로 반영.",
+        "combatBonus": {
+          "atk": 10,
+          "matk": 10
+        }
+      },
+      {
+        "name": "FuriousCharge",
+        "requiredLevel": 30,
+        "skillPointCost": 8,
+        "stat": "str",
+        "coefficient": 4.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "rowMultiplier": {
+          "who": "target",
+          "row": "front",
+          "multiplier": 3
+        },
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "front",
+            "target": "self"
+          },
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ]
+      },
+      {
+        "name": "Liberation",
+        "requiredLevel": 30,
+        "skillPointCost": 12,
+        "costs": [],
+        "skillType": "support",
+        "targetFaction": "deadAlly",
+        "targetCount": "all",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 300,
+        "effects": [
+          {
+            "type": "resurrect",
+            "tpCost": 20
+          }
+        ],
+        "note": "'유저 타입 전체'로 한정하는 건 미구현 - 지금은 죽은 아군 전체(소환수 포함)가 대상. 스킬 자체에 stat/coefficient가 있지만 데미지 판정 없이 resurrect 효과만 실질적으로 작동함(적 없는 targetFaction이라 데미지 계산은 안 걸림)"
+      }
+    ],
+    "카디널": [
+      {
+        "name": "Job Master: Cardinal",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "passive": true,
+        "passiveMods": {
+          "healingDealtFlat": 200,
+          "healingDealtPct": 10
+        }
+      },
+      {
+        "name": "Heal All",
+        "requiredLevel": 30,
+        "skillPointCost": 15,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": [
+          {
+            "type": "scaledHeal"
+          }
+        ]
+      },
+      {
+        "name": "Resurrection",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 300
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "deadAlly",
+        "targetCount": "single",
+        "preDelay": 100,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "resurrect",
+            "tpCost": 20
+          }
+        ]
+      },
+      {
+        "name": "Regene Heal",
+        "requiredLevel": 30,
+        "skillPointCost": 10,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "applyTick",
+            "name": "HP리젠",
+            "kind": "hp",
+            "percentOfMax": 5,
+            "duration": 1
+          },
+          {
+            "type": "applyTick",
+            "name": "SP리젠",
+            "kind": "sp",
+            "percentOfMax": 5,
+            "duration": 1
+          }
+        ],
+        "note": "선행조건[Regeneration + Smart Heal]은 스킬트리 몫이라 안 걸어둠",
+        "requiredSkills": [
+          "Regeneration",
+          "SmartHeal"
+        ],
+        "requiredSkillMode": "all"
+      },
+      {
+        "name": "Divine Burst",
+        "requiredLevel": 30,
+        "skillPointCost": 7,
+        "stat": "int",
+        "coefficient": 2.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 80
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 8,
+        "diminishPerHit": 20,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [],
+        "note": "'무기 딜레이 감소 50%'는 postDelay 자체가 0이라 반영할 자리가 없음(원문에 postDelay가 (50:0)) - 별도 감소 여지 없어서 그냥 생략"
+      },
+      {
+        "name": "Inner Fire",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 75
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": 20
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": 20
+          }
+        ]
+      }
+    ],
+    "비숍": [
+      {
+        "name": "Advent Angel",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 160
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -9999,
+        "effects": [],
+        "note": "'천사강림'의 실제 효과 내용이 이미지에 없어서 미구현 - 'Quick'만 postDelay 음수로 근사"
+      },
+      {
+        "name": "ProtectionField",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": 25
+          }
+        ]
+      },
+      {
+        "name": "Holy Burst",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 2.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 40
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 3,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      }
+    ],
+    "하이드루이드": [
+      {
+        "name": "Job Master: High Druid",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "passive": true,
+        "passiveMods": {
+          "physicalDamageDealtPct": 5,
+          "magicDamageDealtPct": 5,
+          "physicalDamageTakenPct": 5,
+          "magicDamageTakenPct": 5,
+          "healingDealtPct": 5
+        }
+      },
+      {
+        "name": "Thorns Skin",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "ally",
+        "targetCount": "all",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": 5
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": 5
+          }
+        ],
+        "note": "'데미지 반사(+80) 8회까지 중첩'은 데미지 반사 메커니즘 자체가 없어서 미구현 - 방어력 버프만 반영"
+      },
+      {
+        "name": "BindingRoots",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 2.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 250
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 12,
+        "diminishPerHit": 40,
+        "preDelay": 150,
+        "preDelayType": "action",
+        "postDelay": 105,
+        "effects": [
+          {
+            "type": "castDelay",
+            "value": 15
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": -5
+          }
+        ],
+        "note": "'무기 딜레이 감소 40%'는 postDelay(150->105)에 미리 반영. Delay-15%는 castDelay 효과로 근사"
+      }
+    ],
+    "스나이퍼": [
+      {
+        "name": "Charge Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "dex",
+        "coefficient": 12.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 60
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 1
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ]
+      },
+      {
+        "name": "Eagle Eye (Passive)",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "passive": true,
+        "passiveMods": {
+          "accuracyBonusPct": 10
+        },
+        "note": "원문은 Passive+Use 겸용 스킬 하나였는데, 지금 스킬 스키마는 패시브/액티브를 동시에 가질 수 없어서 둘로 분리함"
+      },
+      {
+        "name": "Eagle Eye (Active)",
+        "requiredLevel": 15,
+        "skillPointCost": 0,
+        "stat": "dex",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "physical",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "grantPassiveMod",
+            "key": "physicalIgnoreBonusDefPct",
+            "scaleByStat": "atk",
+            "scaleFactor": 0.5
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -40
+          }
+        ],
+        "note": "\"매의 눈\" 상태 - 영구지속(아군 버프 제거 스킬이 아직 없어서 해제 수단은 미구현). 원문 서술 순서(방어무시 증가 언급이 먼저, ATK감소가 나중)를 따라서 effects 순서도 grantPassiveMod를 먼저 둠 - ATK 감소 전 원래 ATK 기준으로 방어무시%가 스냅샷됨"
+      },
+      {
+        "name": "Power Shoot",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "dex",
+        "coefficient": 8.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 1
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Pierce Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 8,
+        "stat": "dex",
+        "coefficient": 2.2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 25
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 2
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "ignoreBonusDefPct": 100,
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": []
+      },
+      {
+        "name": "Aiming",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "dex",
+        "coefficient": 2.1,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 80
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 3
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "ignoreBonusDefPct": 100,
+        "hits": 3,
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": [],
+        "note": "'일부 타입 제외 대상에게 방어무시'와 '특정 타입에게 적중시 2회 데미지'는 몬스터 종족/타입 태그 시스템이 없어서 미구현 - 지금은 전체 대상에게 무조건 방어무시만 적용"
+      },
+      {
+        "name": "Disarm",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "dex",
+        "coefficient": 1.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 1
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "targetPriority": "backRow",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "atk",
+            "value": -70
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "matk",
+            "value": -70
+          }
+        ]
+      },
+      {
+        "name": "Palsy Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "dex",
+        "coefficient": 2.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 2
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "targetPriority": "backRow",
+        "hits": 2,
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [],
+        "note": "'Delay-100%'(대상의 다음 행동 지연)는 대상에게 actionDelay를 거는 효과가 필요한데, 정확한 배율/기준이 불명확해서 일단 미반영 - 필요하면 effects에 {type:'actionDelay', value:N} 추가하면 됨"
+      },
+      {
+        "name": "Poison Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "dex",
+        "coefficient": 1.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 3
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 3,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [],
+        "note": "'독화'(중독 상태이상 부여)와 '독 데미지(+300)'는 상태이상(독) 시스템 자체가 없어서 미구현 - 기본 타격만 반영"
+      },
+      {
+        "name": "Arrow Shower",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "dex",
+        "coefficient": 0.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 6
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 6,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Concentration",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "stat": "dex",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 10,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": 25
+          },
+          {
+            "type": "statUp",
+            "stat": "dex",
+            "value": 100
+          }
+        ]
+      },
+      {
+        "name": "Hunting Sign",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "dex",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "targetPriority": "bossTier",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -50,
+        "effects": [
+          {
+            "type": "huntingSign"
+          }
+        ],
+        "note": "'자신의 화살 공격에 추가 데미지 부여'는 미구현(마킹된 특정 대상에게만 추가 데미지 주는 대상-조건부 데미지 보정이 필요, 지금은 caster 상태 기준 조건부 패시브만 있어서 대상 기준 조건은 없음) - 표식+화살스킬 자동 우선타겟팅만 반영"
+      },
+      {
+        "name": "Hurricane Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 16,
+        "stat": "dex",
+        "coefficient": 0.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 90
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 16
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 16,
+        "diminishPerHit": 40,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [],
+        "requiredSkills": [
+          "Charge Shot",
+          "Pierce Shot",
+          "Arrow Shower"
+        ],
+        "requiredSkillMode": "all"
+      },
+      {
+        "name": "Vulcan Arrow",
+        "requiredLevel": 15,
+        "skillPointCost": 15,
+        "stat": "dex",
+        "coefficient": 2.2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 10
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "hits": 10,
+        "diminishPerHit": 60,
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 80,
+        "effects": []
+      },
+      {
+        "name": "Quick Shot",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "stat": "dex",
+        "coefficient": 1.6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 5
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 5,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -35,
+        "effects": [],
+        "requiredSkills": [
+          "Aiming",
+          "Disarm"
+        ],
+        "requiredSkillMode": "all"
+      }
+    ],
+    "아케인아처": [
+      {
+        "name": "Arcane Bolt",
+        "requiredLevel": 30,
+        "skillPointCost": 12,
+        "stat": "dex",
+        "coefficient": 4.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 3
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "hits": 3,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "barrierUp",
+            "value": 50,
+            "target": "self"
+          }
+        ],
+        "note": "'자신의 INT 증가(최대 MAXSP의 3배까지)'와 '공격 데미지에 비례하여 비전 방어막(최대 MAXSP의 3배까지)'은 스탯/데미지 비례+MAXSP 상한 계산이 필요해서 정확한 수치 대신 barrierUp 고정치(50)로 임시 근사만 해둠 - 조정 필요"
+      },
+      {
+        "name": "Arcane Spear",
+        "requiredLevel": 30,
+        "skillPointCost": 15,
+        "stat": "dex",
+        "coefficient": 33.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 350
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 1
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "refillPersonalResource",
+            "resource": "arrow",
+            "target": "self"
+          }
+        ],
+        "note": "'화살이 5발 이하일 때만 사용 가능'은 스킬 자체가 아니라 이 스킬을 쓰는 패턴 쪽에 조건을 걸어야 함(지금 조건 시스템에 personalResource 잔량 조건이 없어서, 있다면 pattern condition으로 추가 필요). '자신의 INT에 비례한 추가 데미지'는 미구현(대상 방어와 무관하게 순수 가산되는 별도 데미지 항이라 지금 파이프라인엔 없음) - 화살 재충전만 반영"
+      },
+      {
+        "name": "Magic Sight",
+        "requiredLevel": 30,
+        "skillPointCost": 14,
+        "passive": true,
+        "combatBonus": {
+          "atk": 0
+        },
+        "note": "'전투 시작 시 Atk에 자신의 INT 비례 추가치를 더한다'는 원문상 액티브(Physical/Support)였지만, 전투 시작 시 1회 적용되는 개막 패시브로 근사하기로 한 방침에 따라 passive로 전환. 다만 INT 비례 계산 자체는 미구현(스탯 비례 combatBonus를 스냅샷하는 기능이 아직 없음) - 틀만 만들어둠"
+      },
+      {
+        "name": "Enchant Arrow",
+        "requiredLevel": 30,
+        "skillPointCost": 9,
+        "passive": true,
+        "combatBonus": {
+          "atk": 10,
+          "matk": 10
+        },
+        "note": "'물리 공격을 한 번 할 때마다 SP 회복+비전 방어막'은 매 공격 트리거형이라 개막 패시브로 근사가 안 됨(1회성이 아니라 반복 트리거가 핵심) - 미구현. ATK/MATK 고정치만 반영"
+      },
+      {
+        "name": "Agility",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "passive": true,
+        "combatBonus": {
+          "atk": 20
+        },
+        "statBonus": {
+          "spd": 10
+        },
+        "passiveMods": {
+          "physicalDamageTakenPct": 5,
+          "magicDamageTakenPct": 5
+        },
+        "patternSlotBonus": 1
+      },
+      {
+        "name": "Arcane Intuition",
+        "requiredLevel": 30,
+        "skillPointCost": 18,
+        "passive": true,
+        "passiveMods": {
+          "accuracyBonusPct": 5
+        },
+        "maxSpBonus": 200,
+        "patternSlotBonus": 2,
+        "excludesSkills": [
+          "Arcane Curtain"
+        ],
+        "note": "'자신의 첫 행동 종료 시 Atk를 Matk의 100%만큼 상승'과 '대상 방어력↓/자신 INT↑일수록 추가 보정'은 매 전투 이벤트 트리거+대상 상태 의존형이라 미구현 - 명중률/MAXSP/패턴슬롯 고정 보너스만 반영"
+      },
+      {
+        "name": "Arcane Curtain",
+        "requiredLevel": 30,
+        "skillPointCost": 18,
+        "passive": true,
+        "combatBonus": {
+          "def": 8,
+          "mdef": 8
+        },
+        "passiveMods": {
+          "completeDefenseChancePct": 5
+        },
+        "maxSpBonus": 200,
+        "conditionalPassiveMods": [
+          {
+            "key": "physicalDamageDealtPct",
+            "value": 30,
+            "condition": {
+              "type": "hasBarrier"
+            }
+          },
+          {
+            "key": "magicDamageDealtPct",
+            "value": 30,
+            "condition": {
+              "type": "hasBarrier"
+            }
+          }
+        ],
+        "excludesSkills": [
+          "Arcane Intuition"
+        ],
+        "note": "'모든 공격 1.3배'를 hasBarrier 조건부 +30%로 근사(정확히는 배율 1.3배와 %가산은 수학적으로 다르지만 근사치로 채택). '첫 행동 종료 시 MAXHP/MAXSP 비례 상승'과 '전투 시작 시 MAXSP 비례 방어막으로 시작'은 미구현(패시브에서 전투 시작 시 barrierHp를 자동 부여하는 기능이 아직 어댑터에 없음) - DEF/MDEF/완전방어(확률형)/MAXSP는 정상 반영"
+      },
+      {
+        "name": "Arrow Charge",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "stat": "dex",
+        "coefficient": 0,
+        "costs": [],
+        "skillType": "physical",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "refillPersonalResource",
+            "resource": "arrow"
+          }
+        ],
+        "note": "화살통으로 분류된 장비 착용 시 나오는 아이템 스킬이라고 되어있는데, '장비 장착 시 자동으로 스킬 부여' 기능(SkillSeal과 유사한 개념) 자체는 미구현 - 스킬 자체는 만들어뒀지만 자동 습득 연결은 안 됨"
+      },
+      {
+        "name": "Job Master: Arcane Archer",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "passive": true,
+        "passiveMods": {
+          "dexDamageDealtPct": 6
+        }
+      }
+    ],
+    "화이트아크": [
+      {
+        "name": "Star Bow Brake",
+        "requiredLevel": 30,
+        "skillPointCost": 10,
+        "stat": "dex",
+        "coefficient": 2.65,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 15
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 3,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 80,
+        "effects": []
+      },
+      {
+        "name": "Fury",
+        "requiredLevel": 30,
+        "skillPointCost": 12,
+        "stat": "dex",
+        "coefficient": 0.7,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 90
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 32
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "hits": 64,
+        "diminishPerHit": 80,
+        "preDelay": 150,
+        "preDelayType": "action",
+        "postDelay": 150,
+        "effects": []
+      },
+      {
+        "name": "Job Master: White Arch",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "passive": true,
+        "passiveMods": {
+          "accuracyBonusPct": 10
+        }
+      }
+    ],
+    "헌터": [
+      {
+        "name": "Shoot",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "dex",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 2
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "targetPriority": "backRow",
+        "hits": 2,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Hunting Shot",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "dex",
+        "coefficient": 1.9,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 5
+          },
+          {
+            "type": "personalResource",
+            "resource": "arrow",
+            "amount": 4
+          }
+        ],
+        "skillType": "physical",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "targetPriority": "backRow",
+        "hits": 4,
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      }
+    ],
+    "마법사": [
+      {
+        "name": "Fire Ball",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 1.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "fire",
+        "hits": 4,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Mana Recharge",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "convertResource",
+            "from": "hp",
+            "to": "sp",
+            "fromPct": 0,
+            "toPct": 30
+          }
+        ],
+        "note": "'SP회복' 수치가 이미지에 없어서 임의로 최대SP의 30%로 넣어둠 - 조정 필요"
+      }
+    ],
+    "워록": [
+      {
+        "name": "Fire Storm",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 1.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "fire",
+        "hits": 6,
+        "preDelay": 40,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": []
+      },
+      {
+        "name": "Fire Pillar",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 1.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 40
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "fire",
+        "hits": 2,
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -40
+          }
+        ],
+        "requiredSkills": [
+          "Fire Storm"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Explosion",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 2.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 180
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "everyone",
+        "targetCount": "all",
+        "element": "fire",
+        "preDelay": 100,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -40
+          }
+        ],
+        "requiredSkills": [
+          "Fire Pillar"
+        ],
+        "requiredSkillMode": "any",
+        "note": "all-all 스킬 - targetFaction:'everyone'으로 아군까지 전부 타격됨(원문 그대로)"
+      },
+      {
+        "name": "Hell Fire",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 1.2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 240
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "fire",
+        "hits": 12,
+        "preDelay": 70,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [],
+        "requiredSkills": [
+          "Fire Storm"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Meteor Storm",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 2.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 300
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "fire",
+        "hits": 16,
+        "preDelay": 130,
+        "preDelayType": "action",
+        "postDelay": 16,
+        "effects": [],
+        "requiredSkills": [
+          "Hell Fire"
+        ],
+        "requiredSkillMode": "any",
+        "note": "'딜레이 감소 20%'는 postDelay(20->16)에 미리 반영"
+      },
+      {
+        "name": "Ice Spear",
+        "requiredLevel": 15,
+        "skillPointCost": 1,
+        "stat": "int",
+        "coefficient": 3.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "element": "ice",
+        "hits": 3,
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 5,
+        "effects": []
+      },
+      {
+        "name": "Ice Javelin",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 1.3,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 180
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "ice",
+        "hits": 8,
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 20,
+        "effects": [],
+        "requiredSkills": [
+          "Ice Spear"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Ice Prison",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 1.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "element": "ice",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -30
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -30
+          }
+        ],
+        "requiredSkills": [
+          "Ice Javelin"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Tidal Wave",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 1.1,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 250
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "ice",
+        "hits": 24,
+        "preDelay": 120,
+        "preDelayType": "action",
+        "postDelay": 36,
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ],
+        "requiredSkills": [
+          "Ice Prison"
+        ],
+        "requiredSkillMode": "any",
+        "note": "'딜레이 감소 40%'는 postDelay(60->36)에 미리 반영"
+      },
+      {
+        "name": "Blizzard",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 1.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 250
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "ice",
+        "hits": 10,
+        "preDelay": 70,
+        "preDelayType": "action",
+        "postDelay": 5,
+        "effects": [],
+        "requiredSkills": [
+          "Ice Javelin"
+        ],
+        "requiredSkillMode": "any",
+        "note": "'딜레이 감소 50%'는 postDelay(10->5)에 미리 반영"
+      },
+      {
+        "name": "Thunder Bolt",
+        "requiredLevel": 15,
+        "skillPointCost": 1,
+        "stat": "int",
+        "coefficient": 5.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "invalid": true,
+        "element": "thunder",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": []
+      },
+      {
+        "name": "Lightning Ball",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 2.6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "thunder",
+        "hits": 3,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 10,
+        "effects": [],
+        "requiredSkills": [
+          "Thunder Bolt"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Flash",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 0.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 30
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "everyone",
+        "targetCount": "all",
+        "element": "thunder",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "actionDelay",
+            "value": 100
+          }
+        ],
+        "requiredSkills": [
+          "Lightning Ball"
+        ],
+        "requiredSkillMode": "any",
+        "note": "Delay-100%(행동 지연)를 actionDelay:100으로 근사. all-all이라 아군도 맞음(원문 그대로)"
+      },
+      {
+        "name": "Paralysis",
+        "requiredLevel": 15,
+        "skillPointCost": 4,
+        "stat": "int",
+        "coefficient": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 15
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "element": "thunder",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "actionDelay",
+            "value": 120
+          }
+        ],
+        "requiredSkills": [
+          "Lightning Ball"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Thunder Storm",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 3.7,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 350
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "thunder",
+        "hits": 6,
+        "preDelay": 90,
+        "preDelayType": "action",
+        "postDelay": 20,
+        "effects": [],
+        "requiredSkills": [
+          "Lightning Ball"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "High Mana Recharge",
+        "requiredLevel": 15,
+        "skillPointCost": 2,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 30,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "convertResource",
+            "from": "hp",
+            "to": "sp",
+            "fromPct": 0,
+            "toPct": 60
+          }
+        ],
+        "note": "'SP회복' 수치가 이미지에 없어서 임의로 최대SP의 60%로 넣어둠 - 조정 필요"
+      },
+      {
+        "name": "Life Convert",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "convertResource",
+            "from": "hp",
+            "to": "sp",
+            "fromPct": 10,
+            "toPct": 80
+          }
+        ],
+        "requiredSkills": [
+          "High Mana Recharge"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "Energy Exchange",
+        "requiredLevel": 15,
+        "skillPointCost": 10,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 10
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "convertResource",
+            "from": "sp",
+            "to": "hp",
+            "fromPct": 50,
+            "toPct": 50
+          }
+        ],
+        "requiredSkills": [
+          "Life Convert"
+        ],
+        "requiredSkillMode": "any",
+        "note": "'HP,SP교환(%)'의 정확한 비율이 이미지에 없어서 50%/50%로 임의 설정 - 조정 필요"
+      },
+      {
+        "name": "Earthquake",
+        "requiredLevel": 15,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 10.0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 80
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "everyone",
+        "targetCount": "all",
+        "preDelay": 100,
+        "preDelayType": "action",
+        "postDelay": 30,
+        "effects": [
+          {
+            "type": "actionDelay",
+            "value": 80
+          }
+        ],
+        "requiredSkills": [
+          "Fire Storm",
+          "Lightning Ball"
+        ],
+        "requiredSkillMode": "all",
+        "note": "all-all이라 아군도 맞음(원문 그대로). Delay-80%를 actionDelay:80으로 근사"
+      },
+      {
+        "name": "Subsidence",
+        "requiredLevel": 15,
+        "skillPointCost": 8,
+        "stat": "int",
+        "coefficient": 15.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "everyone",
+        "targetCount": "all",
+        "preDelay": 130,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [],
+        "requiredSkills": [
+          "Earthquake"
+        ],
+        "requiredSkillMode": "any"
+      },
+      {
+        "name": "SandStorm",
+        "requiredLevel": 15,
+        "skillPointCost": 12,
+        "stat": "int",
+        "coefficient": 0.6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "preDelay": 200,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "actionDelay",
+            "value": 80
+          }
+        ],
+        "requiredSkills": [
+          "Ice Javelin",
+          "Lightning Ball"
+        ],
+        "requiredSkillMode": "all"
+      }
+    ],
+    "둠로드": [
+      {
+        "name": "Mana Guard",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "manaGuard",
+            "label": "마나 가드",
+            "mods": {
+              "physicalDamageTakenPct": 35,
+              "magicDamageTakenPct": 35,
+              "damageToSpRatio": 0.05,
+              "magicDamageDealtPct": 25
+            }
+          }
+        ],
+        "note": "'사용 동안 모든 마법공격 125% 데미지'를 magicDamageDealtPct:25로 반영"
+      },
+      {
+        "name": "SpellFocus",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "spellFocus",
+            "label": "주문 집속",
+            "mods": {
+              "preDelayMultiplier": 0.5,
+              "postDelayMultiplier": 0.5,
+              "spCostMultiplier": 2,
+              "powerMultiplier": 0.9,
+              "resourceOnCost": {
+                "resource": "focusMana",
+                "costType": "sp",
+                "ratio": 1
+              }
+            }
+          }
+        ],
+        "note": "'위력 소폭 감소'를 powerMultiplier:0.9로 근사. 집속 마력은 PERSONAL_RESOURCE_TYPES의 jobGrant로 둠로드/스펠마에게 자동 부여됨(초기 0, 최대 1000) - 스탠스 중 SP 소모량에 비례해 자동 적립됨"
+      },
+      {
+        "name": "Mana Flood",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 20
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "statUp",
+            "stat": "int",
+            "value": 250
+          }
+        ],
+        "note": "'주문 집속 상태 전용'은 패턴 조건(STANCE_IS:spellFocus)으로 걸어야 함. 'INT상승 최대 1250' 상한은 미구현(statUp에 누적 상한 기능이 없음)"
+      },
+      {
+        "name": "Banishment",
+        "requiredLevel": 30,
+        "skillPointCost": 8,
+        "stat": "int",
+        "coefficient": 3.6,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 3,
+        "preDelay": 80,
+        "preDelayType": "action",
+        "postDelay": 40,
+        "effects": [
+          {
+            "type": "spDamage",
+            "value": 20
+          },
+          {
+            "type": "actionDelay",
+            "value": 50
+          }
+        ],
+        "note": "'SP+HP 데미지'에서 SP데미지 비율이 이미지에 없어서 20%로 임의 설정 - 조정 필요"
+      },
+      {
+        "name": "ReverseGravity",
+        "requiredLevel": 30,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 7.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 500
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "ignoreBonusDefPct": 100,
+        "preDelay": 375,
+        "preDelayType": "action",
+        "postDelay": 190,
+        "effects": [],
+        "note": "'유저 타입에게 50% 데미지'는 tierMultiplier:{user:0.5}로 구현됨",
+        "tierMultiplier": {
+          "user": 0.5
+        }
+      },
+      {
+        "name": "Cataclysm",
+        "requiredLevel": 30,
+        "skillPointCost": 10,
+        "stat": "int",
+        "coefficient": 4.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 1200
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 40
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "ignoreBonusDefPct": 100,
+        "hits": 3,
+        "preDelay": 200,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [],
+        "note": "'주문 집속 상태 전용'은 패턴 조건으로. '유저 타입에게 50% 데미지'는 tierMultiplier:{user:0.5}로 구현됨",
+        "tierMultiplier": {
+          "user": 0.5
+        }
+      },
+      {
+        "name": "Rapid Spell",
+        "requiredLevel": 30,
+        "skillPointCost": 0,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": -350,
+        "effects": [],
+        "note": "'고속 영창. SpellFocus 상태에서는 이중 영창으로 변경(집속 마력 100 사용)'에서 조건부 분기(스탠스 여부에 따라 효과가 달라짐)는 미구현 - 지금은 고속 영창(postDelay 음수)만 반영"
+      },
+      {
+        "name": "Voltex",
+        "requiredLevel": 30,
+        "skillPointCost": 5,
+        "stat": "int",
+        "coefficient": 3.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "hits": 5,
+        "preDelay": 240,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -50
+          }
+        ]
+      },
+      {
+        "name": "Meteor Shower",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 2.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 600
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 25
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "fire",
+        "hits": 21,
+        "preDelay": 130,
+        "preDelayType": "action",
+        "postDelay": 32,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -5
+          }
+        ],
+        "requiredSkills": [
+          "Meteor Storm",
+          "SpellFocus"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'주문 집속 상태 전용'은 패턴 조건으로. '딜레이 감소 50%'는 postDelay(65->32)에 반영"
+      },
+      {
+        "name": "Poseidon Wave",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 5.4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 500
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 25
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "ice",
+        "hits": 10,
+        "preDelay": 80,
+        "preDelayType": "action",
+        "postDelay": 71,
+        "effects": [
+          {
+            "type": "setRow",
+            "value": "back"
+          }
+        ],
+        "requiredSkills": [
+          "Tidal Wave",
+          "SpellFocus"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'주문 집속 상태 전용'은 패턴 조건으로. '딜레이 감소 25%'는 postDelay(95->71)에 반영. '대열 역전'은 setRow:back으로 근사"
+      },
+      {
+        "name": "Lightning Vortex",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "stat": "int",
+        "coefficient": 7.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 700
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 25
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "thunder",
+        "hits": 7,
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 120,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -5
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -5
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": -5
+          }
+        ],
+        "requiredSkills": [
+          "Thunder Storm",
+          "SpellFocus"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'주문 집속 상태 전용'은 패턴 조건으로"
+      }
+    ],
+    "아크메이지": [
+      {
+        "name": "MagicCircle",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 100
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "teamResourceGain",
+            "resource": "magicCircle",
+            "value": 1
+          }
+        ]
+      },
+      {
+        "name": "Mana Shield",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 0,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "manaShield",
+            "label": "마나 실드",
+            "mods": {
+              "physicalDamageTakenPct": 40,
+              "magicDamageTakenPct": 40,
+              "damageToSpRatio": 0.05,
+              "magicDamageDealtPct": 50
+            }
+          }
+        ]
+      },
+      {
+        "name": "Elemental Shield(Red)",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "elementalShieldRed",
+            "label": "엘리멘탈 실드(적)",
+            "exclusiveGroup": "elementalShield",
+            "mods": {}
+          }
+        ],
+        "requiredSkills": [
+          "Mana Shield"
+        ],
+        "requiredSkillMode": "any",
+        "note": "'적색 타입에게 받는 데미지 감소'는 속성 태그 시스템이 없어서 미구현(빈 mods). exclusiveGroup으로 '한종류만 사용 가능' 규칙만 반영"
+      },
+      {
+        "name": "Elemental Shield(Blue)",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "elementalShieldBlue",
+            "label": "엘리멘탈 실드(청)",
+            "exclusiveGroup": "elementalShield",
+            "mods": {}
+          }
+        ],
+        "requiredSkills": [
+          "Mana Shield"
+        ],
+        "requiredSkillMode": "any",
+        "note": "위와 동일 - 속성 감소는 미구현, 상호배타만 반영"
+      },
+      {
+        "name": "Elemental Shield(Green)",
+        "requiredLevel": 30,
+        "skillPointCost": 4,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 150
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 50,
+        "effects": [
+          {
+            "type": "enterStance",
+            "key": "elementalShieldGreen",
+            "label": "엘리멘탈 실드(녹)",
+            "exclusiveGroup": "elementalShield",
+            "mods": {}
+          }
+        ],
+        "requiredSkills": [
+          "Mana Shield"
+        ],
+        "requiredSkillMode": "any",
+        "note": "위와 동일 - 속성 감소는 미구현, 상호배타만 반영"
+      },
+      {
+        "name": "Mana Extend",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": -50,
+        "effects": [
+          {
+            "type": "maxSpUp",
+            "value": 500
+          }
+        ],
+        "note": "'최대 SP상승 (5000 한계)'에서 1회 상승량이 이미지에 없어서 500으로 임의 설정. 5000 상한은 미구현 - 조정 필요"
+      },
+      {
+        "name": "Solnigel",
+        "requiredLevel": 30,
+        "skillPointCost": 14,
+        "stat": "int",
+        "coefficient": 2.8,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 200
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "everyone",
+        "targetCount": "all",
+        "hits": 2,
+        "preDelay": 100,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -25
+          }
+        ],
+        "requiredSkills": [
+          "Elemental Shield(Red)",
+          "Elemental Shield(Blue)",
+          "Elemental Shield(Green)"
+        ],
+        "requiredSkillMode": "all",
+        "note": "all-all이라 아군도 맞음(원문 그대로)"
+      },
+      {
+        "name": "Elemental Enchant",
+        "requiredLevel": 30,
+        "skillPointCost": 2,
+        "passive": true,
+        "note": "'몬스터의 속성 타입에 따라 스킬의 위력 상승'은 속성 태그 시스템이 없어서 미구현 - 틀만 만들어둠"
+      },
+      {
+        "name": "Spirit of Mana",
+        "requiredLevel": 30,
+        "skillPointCost": 6,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 50
+          },
+          {
+            "type": "teamResource",
+            "resource": "magicCircle",
+            "amount": 2
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 0,
+        "preDelayType": "action",
+        "postDelay": 15,
+        "effects": [
+          {
+            "type": "convertResource",
+            "from": "hp",
+            "to": "sp",
+            "fromPct": 0,
+            "toPct": 50
+          },
+          {
+            "type": "maxSpUp",
+            "value": 500
+          },
+          {
+            "type": "applyTick",
+            "name": "SP리젠",
+            "kind": "sp",
+            "percentOfMax": 10,
+            "duration": 1
+          }
+        ],
+        "requiredSkills": [
+          "Mana Extend",
+          "MagicCircle",
+          "High Mana Recharge"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'2회 제한'은 패턴의 maxUses로 걸어야 함(스킬 자체엔 없음). SP회복/최대SP상승 수치는 이미지에 없어서 임의값"
+      },
+      {
+        "name": "Prominence",
+        "requiredLevel": 30,
+        "skillPointCost": 14,
+        "stat": "int",
+        "coefficient": 10.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 1200
+          },
+          {
+            "type": "teamResource",
+            "resource": "magicCircle",
+            "amount": 1
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "single",
+        "element": "fire",
+        "hits": 3,
+        "preDelay": 190,
+        "preDelayType": "action",
+        "postDelay": 25,
+        "effects": [
+          {
+            "type": "combatStatUpPercent",
+            "stat": "def",
+            "value": -25
+          },
+          {
+            "type": "combatStatUpPercent",
+            "stat": "mdef",
+            "value": -25
+          }
+        ],
+        "requiredSkills": [
+          "Explosion",
+          "Meteor Storm",
+          "MagicCircle"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'회피 불가'는 ignoreEvade 스텁(회피 시스템 자체가 아직 없음)"
+      },
+      {
+        "name": "Absolute Zero",
+        "requiredLevel": 30,
+        "skillPointCost": 16,
+        "stat": "int",
+        "coefficient": 12.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 900
+          },
+          {
+            "type": "teamResource",
+            "resource": "magicCircle",
+            "amount": 1
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "ice",
+        "preDelay": 125,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "actionDelay",
+            "value": 200
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -15
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -15
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": -15
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "luk",
+            "value": -15
+          }
+        ],
+        "requiredSkills": [
+          "Tidal Wave",
+          "Blizzard",
+          "MagicCircle"
+        ],
+        "requiredSkillMode": "all"
+      },
+      {
+        "name": "Voltex Sphere",
+        "requiredLevel": 30,
+        "skillPointCost": 20,
+        "stat": "int",
+        "coefficient": 4.5,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 1050
+          },
+          {
+            "type": "teamResource",
+            "resource": "magicCircle",
+            "amount": 1
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "element": "thunder",
+        "hits": 12,
+        "preDelay": 125,
+        "preDelayType": "action",
+        "postDelay": 100,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "spd",
+            "value": -10
+          }
+        ],
+        "requiredSkills": [
+          "Thunder Storm",
+          "MagicCircle"
+        ],
+        "requiredSkillMode": "all",
+        "note": "'전열 후열 교차 데미지'를 bounceRows로 구현(히트마다 반대 열로 튕기고, 반대 열에 대상이 없으면 연쇄 중단)",
+        "bounceRows": true
+      }
+    ]
+  }
+}

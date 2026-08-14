@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>제작공방</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { max-width:1100px; width:100%; margin:0 auto; padding:26px 20px 0; }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  .desc { font-size:13px; color:var(--mist-dim); line-height:1.6; margin-top:6px; }
+  .gold-badge { font-family:'JetBrains Mono',monospace; font-size:15px; color:var(--gold); font-weight:600; background:var(--panel); border:1px solid var(--gold-dim); border-radius:20px; padding:8px 16px; white-space:nowrap; }
+
+  main { max-width:1100px; width:100%; margin:0 auto; padding:22px 20px 60px; flex:1; }
+
+  .tabs { display:flex; gap:6px; margin-bottom:20px; border-bottom:1px solid var(--line); }
+  .tab { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); background:none; border:none; border-bottom:2px solid transparent; padding:10px 18px; cursor:pointer; }
+  .tab:hover { color:var(--mist); }
+  .tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  .block { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .section-title { font-family:'Cinzel',serif; font-size:16px; color:#f2efe8; margin:0 0 4px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .hint { font-family:'Inter',sans-serif; font-size:11.5px; color:var(--mist-dim); font-weight:400; }
+
+  .list { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+  .row { display:flex; align-items:center; gap:12px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:11px 14px; }
+  .row.selected { border-color:var(--gold); background:#2b2740; }
+  .row-main { flex:1; min-width:0; }
+  .row-name { font-size:13.5px; color:#e8e4f0; font-weight:600; }
+  .row-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); margin-top:3px; line-height:1.5; }
+  .row-sub .pos { color:var(--cyan); }
+  .row-sub .neg { color:var(--danger); }
+  .tag { font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px; border-radius:10px; border:1px solid var(--line); color:var(--mist-dim); }
+  .tag.gold { color:var(--gold); border-color:var(--gold-dim); }
+  .tag.cyan { color:var(--cyan); border-color:var(--cyan-dim); }
+
+  button.act { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:7px 14px; cursor:pointer; white-space:nowrap; }
+  button.act:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
+  button.act:disabled { opacity:0.35; cursor:not-allowed; }
+  button.act.primary { border-color:var(--gold-dim); color:var(--gold); }
+  button.act.primary:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+
+  .empty { font-size:12.5px; color:var(--mist-dim); text-align:center; padding:26px 10px; }
+  .preview { margin-top:14px; padding:14px; border:1px dashed var(--gold-dim); border-radius:8px; background:#221f30; }
+  .preview-title { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); letter-spacing:0.08em; margin-bottom:8px; }
+  .arrow { color:var(--mist-dim); margin:0 6px; }
+  .flavor { font-size:12px; color:var(--mist-dim); font-style:italic; margin-top:6px; line-height:1.6; }
+  .warn { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--danger); margin-top:10px; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Workshop</div>
+      <h1>제작공방</h1>
+      <div class="desc">
+        장비에 소재를 하나 넣어 성격을 바꿉니다. 소재는 넣는 순간 사라지고, 한 번 넣은 장비는 되돌릴 수 없어요.<br />
+        어떤 소재가 무슨 효과를 주는지 모르겠다면 감정을 맡겨보세요 — 감정하지 않아도 제작은 가능합니다.
+      </div>
+    </div>
+    <div class="gold-badge" id="goldBadge">💰 0 G</div>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" data-tab="craft">🔨 개조</button>
+    <button class="tab" data-tab="appraise">🔍 감정</button>
+  </div>
+  <div id="view"></div>
+</main>
+
+<script src="craft-materials.js"></script>
+<script>
+// ============================================================================
+// 제작공방
+//
+// 이번 단계에서 만드는 건 "개조"와 "감정" 두 가지.
+//   개조 — 창고의 바닐라 장비(강화 안 됨 + 소재 안 넣음 + 미장착) 하나를 고르고
+//          소재 하나를 넣어 결과물을 만듦. 소재 슬롯은 언제나 1개.
+//   감정 — 소재가 어떤 효과를 주는지 골드를 내고 미리 확인. 개별 인스턴스
+//          단위이고, 감정 없이도 개조에 넣을 수 있음(강제 아님).
+//
+// "신규 제작"(기본 소재로 장비를 처음부터 만드는 것)은 레시피 테이블이 정해진
+// 뒤에 붙일 자리만 비워둠 — 지금은 드랍 장비를 개조하는 흐름만으로도
+// "기약 없는 파밍"을 완화한다는 목적이 충족되기 때문.
+//
+// 저장 형식: 개조 결과물은 원본 이름을 그대로 쓰고 craftMaterial 필드로만
+// 구분됨(유저에게 소재명을 이름으로 노출하지 않는 게 의도). 창고 병합도
+// craftMaterial까지 같아야 합쳐지도록 아래 findStackable에서 처리함.
+// ============================================================================
+(function () {
+  const $ = (sel) => document.querySelector(sel);
+
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+  function saveWarehouse(w) { localStorage.setItem("battleSim_warehouse", JSON.stringify(w)); }
+  function getGold() { return Number(localStorage.getItem("battleSim_gold") || 0); }
+  function setGold(v) { localStorage.setItem("battleSim_gold", String(Math.max(0, Math.floor(v)))); }
+
+  // 감정 완료 기록 — 개별 인스턴스 단위라 창고 항목에 appraised 플래그를 직접 붙임.
+  // (같은 소재라도 다른 더미는 따로 감정해야 함 — 알아가는 과정 자체를 재미로 보는 설계)
+
+  let tab = "craft";
+  let selectedEquipIdx = null;
+  let selectedMatName = null;
+
+  // 개조 대상 — 강화도 안 됐고 소재도 안 들어간 순정 장비만.
+  // 강화품을 제외하는 건 "강화 배율 × 소재 보정"이 겹쳐 계산이 꼬이는 걸
+  // 막기 위함이고, 이미 소재가 든 장비를 제외하는 건 소재 슬롯이 1개이기 때문.
+  function craftableEquipment() {
+    return getWarehouse()
+      .map((w, i) => ({ ...w, _idx: i }))
+      .filter((w) => w.category === "equipment" && !w.heldBy && !w.enhanceLevel && !w.craftMaterial && (w.quantity || 0) > 0);
+  }
+  function ownedMaterials() {
+    return getWarehouse()
+      .map((w, i) => ({ ...w, _idx: i }))
+      .filter((w) => w.category === "material" && (w.quantity || 0) > 0 && CRAFT_MATERIAL_TABLE[w.name]);
+  }
+
+  function describeSpec(item) {
+    const parts = [];
+    const push = (obj, prefix) => {
+      if (!obj) return;
+      Object.entries(obj).forEach(([k, v]) => {
+        if (!v) return;
+        parts.push(`<span class="${v > 0 ? "pos" : "neg"}">${prefix}${k} ${v > 0 ? "+" : ""}${v}</span>`);
+      });
+    };
+    push(item.combatReal, "");
+    push(item.combatBonus, "b:");
+    push(item.statBonus, "");
+    push(item.passiveBonus, "");
+    if (item.maxHpBonus) parts.push(`<span class="pos">MaxHP +${item.maxHpBonus}</span>`);
+    if (item.maxSpBonus) parts.push(`<span class="pos">MaxSP +${item.maxSpBonus}</span>`);
+    if (item.weight != null) parts.push(`무게 ${item.weight}`);
+    if (item.twoHanded) parts.push("양손");
+    return parts.join(" · ") || "—";
+  }
+
+  // 창고 병합 — 이름/카테고리뿐 아니라 craftMaterial과 enhanceLevel까지 같아야
+  // 합침. 소재가 다르면 이름이 같아도 완전히 다른 물건이기 때문.
+  function findStackable(warehouse, item) {
+    return warehouse.find((w) =>
+      w.name === item.name && w.category === item.category &&
+      !w.heldBy && !w.enhanceLevel &&
+      (w.craftMaterial || null) === (item.craftMaterial || null));
+  }
+
+  function consumeOne(warehouse, idx) {
+    warehouse[idx].quantity -= 1;
+    if (warehouse[idx].quantity <= 0) warehouse.splice(idx, 1);
+  }
+
+  // ── 개조 탭 ────────────────────────────────────────────────────────────
+  function renderCraft() {
+    const equips = craftableEquipment();
+    const mats = ownedMaterials();
+    const eq = selectedEquipIdx != null ? equips.find((e) => e._idx === selectedEquipIdx) : null;
+    const matEntry = selectedMatName ? mats.find((m) => m.name === selectedMatName) : null;
+    const matDef = selectedMatName ? CRAFT_MATERIAL_TABLE[selectedMatName] : null;
+
+    let preview = "";
+    if (eq && matDef) {
+      const result = applyCraftMaterial(eq, selectedMatName);
+      preview = `
+        <div class="preview">
+          <div class="preview-title">결과 미리보기</div>
+          <div class="row-name">${eq.name}</div>
+          <div class="row-sub">${describeSpec(eq)}</div>
+          <div class="row-sub" style="margin-top:6px;">↓</div>
+          <div class="row-sub">${describeSpec(result)}</div>
+          ${result.setId ? `<div class="row-sub" style="margin-top:6px;"><span class="tag gold">세트: ${result.setId}</span></div>` : ""}
+          ${matEntry && !matEntry.appraised ? `<div class="warn">⚠ 감정하지 않은 소재입니다 — 위 결과는 실제 적용값이지만, 감정 전에는 정보를 몰라도 넣을 수 있다는 점만 참고하세요.</div>` : ""}
+          <div style="margin-top:12px; text-align:right;">
+            <button class="act primary" id="doCraft">이 소재로 개조</button>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="block">
+        <h2 class="section-title">개조할 장비 <span class="hint">강화하지 않은 순정 장비만 — 이미 소재가 들어갔거나 강화된 장비는 개조할 수 없어요</span></h2>
+        <div class="list">
+          ${equips.length ? equips.map((e) => `
+            <div class="row ${e._idx === selectedEquipIdx ? "selected" : ""}" data-equip="${e._idx}">
+              <div class="row-main">
+                <div class="row-name">${e.name}${e.quantity > 1 ? ` <span class="hint">×${e.quantity}</span>` : ""}</div>
+                <div class="row-sub">${describeSpec(e)}</div>
+              </div>
+              <button class="act" data-equip-pick="${e._idx}">${e._idx === selectedEquipIdx ? "선택됨" : "선택"}</button>
+            </div>`).join("") : `<div class="empty">개조할 수 있는 장비가 없어요. 전투에서 장비를 얻거나 상점에서 구매해 보세요.</div>`}
+        </div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">넣을 소재 <span class="hint">소재 슬롯은 하나뿐이라 되돌릴 수 없어요</span></h2>
+        <div class="list">
+          ${mats.length ? mats.map((m) => {
+            const def = CRAFT_MATERIAL_TABLE[m.name];
+            return `
+            <div class="row ${m.name === selectedMatName ? "selected" : ""}">
+              <div class="row-main">
+                <div class="row-name">${m.name} <span class="hint">×${m.quantity}</span>
+                  ${m.appraised ? `<span class="tag cyan">감정됨</span>` : `<span class="tag">미감정</span>`}</div>
+                <div class="row-sub">${m.appraised ? def.describe : "??? — 감정하면 효과를 알 수 있어요"}</div>
+              </div>
+              <button class="act" data-mat-pick="${m.name}">${m.name === selectedMatName ? "선택됨" : "선택"}</button>
+            </div>`;
+          }).join("") : `<div class="empty">가진 소재가 없어요.</div>`}
+        </div>
+        ${preview}
+      </div>`;
+  }
+
+  // ── 감정 탭 ────────────────────────────────────────────────────────────
+  function renderAppraise() {
+    const mats = ownedMaterials();
+    const gold = getGold();
+    return `
+      <div class="block">
+        <h2 class="section-title">소재 감정 <span class="hint">감정비는 소재의 희귀도에 따라 달라져요. 감정하지 않아도 개조에는 넣을 수 있어요</span></h2>
+        <div class="list">
+          ${mats.length ? mats.map((m) => {
+            const def = CRAFT_MATERIAL_TABLE[m.name];
+            const cant = gold < def.appraisalCost;
+            return `
+            <div class="row">
+              <div class="row-main">
+                <div class="row-name">${m.name} <span class="hint">×${m.quantity}</span>
+                  ${m.appraised ? `<span class="tag cyan">감정됨</span>` : `<span class="tag gold">${def.appraisalCost} G</span>`}</div>
+                <div class="row-sub">${m.appraised ? def.describe : "???"}</div>
+                ${m.appraised ? `<div class="flavor">${def.flavor}</div>` : ""}
+              </div>
+              ${m.appraised
+                ? `<button class="act" disabled>완료</button>`
+                : `<button class="act primary" data-appraise="${m._idx}" ${cant ? "disabled title='골드가 부족해요'" : ""}>감정</button>`}
+            </div>`;
+          }).join("") : `<div class="empty">감정할 소재가 없어요.</div>`}
+        </div>
+      </div>`;
+  }
+
+  function render() {
+    $("#goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    $("#view").innerHTML = tab === "craft" ? renderCraft() : renderAppraise();
+    bind();
+  }
+
+  function bind() {
+    document.querySelectorAll("[data-equip-pick]").forEach((b) => b.addEventListener("click", () => {
+      const idx = Number(b.dataset.equipPick);
+      selectedEquipIdx = selectedEquipIdx === idx ? null : idx;
+      render();
+    }));
+    document.querySelectorAll("[data-mat-pick]").forEach((b) => b.addEventListener("click", () => {
+      const name = b.dataset.matPick;
+      selectedMatName = selectedMatName === name ? null : name;
+      render();
+    }));
+
+    const craftBtn = $("#doCraft");
+    if (craftBtn) craftBtn.addEventListener("click", () => {
+      const warehouse = getWarehouse();
+      const eqIdx = selectedEquipIdx;
+      const matIdx = warehouse.findIndex((w) => w.name === selectedMatName && w.category === "material" && (w.quantity || 0) > 0);
+      if (eqIdx == null || matIdx < 0) return;
+
+      const base = { ...warehouse[eqIdx] };
+      const matName = selectedMatName;
+      if (!confirm(`"${base.name}"에 "${matName}"을(를) 넣습니다.\n소재는 사라지고 되돌릴 수 없어요. 진행할까요?`)) return;
+
+      // 원본 1개와 소재 1개를 소모 — 인덱스가 밀리지 않도록 큰 쪽부터 지움
+      const [a, b] = eqIdx > matIdx ? [eqIdx, matIdx] : [matIdx, eqIdx];
+      consumeOne(warehouse, a);
+      consumeOne(warehouse, b);
+
+      const crafted = applyCraftMaterial(base, matName);
+      delete crafted._idx;
+      crafted.quantity = 1;
+      const stack = findStackable(warehouse, crafted);
+      if (stack) stack.quantity += 1;
+      else warehouse.push(crafted);
+
+      saveWarehouse(warehouse);
+      selectedEquipIdx = null; selectedMatName = null;
+      alert(`"${base.name}" 개조 완료!`);
+      render();
+    });
+
+    document.querySelectorAll("[data-appraise]").forEach((b) => b.addEventListener("click", () => {
+      const idx = Number(b.dataset.appraise);
+      const warehouse = getWarehouse();
+      const entry = warehouse[idx];
+      if (!entry) return;
+      const def = CRAFT_MATERIAL_TABLE[entry.name];
+      if (!def || getGold() < def.appraisalCost) return;
+      setGold(getGold() - def.appraisalCost);
+      entry.appraised = true;
+      saveWarehouse(warehouse);
+      render();
+    }));
+
+    document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+      tab = t.dataset.tab;
+      document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
+      selectedEquipIdx = null; selectedMatName = null;
+      render();
+    }));
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

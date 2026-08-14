@@ -1,0 +1,485 @@
+{
+  "advancement": {
+    "사제": [
+      {
+        "toJob": "비숍",
+        "portrait": "🕊️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      },
+      {
+        "toJob": "드루이드",
+        "portrait": "🌿",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      },
+      {
+        "toJob": "광신도",
+        "portrait": "🕯️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          },
+          {
+            "type": "item",
+            "value": "부정한 성배"
+          }
+        ]
+      }
+    ],
+    "비숍": [
+      {
+        "toJob": "카디널",
+        "portrait": "🎖️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ],
+    "드루이드": [
+      {
+        "toJob": "하이드루이드",
+        "portrait": "🐺",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ],
+    "전사": [
+      {
+        "toJob": "가드",
+        "portrait": "🛡️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      },
+      {
+        "toJob": "위치헌터",
+        "portrait": "🔮",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      }
+    ],
+    "가드": [
+      {
+        "toJob": "로열가드",
+        "portrait": "⚔️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ],
+    "위치헌터": [
+      {
+        "toJob": "인퀴지터",
+        "portrait": "✝️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "toJob": "데몬헌터",
+        "portrait": "🗡️",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ],
+    "마법사": [
+      {
+        "toJob": "워록",
+        "portrait": "🔮",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      }
+    ],
+    "워록": [
+      {
+        "toJob": "둠로드",
+        "portrait": "💀",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "toJob": "아크메이지",
+        "portrait": "✨",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ],
+    "헌터": [
+      {
+        "toJob": "스나이퍼",
+        "portrait": "🎯",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 15
+          }
+        ]
+      }
+    ],
+    "스나이퍼": [
+      {
+        "toJob": "화이트아크",
+        "portrait": "🏹",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      },
+      {
+        "toJob": "아케인아처",
+        "portrait": "🔯",
+        "requirements": [
+          {
+            "type": "level",
+            "value": 30
+          }
+        ]
+      }
+    ]
+  },
+  "allowedEquipmentTypes": {
+    "전사": [
+      "sword",
+      "greatsword",
+      "axe",
+      "hatchet",
+      "pike",
+      "mace",
+      "shield",
+      "armguard",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "helm",
+      "item",
+      "accessory"
+    ],
+    "가드": [
+      "sword",
+      "greatsword",
+      "axe",
+      "hatchet",
+      "pike",
+      "mace",
+      "subsword",
+      "subhatchet",
+      "subpike",
+      "submace",
+      "shield",
+      "armguard",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "helm",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "로열가드": [
+      "sword",
+      "greatsword",
+      "axe",
+      "hatchet",
+      "pike",
+      "mace",
+      "subsword",
+      "subhatchet",
+      "subpike",
+      "submace",
+      "shield",
+      "armguard",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "helm",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "위치헌터": [
+      "sword",
+      "pike",
+      "dagger",
+      "shield",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "인퀴지터": [
+      "sword",
+      "greatsword",
+      "pike",
+      "dagger",
+      "shield",
+      "maingauche",
+      "rune",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "데몬헌터": [
+      "axe",
+      "hatchet",
+      "tome",
+      "maingauche",
+      "armguard",
+      "armor",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "마법사": [
+      "wand",
+      "staff",
+      "tome",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory"
+    ],
+    "워록": [
+      "wand",
+      "staff",
+      "tome",
+      "rune",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "helm",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "둠로드": [
+      "wand",
+      "staff",
+      "sword",
+      "tome",
+      "rune",
+      "cloth",
+      "cap",
+      "helm",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "아크메이지": [
+      "wand",
+      "staff",
+      "tome",
+      "dagger",
+      "maingauche",
+      "rune",
+      "cloth",
+      "cap",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "사제": [
+      "wand",
+      "mace",
+      "staff",
+      "tome",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory"
+    ],
+    "비숍": [
+      "wand",
+      "mace",
+      "staff",
+      "tome",
+      "rune",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "카디널": [
+      "wand",
+      "mace",
+      "staff",
+      "tome",
+      "rune",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "드루이드": [
+      "wand",
+      "mace",
+      "staff",
+      "tome",
+      "rune",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "하이드루이드": [
+      "wand",
+      "mace",
+      "submace",
+      "staff",
+      "tome",
+      "rune",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "cap",
+      "item",
+      "accessory",
+      "jItem"
+    ],
+    "헌터": [
+      "bow",
+      "arrowcase",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "cap"
+    ],
+    "스나이퍼": [
+      "bow",
+      "arrowcase",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "cap",
+      "jItem"
+    ],
+    "화이트아크": [
+      "bow",
+      "arrowcase",
+      "cloth",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "cap",
+      "jItem"
+    ],
+    "아케인아처": [
+      "bow",
+      "arrowcase",
+      "robe",
+      "cloak",
+      "shoes",
+      "item",
+      "accessory",
+      "cap",
+      "jItem"
+    ]
+  }
+}

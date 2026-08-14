@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>상점 · Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:28px 40px 18px; border-bottom:1px solid var(--line); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  .gold-badge {
+    font-family:'JetBrains Mono',monospace; font-size:15px; color:var(--gold); font-weight:600;
+    background:var(--panel); border:1px solid var(--gold-dim); border-radius:20px; padding:8px 16px;
+  }
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:12px;
+  }
+
+  .cat-tabs { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .cat-tab {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); background:var(--panel);
+    border:1px solid var(--line); border-radius:20px; padding:7px 16px; cursor:pointer;
+  }
+  .cat-tab.active { color:var(--gold); border-color:var(--gold-dim); background:var(--panel-raised); }
+
+  main { flex:1; padding:24px 40px 140px; max-width:960px; margin:0 auto; width:100%; }
+
+  .shop-row {
+    display:flex; align-items:flex-start; gap:14px; padding:14px 16px; border:1px solid var(--line);
+    border-radius:10px; background:var(--panel); margin-bottom:8px;
+  }
+  .shop-row .row-check { margin-top:4px; width:16px; height:16px; accent-color:var(--gold); cursor:pointer; flex-shrink:0; }
+  .shop-icon {
+    width:42px; height:42px; border-radius:9px; background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .shop-main { flex:1; min-width:0; }
+  .shop-name-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .shop-name { font-family:'Cinzel',serif; font-size:14px; color:#f2efe8; }
+  .shop-cat-badge {
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.04em; padding:2px 8px; border-radius:10px;
+    border:1px solid; white-space:nowrap; flex-shrink:0;
+  }
+  .shop-cat-badge.equipment { color:var(--ember); border-color:var(--ember-dim); }
+  .shop-cat-badge.material  { color:var(--cyan);  border-color:var(--cyan-dim); }
+  .shop-cat-badge.keyItem   { color:var(--gold);  border-color:var(--gold-dim); }
+  .shop-cat-badge.stash     { color:#c99ee8;      border-color:#5a3f6b; }
+  .shop-desc { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:4px; line-height:1.6; }
+  .shop-spec { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:3px; line-height:1.6; }
+  .shop-condition { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--cyan); margin-top:5px; }
+  .shop-price { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--gold); font-weight:600; margin-top:6px; }
+
+  .shop-qty-wrap { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .shop-qty {
+    width:64px; font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:7px 8px; text-align:right;
+  }
+  .shop-qty:focus { outline:none; border-color:var(--gold); }
+  .shop-qty-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+
+  .empty-wrap {
+    text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px;
+  }
+
+  /* ── 하단 고정 장바구니 바 — 뭐라도 담겨있을 때만 보임 ─────────────────── */
+  .cart-bar {
+    position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--gold-dim);
+    padding:14px 40px; box-shadow:0 -8px 24px rgba(0,0,0,0.4); z-index:50;
+  }
+  .cart-bar-inner { max-width:960px; margin:0 auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .cart-list { flex:1; min-width:200px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist); line-height:1.7; max-height:60px; overflow-y:auto; }
+  .cart-total { font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--gold); font-weight:600; white-space:nowrap; }
+  .cart-buy-btn {
+    font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--ember); color:#1a1108; border:none;
+    border-radius:8px; padding:11px 24px; cursor:pointer; font-weight:600; white-space:nowrap;
+  }
+  .cart-buy-btn:hover { opacity:0.9; }
+
+  /* ── 최상단/최하단 이동 버튼 ─────────────────────────────────────────── */
+  .scroll-nav { position:fixed; right:18px; bottom:100px; display:flex; flex-direction:column; gap:8px; z-index:40; }
+  .scroll-btn {
+    width:38px; height:38px; border-radius:50%; background:var(--panel); border:1px solid var(--line);
+    color:var(--mist-dim); font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .scroll-btn:hover { color:var(--gold); border-color:var(--gold-dim); }
+
+  /* ── 구매 확인 모달 ──────────────────────────────────────────────────── */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(10,9,14,0.75); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-box {
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; max-width:520px; width:100%;
+    max-height:80vh; display:flex; flex-direction:column;
+  }
+  .modal-head { padding:20px 22px 14px; border-bottom:1px solid var(--line); }
+  .modal-head h2 { font-family:'Cinzel',serif; font-size:18px; color:#f2efe8; margin:0; }
+  .modal-body { padding:16px 22px; overflow-y:auto; flex:1; }
+  .modal-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .modal-row:last-child { border-bottom:none; }
+  .modal-row-name { flex:1; font-size:13px; color:var(--mist); }
+  .modal-row-price { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); width:80px; text-align:right; }
+  .modal-foot { padding:16px 22px 20px; border-top:1px solid var(--line); }
+  .modal-total-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .modal-total-label { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
+  .modal-total-value { font-family:'JetBrains Mono',monospace; font-size:18px; color:var(--gold); font-weight:700; }
+  .modal-actions { display:flex; gap:10px; align-items:center; }
+  .modal-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:11px 18px; border-radius:8px; cursor:pointer; flex:1;
+  }
+  .modal-btn.cancel { background:transparent; border:1px solid var(--line); color:var(--mist-dim); }
+  .modal-btn.confirm { background:var(--ember); border:none; color:#1a1108; font-weight:600; }
+  .modal-btn.confirm:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+  .modal-insufficient { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--danger); white-space:nowrap; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">General Store</div>
+      <h1>상점</h1>
+    </div>
+    <div class="gold-badge" id="goldBadge">💰 0 G</div>
+  </div>
+  <div class="cat-tabs" id="catTabs"></div>
+  <div class="mock-badge">⚠ 테스트 빌드 — 재고/기간/요일 조건은 개인 계정 기준(서버 공유 아님)</div>
+</header>
+
+<main id="mainArea"></main>
+
+<div class="scroll-nav">
+  <button class="scroll-btn" id="scrollTopBtn" title="맨 위로">▲</button>
+  <button class="scroll-btn" id="scrollBottomBtn" title="맨 아래로">▼</button>
+</div>
+
+<div id="cartBarWrap"></div>
+<div id="modalWrap"></div>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  // ============================================================================
+  // 상점 데이터 — 아이템 마스터 테이블은 일부러 안 둠(강화/조합으로 파생되는
+  // 아이템까지 "정의에 없는 버그 아이템"으로 오판하게 되는 걸 피하기 위함).
+  // 상점은 그 자체로 완결된 판매 목록일 뿐, 다른 목록과 대조·검증되지 않음.
+  //
+  //   price               — 판매가(골드)
+  //   combatReal/combatBonus — 장비의 real/bonus 능력치(character-sheet.html과
+  //                            동일한 스키마)
+  //   stock               — 개인 계정 기준 "구매 가능한 남은 개수". 생략하면 무제한.
+  //                          (서버가 없어서 재고는 플레이어 개인이 이미 얼마나
+  //                          샀는지로 계산함 — 다른 플레이어와 공유 안 됨)
+  //   saleStart/saleEnd   — "YYYY-MM-DD" 판매 기간. 생략하면 상시 판매.
+  //   saleDays            — 요일 배열(0=일~6=토). 생략하면 매일 판매.
+  //   조건을 하나라도 못 채우면 목록에서 완전히 숨김(비활성 표시가 아님).
+  //   equipmentType — 무기/방어구 무게·숙련 등급(dagger/sword/greatsword/staff/
+  //     bow/gun/robe/armor/plate/sandal/shoes/greave 등). 나중에 직업별 착용
+  //     가능 타입을 가리는 데 씀. character-sheet.html의 EQUIPMENT_SLOT_TYPES가
+  //     슬롯별로 needsEquipmentType을 갖고 있음 — mainhand/subhand/armor/shoes/
+  //     head만 필요하고, jItem(이미 requiredJob으로 걸러짐)·uItem(전 직업 공용)·
+  //     cloak/accessory/item(직업 제한 없는 범용 슬롯)은 안 붙여도 됨.
+  // ============================================================================
+  function getShopTable() {
+    try { return JSON.parse(localStorage.getItem("battleSim_shopTable")) || []; }
+    catch { return []; }
+  }
+  function saveShopTable(table) {
+    localStorage.setItem("battleSim_shopTable", JSON.stringify(table));
+  }
+  // 최초 1회만 예전에 여기 하드코딩돼있던 값으로 시딩(로스터가 비어있고 아직
+  // 마이그레이션 안 했을 때만) — 이후로는 dev-tools의 상점 테이블 편집기에서
+  // 직접 관리함.
+  const LEGACY_SHOP_SEED = [
+    {
+      "name": "아밍 소드",
+      "category": "equipment",
+      "price": 3000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "sword",
+      "combatReal": {
+        "atk": 20
+      },
+      "weight": 1
+    },
+    {
+      "name": "레이피어",
+      "category": "equipment",
+      "price": 5000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "sword",
+      "combatReal": {
+        "atk": 25
+      },
+      "weight": 2,
+      "passiveBonus": {
+        "physicalIgnoreBonusDefPct": 10
+      }
+    },
+    {
+      "name": "커틀러스",
+      "category": "equipment",
+      "price": 8000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "sword",
+      "combatReal": {
+        "atk": 30
+      },
+      "weight": 3
+    },
+    {
+      "name": "스틸레토",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "dagger",
+      "combatReal": {
+        "atk": 7
+      },
+      "weight": 1,
+      "passiveBonus": {
+        "accuracyBonusPct": 10
+      }
+    },
+    {
+      "name": "메이스",
+      "category": "equipment",
+      "price": 1200,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "mace",
+      "combatReal": {
+        "atk": 52
+      },
+      "weight": 4,
+      "statBonus": {
+        "int": 10
+      }
+    },
+    {
+      "name": "대검",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "greatsword",
+      "combatReal": {
+        "atk": 70,
+        "def": 8,
+        "mdef": 3
+      },
+      "combatBonus": {
+        "def": 43,
+        "mdef": 22
+      },
+      "weight": 2,
+      "twoHanded": true
+    },
+    {
+      "name": "클레이모어",
+      "category": "equipment",
+      "price": 5000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "greatsword",
+      "combatReal": {
+        "atk": 85,
+        "def": 7,
+        "mdef": 4
+      },
+      "combatBonus": {
+        "def": 63,
+        "mdef": 52
+      },
+      "weight": 3,
+      "twoHanded": true
+    },
+    {
+      "name": "전투 도끼",
+      "category": "equipment",
+      "price": 900,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "axe",
+      "combatReal": {
+        "atk": 88
+      },
+      "weight": 2,
+      "twoHanded": true,
+      "maxHpBonus": 200,
+      "passiveBonus": {
+        "accuracyBonusPct": -5
+      }
+    },
+    {
+      "name": "단궁",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "bow",
+      "combatReal": {
+        "atk": 33
+      },
+      "weight": 2
+    },
+    {
+      "name": "합성궁",
+      "category": "equipment",
+      "price": 4000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "bow",
+      "combatReal": {
+        "atk": 48
+      },
+      "weight": 6
+    },
+    {
+      "name": "화살통",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "subhand",
+      "equipmentType": "arrowcase",
+      "combatReal": {
+        "atk": 15
+      },
+      "weight": 1,
+      "grantsResource": {
+        "key": "arrow",
+        "max": 90
+      },
+      "passiveBonus": {
+        "physicalIgnoreBonusDefPct": 10
+      }
+    },
+    {
+      "name": "완드",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "wand",
+      "combatReal": {
+        "atk": 1,
+        "matk": 15
+      },
+      "weight": 1
+    },
+    {
+      "name": "목제 완드",
+      "category": "equipment",
+      "price": 4000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "wand",
+      "combatReal": {
+        "atk": 8,
+        "matk": 25
+      },
+      "weight": 3
+    },
+    {
+      "name": "스태프",
+      "category": "equipment",
+      "price": 2000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "staff",
+      "combatReal": {
+        "atk": 13,
+        "matk": 55,
+        "def": 5,
+        "mdef": 5
+      },
+      "combatBonus": {
+        "def": 18,
+        "mdef": 12
+      },
+      "weight": 2,
+      "twoHanded": true
+    },
+    {
+      "name": "롱스태프",
+      "category": "equipment",
+      "price": 5000,
+      "enhanceable": true,
+      "slot": "mainhand",
+      "equipmentType": "staff",
+      "combatReal": {
+        "atk": 11,
+        "matk": 70,
+        "def": 7,
+        "mdef": 6
+      },
+      "combatBonus": {
+        "def": 27,
+        "mdef": 20
+      },
+      "weight": 3,
+      "twoHanded": true,
+      "passiveBonus": {
+        "magicIgnoreBonusDefPct": 20
+      }
+    },
+    {
+      "name": "고서",
+      "category": "equipment",
+      "price": 200,
+      "enhanceable": true,
+      "slot": "subhand",
+      "equipmentType": "tome",
+      "combatReal": {
+        "atk": 5,
+        "matk": 10,
+        "def": 5,
+        "mdef": 5
+      },
+      "combatBonus": {
+        "def": 45,
+        "mdef": 45
+      },
+      "weight": 1
+    },
+    {
+      "name": "나무방패",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "subhand",
+      "equipmentType": "shield",
+      "combatReal": {
+        "def": 7,
+        "mdef": 3
+      },
+      "combatBonus": {
+        "def": 9,
+        "mdef": 5
+      },
+      "weight": 1,
+      "passiveBonus": {
+        "completeDefenseChancePct": 6
+      }
+    },
+    {
+      "name": "바카라",
+      "category": "equipment",
+      "price": 2000,
+      "enhanceable": true,
+      "slot": "subhand",
+      "equipmentType": "shield",
+      "combatReal": {
+        "def": 15,
+        "mdef": 11
+      },
+      "combatBonus": {
+        "def": 28,
+        "mdef": 23
+      },
+      "weight": 2,
+      "passiveBonus": {
+        "completeDefenseChancePct": 10
+      }
+    },
+    {
+      "name": "가죽 갑옷",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "armor",
+      "combatReal": {
+        "def": 7,
+        "mdef": 4
+      },
+      "combatBonus": {
+        "def": 15,
+        "mdef": 5
+      },
+      "weight": 1
+    },
+    {
+      "name": "비늘 갑옷",
+      "category": "equipment",
+      "price": 2000,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "armor",
+      "combatReal": {
+        "def": 8,
+        "mdef": 4
+      },
+      "combatBonus": {
+        "def": 25,
+        "mdef": 12
+      },
+      "weight": 2
+    },
+    {
+      "name": "판금 갑옷",
+      "category": "equipment",
+      "price": 5000,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "armor",
+      "combatReal": {
+        "def": 14,
+        "mdef": 4
+      },
+      "combatBonus": {
+        "def": 50,
+        "mdef": 35
+      },
+      "weight": 3
+    },
+    {
+      "name": "면 셔츠",
+      "category": "equipment",
+      "price": 500,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "cloth",
+      "combatReal": {
+        "def": 5,
+        "mdef": 5
+      },
+      "combatBonus": {
+        "def": 13,
+        "mdef": 15
+      },
+      "weight": 1
+    },
+    {
+      "name": "로브",
+      "category": "equipment",
+      "price": 1000,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "robe",
+      "combatReal": {
+        "def": 3,
+        "mdef": 20
+      },
+      "combatBonus": {
+        "def": 5,
+        "mdef": 10
+      },
+      "weight": 1
+    },
+    {
+      "name": "은실 로브",
+      "category": "equipment",
+      "price": 1500,
+      "enhanceable": true,
+      "slot": "armor",
+      "equipmentType": "robe",
+      "combatReal": {
+        "def": 5,
+        "mdef": 25
+      },
+      "combatBonus": {
+        "def": 5,
+        "mdef": 15
+      },
+      "weight": 2
+    },
+    {
+      "name": "모자",
+      "category": "equipment",
+      "price": 300,
+      "enhanceable": true,
+      "slot": "head",
+      "equipmentType": "cap",
+      "combatReal": {
+        "mdef": 3
+      },
+      "combatBonus": {
+        "mdef": 5
+      },
+      "weight": 1
+    },
+    {
+      "name": "투구",
+      "category": "equipment",
+      "price": 800,
+      "enhanceable": true,
+      "slot": "head",
+      "equipmentType": "helm",
+      "combatReal": {
+        "def": 6
+      },
+      "combatBonus": {
+        "def": 10,
+        "mdef": 3
+      },
+      "weight": 2
+    },
+    {
+      "name": "가죽 신발",
+      "category": "equipment",
+      "price": 300,
+      "enhanceable": true,
+      "slot": "shoes",
+      "equipmentType": "shoes",
+      "combatReal": {
+        "def": 2,
+        "mdef": 2
+      },
+      "combatBonus": {
+        "def": 4,
+        "mdef": 4
+      },
+      "weight": 1
+    },
+    {
+      "name": "생명의 반지",
+      "category": "equipment",
+      "price": 10000,
+      "enhanceable": true,
+      "slot": "accessory",
+      "weight": 1,
+      "maxHpBonus": 175
+    },
+    {
+      "name": "마나의 반지",
+      "category": "equipment",
+      "price": 10000,
+      "enhanceable": true,
+      "slot": "accessory",
+      "weight": 1,
+      "maxSpBonus": 150
+    },
+    {
+      "name": "가죽 장갑",
+      "category": "equipment",
+      "price": 30000,
+      "enhanceable": true,
+      "slot": "accessory",
+      "combatReal": {
+        "atk": 5,
+        "matk": 5
+      },
+      "combatBonus": {
+        "def": 10,
+        "mdef": 10
+      },
+      "weight": 1,
+      "maxHpBonus": 35,
+      "maxSpBonus": 35,
+      "passiveBonus": {
+        "accuracyBonusPct": 3
+      }
+    },
+    {
+      "name": "법전",
+      "category": "equipment",
+      "price": 500,
+      "enhanceable": true,
+      "slot": "jItem",
+      "combatReal": {
+        "mdef": 5
+      },
+      "combatBonus": {
+        "def": 10,
+        "mdef": 10
+      },
+      "weight": 1
+    },
+    {
+      "name": "성배",
+      "category": "equipment",
+      "price": 2000,
+      "enhanceable": true,
+      "slot": "jItem",
+      "combatReal": {
+        "mdef": 10
+      },
+      "combatBonus": {
+        "mdef": 15
+      },
+      "weight": 1
+    },
+    {
+      "name": "연금 복권",
+      "category": "consumable",
+      "price": 10000
+    }
+  ];
+  // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
+  const SHOP_SEED_VERSION = "2026-08-14a";
+  if (localStorage.getItem("battleSim_shopSeedVersion") !== SHOP_SEED_VERSION) {
+    // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — shop-table-editor.html에서
+    // 직접 손본 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함.
+    try { localStorage.setItem("battleSim_shopSeedVersionBackup", JSON.stringify(getShopTable())); } catch {}
+    saveShopTable(LEGACY_SHOP_SEED);
+    localStorage.setItem("battleSim_shopSeedVersion", SHOP_SEED_VERSION);
+  }
+  const SHOP_TABLE = getShopTable();
+
+  const CATEGORY_LABELS = {
+    equipment: { label: "장비", icon: "⚔️" },
+    material:  { label: "소재", icon: "🧪" },
+    keyItem:   { label: "열쇠 아이템", icon: "🗝️" },
+    stash:     { label: "보물상자", icon: "🎁" },
+  };
+
+  // ── 저장 헬퍼(다른 페이지들과 동일한 규칙) ──────────────────────────────
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+  function setGold(amount) {
+    localStorage.setItem("battleSim_gold", String(amount));
+  }
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+  function saveWarehouse(warehouse) {
+    localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
+  }
+  // 개인 계정 기준 "이 아이템을 지금까지 몇 개 샀는지" — 재고 계산용.
+  function getShopPurchased() {
+    try { return JSON.parse(localStorage.getItem("battleSim_shopPurchased")) || {}; }
+    catch { return {}; }
+  }
+  function saveShopPurchased(purchased) {
+    localStorage.setItem("battleSim_shopPurchased", JSON.stringify(purchased));
+  }
+
+  // ── 판매 조건 판정 ──────────────────────────────────────────────────────
+  function remainingStock(item) {
+    if (item.stock === undefined) return Infinity;
+    const bought = getShopPurchased()[item.name] || 0;
+    return Math.max(0, item.stock - bought);
+  }
+  function isOnSaleNow(item) {
+    const today = new Date();
+    if (item.saleDays && !item.saleDays.includes(today.getDay())) return false;
+    if (item.saleStart || item.saleEnd) {
+      const ymd = today.toISOString().slice(0, 10);
+      if (item.saleStart && ymd < item.saleStart) return false;
+      if (item.saleEnd && ymd > item.saleEnd) return false;
+    }
+    return true;
+  }
+  function isItemAvailable(item) {
+    return remainingStock(item) > 0 && isOnSaleNow(item);
+  }
+  function saleConditionLabel(item) {
+    const parts = [];
+    if (item.stock !== undefined) parts.push(`앞으로 ${remainingStock(item)}개 남음`);
+    if (item.saleStart || item.saleEnd) parts.push(`${item.saleStart || "제한 없음"} ~ ${item.saleEnd || "제한 없음"} 판매`);
+    if (item.saleDays) {
+      const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+      parts.push(`매주 ${item.saleDays.map((d) => dayNames[d]).join("·")}요일 한정 판매`);
+    }
+    return parts.join(" · ");
+  }
+
+  function describeShopSpec(item) {
+    const parts = [];
+    if (item.equipmentType) parts.push(item.equipmentType);
+    const real = item.combatReal || {};
+    const bonus = item.combatBonus || {};
+    [["ATK", "atk"], ["MATK", "matk"], ["DEF", "def"], ["MDEF", "mdef"]].forEach(([label, key]) => {
+      if (real[key] || bonus[key]) parts.push(`${label} ${real[key] || 0}+${bonus[key] || 0}`);
+    });
+    if (item.weight) parts.push(`무게 ${item.weight}`);
+    if (item.twoHanded) parts.push(`양손 무기`);
+    return parts.join(" · ");
+  }
+
+  // ── 상태: 체크된 아이템의 수량. { itemName: qty } ───────────────────────
+  const cart = {};
+
+  // 상점 탭은 "장비" / "아이템" 두 그룹으로만 나눔(너무 세분화하지 않기 위함) —
+  // 다만 아이템 하나하나의 실제 category 값(equipment/material/keyItem/stash)은
+  // 그대로 둠. 구매 후 창고에 저장될 때 item.html의 기존 분류·배지 색상과
+  // 계속 맞아야 하기 때문 — 탭은 "보여주는 방식"만 묶은 것이지 데이터 자체를
+  // 바꾼 게 아님.
+  const SHOP_TABS = [
+    { key: "equipment", label: "⚔️ 장비", match: (cat) => cat === "equipment" },
+    { key: "item", label: "🎒 아이템", match: (cat) => cat !== "equipment" },
+  ];
+  let activeShopTab = "equipment";
+
+  function cartEntries() {
+    return SHOP_TABLE.filter((it) => (cart[it.name] || 0) >= 1);
+  }
+  function cartTotal() {
+    return cartEntries().reduce((sum, it) => sum + it.price * cart[it.name], 0);
+  }
+
+  function renderCatTabs() {
+    const el = document.getElementById("catTabs");
+    el.innerHTML = SHOP_TABS.map((t) => `
+      <button class="cat-tab ${t.key === activeShopTab ? "active" : ""}" data-tab="${t.key}">${t.label}</button>
+    `).join("");
+    el.querySelectorAll(".cat-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeShopTab = btn.dataset.tab;
+        renderCatTabs();
+        renderList();
+      });
+    });
+  }
+
+  function renderList() {
+    const el = document.getElementById("mainArea");
+    const activeTab = SHOP_TABS.find((t) => t.key === activeShopTab);
+    const items = SHOP_TABLE.filter((it) => activeTab.match(it.category) && isItemAvailable(it));
+
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty-wrap">지금 이 카테고리에서 판매 중인 상품이 없어요.</div>`;
+      return;
+    }
+
+    el.innerHTML = items.map((it) => {
+      const catMeta = CATEGORY_LABELS[it.category] || { label: it.category, icon: "❔" };
+      const spec = describeShopSpec(it);
+      const condition = saleConditionLabel(it);
+      const qty = cart[it.name] || 0;
+      const max = remainingStock(it) === Infinity ? 999 : remainingStock(it);
+      return `
+        <div class="shop-row" data-item="${it.name}">
+          <input type="checkbox" class="row-check" ${qty >= 1 ? "checked" : ""} />
+          <div class="shop-icon">${catMeta.icon}</div>
+          <div class="shop-main">
+            <div class="shop-name-row">
+              <span class="shop-name">${it.name}</span>
+              <span class="shop-cat-badge ${it.category}">${it.category === "equipment" ? it.slot : catMeta.label}</span>
+            </div>
+            ${it.description ? `<div class="shop-desc">${it.description}</div>` : ""}
+            ${spec ? `<div class="shop-spec">${spec}</div>` : ""}
+            ${condition ? `<div class="shop-condition">${condition}</div>` : ""}
+            <div class="shop-price">${it.price.toLocaleString()} G</div>
+          </div>
+          <div class="shop-qty-wrap">
+            <span class="shop-qty-label">수량</span>
+            <input type="number" class="shop-qty" min="0" max="${max}" value="${qty}" />
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    el.querySelectorAll(".shop-row").forEach((row) => {
+      const itemName = row.dataset.item;
+      const item = SHOP_TABLE.find((it) => it.name === itemName);
+      const checkbox = row.querySelector(".row-check");
+      const qtyInput = row.querySelector(".shop-qty");
+
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          cart[itemName] = Math.max(1, cart[itemName] || 1);
+          qtyInput.value = cart[itemName];
+        } else {
+          cart[itemName] = 0;
+          qtyInput.value = 0;
+        }
+        renderCartBar();
+      });
+
+      qtyInput.addEventListener("input", () => {
+        const max = remainingStock(item) === Infinity ? 999 : remainingStock(item);
+        let v = Math.max(0, Math.min(max, Number(qtyInput.value) || 0));
+        qtyInput.value = v;
+        cart[itemName] = v;
+        checkbox.checked = v >= 1;
+        renderCartBar();
+      });
+    });
+  }
+
+  // ── 하단 장바구니 바 — 뭐라도 담겨있을 때만 표시 ────────────────────────
+  function renderCartBar() {
+    const wrap = document.getElementById("cartBarWrap");
+    const entries = cartEntries();
+    if (entries.length === 0) {
+      wrap.innerHTML = "";
+      return;
+    }
+    const listText = entries.map((it) => `${it.name} ×${cart[it.name]}`).join(", ");
+    wrap.innerHTML = `
+      <div class="cart-bar">
+        <div class="cart-bar-inner">
+          <div class="cart-list">${listText}</div>
+          <div class="cart-total">${cartTotal().toLocaleString()} G</div>
+          <button class="cart-buy-btn" id="openModalBtn">구매</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("openModalBtn").addEventListener("click", openModal);
+  }
+
+  // ── 구매 확인 모달 — 페이지 이동 없이 같은 스코프의 데이터를 그대로 참조함
+  // (다른 창으로 데이터를 넘기지 않으므로 변조 가능성 자체가 없음) ─────────
+  function openModal() {
+    renderModal();
+  }
+  function closeModal() {
+    document.getElementById("modalWrap").innerHTML = "";
+  }
+
+  function renderModal() {
+    const wrap = document.getElementById("modalWrap");
+    const entries = cartEntries();
+    const total = cartTotal();
+    const gold = getGold();
+    const insufficient = total > gold;
+
+    wrap.innerHTML = `
+      <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+          <div class="modal-head"><h2>구매 확인</h2></div>
+          <div class="modal-body">
+            ${entries.map((it) => `
+              <div class="modal-row" data-item="${it.name}">
+                <span class="modal-row-name">${it.name}</span>
+                <input type="number" class="shop-qty modal-qty" min="0" max="${remainingStock(it) === Infinity ? 999 : remainingStock(it)}" value="${cart[it.name]}" />
+                <span class="modal-row-price">${(it.price * cart[it.name]).toLocaleString()} G</span>
+              </div>
+            `).join("")}
+          </div>
+          <div class="modal-foot">
+            <div class="modal-total-row">
+              <span class="modal-total-label">합계</span>
+              <span class="modal-total-value" id="modalTotalValue">${total.toLocaleString()} G</span>
+            </div>
+            <div class="modal-actions">
+              <button class="modal-btn cancel" id="modalCancelBtn">취소</button>
+              <button class="modal-btn confirm" id="modalConfirmBtn" ${insufficient ? "disabled" : ""}>구매 확정</button>
+              ${insufficient ? `<span class="modal-insufficient">*소지금 부족</span>` : ""}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
+    document.getElementById("modalOverlay").addEventListener("click", (e) => {
+      if (e.target.id === "modalOverlay") closeModal();
+    });
+    const confirmBtn = document.getElementById("modalConfirmBtn");
+    if (confirmBtn) confirmBtn.addEventListener("click", confirmPurchase);
+
+    // 모달 안에서도 수량을 그대로 조절 가능 — 여기서 바뀐 값이 곧 실제 구매
+    // 데이터가 됨(0으로 낮춰도 목록에서 안 빠짐 — 다시 필요하면 창을 나갔다
+    // 들어올 필요 없이 바로 숫자만 올리면 됨).
+    wrap.querySelectorAll(".modal-qty").forEach((input) => {
+      const row = input.closest(".modal-row");
+      const itemName = row.dataset.item;
+      const item = SHOP_TABLE.find((it) => it.name === itemName);
+      input.addEventListener("input", () => {
+        const max = remainingStock(item) === Infinity ? 999 : remainingStock(item);
+        const v = Math.max(0, Math.min(max, Number(input.value) || 0));
+        input.value = v;
+        cart[itemName] = v;
+        renderModal(); // 합계/소지금부족 표시 갱신 위해 통째로 재렌더
+      });
+    });
+  }
+
+  // ── 실제 구매 확정 — 여기 남아있는 cart 데이터 중 수량 1 이상인 것만 반영 ─
+  function confirmPurchase() {
+    const entries = cartEntries(); // 이 시점 cart는 모달에서 조절한 최종 상태
+    const total = cartTotal();
+    if (total > getGold()) return; // 이중 방어(버튼은 이미 비활성화되어 있음)
+
+    setGold(getGold() - total);
+
+    const warehouse = getWarehouse();
+    const purchased = getShopPurchased();
+    entries.forEach((it) => {
+      const qty = cart[it.name];
+      // heldBy가 없는(=아직 아무도 안 가져간 "풀") 항목만 병합 대상으로 삼음 —
+      // heldBy가 붙은 항목(누군가 이미 장착한 개별 인스턴스)과는 절대 안 섞임.
+      // enhanceLevel도 같이 봐야 함 — 상점 구매품은 항상 +0(강화 안 됨)인데,
+      // 창고에 이미 강화된 같은 이름의 장비가 있으면 절대 같이 섞이면 안 됨.
+      const existing = warehouse.find((w) => w.name === it.name && w.category === it.category && !w.heldBy && !w.enhanceLevel);
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        // 장비는 combatReal/combatBonus/slot 등 스탯 전체를 그대로 실어서 저장
+        // 해야 나중에 장착했을 때 실제 능력치가 살아남음(예전엔 name/category/
+        // quantity만 저장돼서 장착해도 스탯이 0이 되는 문제가 있었음).
+        const { name, category, price, ...spec } = it;
+        warehouse.push({ name, category, quantity: qty, ...spec });
+      }
+      purchased[it.name] = (purchased[it.name] || 0) + qty;
+      cart[it.name] = 0; // 구매 완료했으니 장바구니에서 비움
+    });
+    saveWarehouse(warehouse);
+    saveShopPurchased(purchased);
+
+    closeModal();
+    document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    renderList();
+    renderCartBar();
+  }
+
+  document.getElementById("scrollTopBtn").addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.getElementById("scrollBottomBtn").addEventListener("click", () => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  });
+
+  document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+  renderCatTabs();
+  renderList();
+  renderCartBar();
+</script>
+</body>
+</html>

@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>전투 화면(초안) · Battle View Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:28px 40px 18px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .nav-link {
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none;
+    border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
+  }
+  .nav-link:hover { border-color:var(--gold); color:var(--gold); }
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:12px;
+  }
+
+  main { flex:1; padding:32px 40px 48px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+  /* ==========================================================
+     전투 배너 — 16:5 비율, 실제 이미지 대신 CSS로 테마 배경 표현
+     (석양 지는 폐허 아레나 콘셉트). 나중에 진짜 지역별 배경 이미지로
+     교체할 자리 — 지금은 layout-only 러프 버전.
+  ========================================================== */
+  .battle-banner {
+    position: relative;
+    width: 100%;
+    max-width: 1120px;
+    aspect-ratio: 16 / 5;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 15%, #4a2e5e55, transparent 70%),
+      linear-gradient(180deg, #241a35 0%, #3a2440 32%, #6b3f3a 52%, #8a5535 60%, #2a2118 61%, #171319 100%);
+  }
+  /* 아득한 산 실루엣 */
+  .battle-banner::before {
+    content: "";
+    position: absolute; left:0; right:0; top:38%; height:24%;
+    background: linear-gradient(180deg, transparent, #1c141fcc 90%);
+    clip-path: polygon(0% 100%, 0% 40%, 8% 55%, 16% 30%, 26% 58%, 36% 20%, 48% 50%, 58% 15%, 70% 48%, 82% 25%, 92% 52%, 100% 35%, 100% 100%);
+    opacity: 0.8;
+  }
+  /* 전장 바닥(원근감 있는 사다리꼴) */
+  .battle-banner::after {
+    content: "";
+    position: absolute; left:0; right:0; bottom:0; height:42%;
+    background: linear-gradient(180deg, #2a211aee, #14111a 95%);
+    clip-path: polygon(0% 100%, 0% 30%, 100% 30%, 100% 100%);
+  }
+  .battle-vignette {
+    position: absolute; inset:0;
+    box-shadow: inset 0 0 90px 20px #0000009c;
+    pointer-events: none;
+  }
+  .battle-rift {
+    position:absolute; left:50%; top:35%; bottom:6%; width:2px; transform:translateX(-50%);
+    background: linear-gradient(180deg, transparent, #e8874b55, transparent);
+    pointer-events:none;
+  }
+  .banner-caption {
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    font-family:'Cinzel',serif; font-size:13px; letter-spacing:0.06em; color:#f2efe8cc;
+    text-shadow:0 2px 6px #000000aa;
+  }
+
+  /* 진영 컨테이너 */
+  .side { position:absolute; top:8%; bottom:10%; width:44%; display:flex; }
+  .side.ally { left:0; flex-direction:row; justify-content:flex-end; }
+  .side.enemy { right:0; flex-direction:row-reverse; justify-content:flex-end; }
+  .row-group { display:flex; flex-direction:column; justify-content:space-around; align-items:center; height:100%; padding:0 2%; }
+
+  .unit {
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    filter: drop-shadow(0 4px 8px #00000080);
+  }
+  .unit .token {
+    width:56px; height:56px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+    background: var(--panel); border:2px solid var(--line);
+  }
+  .side.ally .unit .token { border-color: var(--cyan-dim); }
+  .side.enemy .unit .token { border-color: var(--danger); }
+  .unit.empty .token { opacity:0.25; border-style:dashed; font-size:16px; }
+  .unit .u-name {
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#f2efe8;
+    background:#00000080; padding:1px 6px; border-radius:8px; white-space:nowrap;
+  }
+  .unit .u-hpbar { width:44px; height:4px; border-radius:2px; background:#00000080; overflow:hidden; }
+  .unit .u-hpbar i { display:block; height:100%; background:var(--cyan); width:100%; }
+  .side.enemy .unit .u-hpbar i { background: var(--danger); }
+
+  .row-label {
+    position:absolute; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.1em;
+    color:var(--mist-dim); text-transform:uppercase; top:-2px;
+  }
+
+  .legend { display:flex; gap:22px; flex-wrap:wrap; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .legend b { color:#f2efe8; }
+
+  .note-box {
+    max-width:1120px; width:100%; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:10px; padding:14px 16px; line-height:1.7;
+  }
+  .note-box b { color:var(--gold); }
+
+  /* ── 아래부터는 battle-log-view.html 벤치마크 초안에서 그대로 가져온 현황판/
+     로그/결과 스타일 — "전투 시작" 누르면 실제 어댑터→엔진으로 돌린 결과를
+     이 스타일로 렌더링함. ── */
+  .run-btn-row { display:flex; justify-content:center; width:100%; max-width:1120px; }
+  .run-btn {
+    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.04em; padding:12px 28px;
+    background:var(--ember); color:#1a1108; border:none; border-radius:8px; cursor:pointer; font-weight:600;
+  }
+  .run-btn:hover { opacity:0.9; }
+  .run-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
+
+  .battle-log-wrap { max-width:820px; width:100%; }
+
+  .turn-block { margin-bottom:22px; }
+  .turn-label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; margin-bottom:8px; }
+
+  .status-table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .status-table th { background:var(--panel-raised); font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; padding:8px 12px; text-align:left; }
+  .status-table th.ally-col { color:var(--cyan); border-right:1px solid var(--line); }
+  .status-table th.enemy-col { color:var(--danger); }
+  .status-table td { background:var(--panel); padding:8px 12px; vertical-align:top; border-top:1px solid var(--line); }
+  .status-table td.ally-col { border-right:1px solid var(--line); }
+
+  .unit-row { display:flex; align-items:center; gap:8px; padding:3px 0; }
+  .unit-row.down { opacity:0.5; }
+  .unit-name { font-size:12px; color:#f2efe8; width:84px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .unit-row.down .unit-name { text-decoration:line-through; text-decoration-color:var(--danger-dim); }
+  .unit-bars { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .bar-line { display:flex; align-items:center; gap:6px; }
+  .bar-tag { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:14px; flex-shrink:0; }
+  .bar-wrap { flex:1; height:6px; background:var(--panel-raised); border-radius:3px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:3px; }
+  .bar-fill.hp { background:linear-gradient(90deg, var(--ember-dim), var(--ember)); }
+  .bar-fill.sp { background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
+  .bar-figure { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:64px; text-align:right; flex-shrink:0; }
+  .down-tag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); }
+
+  .status-table td.enemy-col .unit-row { flex-direction:row-reverse; }
+  .status-table td.enemy-col .unit-name { text-align:right; }
+  .status-table td.enemy-col .bar-line { flex-direction:row-reverse; }
+  .status-table td.enemy-col .bar-figure { text-align:left; }
+
+  /* 채팅창처럼 위→아래로 실제 발생 순서 그대로 하나의 흐름에 쌓되, 각
+     행동 블록만 왼쪽(아군)/오른쪽(적군)으로 정렬함 — 표 칼럼으로 나눠서
+     "같은 줄"에 놓지 않으므로 구획을 나누는 듯한 경계선이 없음(실제로도
+     없음). 번호 배지도 안 씀 — 위→아래 순서 자체가 시간 순서임. */
+  .turn-narrative { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+  .action-block { max-width:72%; min-width:0; }
+  .action-block.ally { align-self:flex-start; text-align:left; }
+  .action-block.enemy { align-self:flex-end; text-align:right; }
+
+  .log-line { font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7; color:var(--mist-dim); white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word; }
+  .log-line.actor { color:#f2efe8; font-weight:600; }
+  .log-line.skill-activate { color:#f2efe8; }
+  .log-line.skill-activate .skill-name-strong { font-weight:700; text-decoration:underline; }
+  .log-line.skill { opacity:0.85; }
+  .log-line.damage { font-weight:600; color:var(--ember); }
+
+  .outro { padding:28px 0 10px; border-top:1px solid var(--line); margin-top:20px; }
+  .outcome-banner { text-align:center; padding:8px 20px 22px; }
+  .outcome-eyebrow { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.22em; text-transform:uppercase; color:var(--mist-dim); }
+  .outcome-title { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:10px 0 4px; }
+  .outcome-title.win { color:var(--gold); }
+  .outcome-title.lose { color:var(--danger); }
+  .outcome-title.draw { color:var(--mist); }
+  .outcome-turns { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
+  .outcome-turns b { color:var(--mist); font-weight:600; }
+
+  .result-sides { display:flex; gap:14px; margin-bottom:20px; }
+  .result-side-box { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 16px 14px; text-align:center; }
+  .result-side-box.ally { border-top:2px solid var(--cyan); }
+  .result-side-box.enemy { border-top:2px solid var(--danger); }
+  .result-side-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--mist-dim); margin-bottom:10px; }
+  .result-side-box.ally .result-side-label { color:var(--cyan); }
+  .result-side-box.enemy .result-side-label { color:var(--danger); }
+  .result-survivors { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#f2efe8; }
+  .result-survivors .of { font-family:'JetBrains Mono',monospace; font-weight:400; font-size:13px; color:var(--mist-dim); }
+  .result-sub { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:2px; }
+  .result-hp-block { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+  .result-hp-figure { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist); }
+  .result-hp-figure b { color:#f2efe8; font-weight:600; }
+  .result-dmg-block { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .result-dmg-figure { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .result-dmg-figure b { color:var(--ember); font-weight:600; }
+
+  .loot-panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+  .loot-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); }
+  .loot-row:last-child { border-bottom:none; }
+  .loot-label { font-size:12.5px; color:var(--mist); }
+  .loot-value { font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--gold); font-weight:600; }
+  .loot-value.exp { color:var(--cyan); }
+  .loot-empty { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); padding:4px 0; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Battle Scene · Draft</div>
+      <h1>전투 화면 (러프 초안)</h1>
+    </div>
+    <a class="nav-link" href="battle-select.html">← 전투 선택으로</a>
+  </div>
+  <div class="mock-badge">⚠ 레이아웃 구조 확인용 — 실제 전투 로직·이미지 자산과는 아직 연결 안 됨</div>
+</header>
+
+<main>
+  <div class="battle-banner" id="banner">
+    <div class="banner-caption" id="bannerCaption">폐허가 된 협곡 아레나</div>
+    <div class="battle-rift"></div>
+    <div class="battle-vignette"></div>
+  </div>
+
+  <div class="legend">
+    <span><b>🔵 청록 테두리</b> = 아군</span>
+    <span><b>🔴 빨강 테두리</b> = 적군</span>
+    <span>전열이 항상 중앙 쪽(대치선)에 더 가깝게, 후열은 그 뒤에 배치됨</span>
+  </div>
+
+  <div class="note-box">
+    <b>지금 이 화면에 대해:</b> 위 배치는 실제 시작 진형 미리보기예요. 아래 <b>전투 시작</b> 버튼을 누르면 이 편성 그대로
+    실제 엔진(BattleEngine)이 돌아가고, 그 결과(턴별 로그 + 최종 결과)가 그 아래에 표시됩니다.
+  </div>
+
+  <div class="run-btn-row">
+    <button class="run-btn" id="runBattleBtn">⚔️ 전투 시작</button>
+  </div>
+
+  <div class="battle-log-wrap" id="battleLogWrap"></div>
+</main>
+
+<script src="../src/resourceTypes.js"></script>
+<script src="../src/resourceManager.js"></script>
+<script src="../src/skillRegistry.js"></script>
+<script src="../src/combatFormulas.js"></script>
+<script src="../src/registries.js"></script>
+<script src="../src/character.js"></script>
+<script src="../src/prepState.js"></script>
+<script src="../src/skillResolution.js"></script>
+<script src="../src/importer.js"></script>
+<script src="../src/engine.js"></script>
+<script src="battle-encounters.js"></script>
+<script src="battle-themes.js"></script>
+<script src="exp-table.js"></script>
+<script src="battle-adapter.js"></script>
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+  function saveRoster(roster) {
+    localStorage.setItem("battleSim_roster", JSON.stringify(roster));
+  }
+  function getGold() {
+    const raw = localStorage.getItem("battleSim_gold");
+    return raw === null ? 500 : Number(raw);
+  }
+  function setGold(amount) {
+    localStorage.setItem("battleSim_gold", String(amount));
+  }
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+  function saveWarehouse(warehouse) {
+    localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
+  }
+
+  // ============================================================================
+  // 레벨업 공식 — 테스트 빌드 한정으로 레벨 상한을 30으로 낮춰서(원래는 60까지
+  // 계획) 초반 성장곡선을 먼저 검증함. 1->2레벨(100), 2->3레벨(200)만 고정값을
+  // 쓰고, 3레벨부터는 이차함수 곡선(160 + 17×Lv²)으로 자연스럽게 가팔라짐 —
+  // 30레벨(2차 전직) 도달까지 누적 필요 경험치가 약 150,000이 되도록 계수를
+  // 맞춰둠(초반 성장곡선 검증이 이 테스트 빌드의 목표라, 여기까지만 확정하고
+  // 그 이후 — 2차 전직 이후의 곡선 — 는 별도로 다시 고민하기로 함).
+  //
+  // 공식 자체는 exp-table.js로 분리함 — 예전엔 여기에만 있어서 hire/village가
+  // 만드는 신규 캐릭터나 dispatch의 파견 경험치에는 적용되지 않았음.
+  // ============================================================================
+  const { LEVEL_CAP, EXP_HARD_CAP, expToNextForLevel, grantExp } = window.ExpTable;
+
+  // ============================================================================
+  // 몬스터 마스터 테이블 — 이제 monster-sheet.html/monster-roster.html에서
+  // 만든 몬스터 로스터(battleSim_monsterRoster)에서 읽어옴. 예전엔 여기 직접
+  // 하드코딩했었지만, 오타/누락을 검증하기 피곤하고 캐릭터 빌드와 같은 UI로
+  // 만들면 어차피 문제가 없어서 로스터 기반으로 전환함. 로스터의 각 몬스터
+  // 객체가 곧 이 테이블의 값(하나의 id 키에 대응하는 정의)이 됨.
+  //   dropTable: [{ name, category, chance(0~1), quantity:[min,max] }]
+  // 새 몬스터가 필요하면 monster-roster.html에서 "+ 새 몬스터"로 만들면 됨.
+  // ============================================================================
+  // 배열→id 키 객체 변환은 battle-encounters.js의 공용 헬퍼로 일원화함
+  // (dispatch.html도 같은 함수를 씀 — 예전엔 이 변환이 여기에만 있어서
+  // 파견 쪽 몬스터 조회가 전부 실패했음).
+  const MONSTER_TABLE = window.BattleEncounters.getMonsterTable();
+
+  // ============================================================================
+  // 전투별 몬스터 등장 풀 — 고정 편성이 아니라 "등장 가능성이 있는 몬스터 목록 +
+  // 확률 + 상한"으로 정의함. 실제 등장 인원은 매 전투 진입 시 아래 spawnEnemies()가
+  // 이 풀을 갖고 그때그때 뽑음.
+  //   maxCount   이 전투에 등장할 몬스터의 총 마릿수
+  //   pool[]     후보 목록. 각 항목:
+  //     monsterId       MONSTER_TABLE 참조
+  //     row             등장 시 배치될 진형
+  //     weight          가중치(다른 후보 대비 상대값 — 확률 그 자체가 아니라 비율)
+  //     maxAppearances  이 몬스터가 한 전투에서 최대 몇 마리까지 나올 수 있는지.
+  //                      이 수만큼 이미 뽑혔으면 이후엔 후보에서 완전히 제외됨 —
+  //                      그래서 후보가 하나만 남으면 그다음은 확정으로 그게 뽑힘.
+  //     guaranteed      true면 확률 없이 무조건 먼저 등장(보스 등). maxCount 안에서
+  //                      우선 배치되고, 남은 자리만 가중치 추첨으로 채움.
+  // ============================================================================
+  // 편성 테이블과 추첨 로직은 battle-encounters.js로 분리됨(파견 페이지와 공용)
+  const { BATTLE_MONSTER_POOLS, RARE_THRESHOLD, spawnEnemies, computePoolProbabilities } = window.BattleEncounters;
+
+  // 희귀 등장 표시 기준 — 이 비율 미만이면 이름 앞에 [Rare] 태그가 붙음.
+  // guaranteed(보스 등 확정 등장)는 애초에 "희귀"가 아니므로 대상에서 제외.
+
+  // 이 전투의 등장 풀에서, 각 후보가 실제로 뽑힐 확률(가중치 비율)과 희귀 여부를
+  // 계산. maxCount가 1일 때는 이 값이 곧 정확한 등장 확률과 같음(추첨이 한 번뿐이라
+  // 상한/순차 효과가 끼어들 일이 없음) — maxCount가 여러 번이면 참고용 근사치.
+
+
+  function formatMonsterLabel(entry) {
+    const monster = MONSTER_TABLE[entry.monsterId];
+    const tag = entry.isRare ? "[Rare] " : "";
+    return `${tag}${monster.name}`;
+  }
+
+
+  function weightedPick(candidates) {
+    const totalWeight = candidates.reduce((sum, c) => sum + c.weight, 0);
+    let roll = Math.random() * totalWeight;
+    for (const c of candidates) {
+      if (roll < c.weight) return c;
+      roll -= c.weight;
+    }
+    return candidates[candidates.length - 1]; // 부동소수 오차 방어
+  }
+
+  // BATTLE_MONSTER_POOLS + MONSTER_TABLE을 갖고 실제 등장할 적 유닛을 뽑음.
+  // 1) guaranteed 후보를 먼저 자리 채우고, 2) 남은 자리는 상한 안 찬 후보들
+  // 중에서 가중치 추첨 — 후보가 하나만 남으면 그 자리는 확정으로 그게 뽑힘.
+
+
+  function buildRowGroupHTML(units, maxSlots = 5) {
+    const slots = [...units];
+    while (slots.length < maxSlots) slots.push(null);
+    return slots.slice(0, maxSlots).map((u) => {
+      if (!u) return `<div class="unit empty"><div class="token">—</div></div>`;
+      return `
+        <div class="unit">
+          <div class="token">${u.portrait || "❓"}</div>
+          <div class="u-hpbar"><i></i></div>
+          <div class="u-name">${u.name}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // 전투 이름은 battle-themes.js(BATTLE_THEMES) 공용 정의를 씀 — 예전엔 이
+  // 파일에 따로 사본이 있었는데, 존재하지 않는 "gate-ambush"가 들어있고 실제
+  // 전투인 "goblin-cart-raid"(고블린 수송대)는 빠져있는 등 실데이터와 어긋나
+  // 있었음(dispatch.html에서 같은 종류의 문제를 고친 것과 동일 사례).
+  function applyBattleCaption() {
+    const params = new URLSearchParams(location.search);
+    const battleId = params.get("battle");
+    const name = window.BattleThemes.battleNameById(battleId);
+    if (name) document.getElementById("bannerCaption").textContent = name;
+  }
+
+  function render() {
+    const roster = getRoster();
+    const params = new URLSearchParams(location.search);
+    const partyParam = params.get("party");
+    const battleId = params.get("battle");
+    // roster-select.html에서 party(선택된 용병 id 목록)를 넘겨줬으면 그 인원만,
+    // 없으면(직접 접속 등) 기존처럼 로스터 전체를 보여줌 — 하위 호환용 폴백.
+    const party = partyParam
+      ? roster.filter((r) => partyParam.split(",").includes(String(r.id)))
+      : roster;
+
+    const enemies = spawnEnemies(battleId);
+    const allyFront = party.filter((r) => (r.row || "front") === "front");
+    const allyBack = party.filter((r) => r.row === "back");
+    const enemyFront = enemies.filter((e) => e.row === "front");
+    const enemyBack = enemies.filter((e) => e.row === "back");
+
+    const banner = document.getElementById("banner");
+    const sideHTML = `
+      <div class="side ally">
+        <div class="row-group">${buildRowGroupHTML(allyBack)}</div>
+        <div class="row-group">${buildRowGroupHTML(allyFront)}</div>
+      </div>
+      <div class="side enemy">
+        <div class="row-group">${buildRowGroupHTML(enemyBack)}</div>
+        <div class="row-group">${buildRowGroupHTML(enemyFront)}</div>
+      </div>
+    `;
+    banner.insertAdjacentHTML("beforeend", sideHTML);
+  }
+
+  // ============================================================================
+  // 아래부터는 battle-log-view.html에서 검증한 파서/렌더러를 그대로 가져온
+  // 것 — "====" 구분선은 걸러내고 내용 기반으로 파싱. 현황판은 표의 좌우
+  // 칼럼으로, 로그는 표 밖에서 채팅창처럼 위→아래 하나의 흐름으로 쌓되
+  // 아군은 왼쪽/적군은 오른쪽 정렬 — 위→아래 순서 자체가 실제 발생 순서.
+  // ============================================================================
+  const OUTCOME_LINE_PATTERN = /파티는 승리했다!$|^패배했다\.\.\.$|^비겼다\.$/;
+
+  function parseBattleLog(rawLines) {
+    const lines = rawLines
+      .map((l) => l.replace(/^\n/, ""))
+      .filter((l) => l.trim() && l !== "==================================================");
+
+    let i = 0;
+    const intro = [];
+    while (i < lines.length && !/^\[ TURN \d+ \]$/.test(lines[i])) {
+      intro.push(lines[i]);
+      i++;
+    }
+
+    const turns = [];
+    while (i < lines.length) {
+      const turnMatch = lines[i].match(/^\[ TURN (\d+) \]$/);
+      if (!turnMatch) break;
+      const turnNumber = Number(turnMatch[1]);
+      i++;
+
+      const snapshot = { ally: [], enemy: [] };
+      let side = null;
+      while (i < lines.length) {
+        if (lines[i] === "[ 아군 ]") { side = "ally"; i++; continue; }
+        if (lines[i] === "[ 적군 ]") { side = "enemy"; i++; continue; }
+        const unitMatch = lines[i].match(/^\s*(.+?)\s+HP (\d+)\/(\d+)\s+SP (\d+)\/(\d+)\s*$/);
+        if (unitMatch && side) {
+          snapshot[side].push({ name: unitMatch[1], hp: +unitMatch[2], maxHp: +unitMatch[3], sp: +unitMatch[4], maxSp: +unitMatch[5], alive: true });
+          i++; continue;
+        }
+        const downMatch = lines[i].match(/^\s*(.+?)\s+💀 전투불능\s*$/);
+        if (downMatch && side) {
+          snapshot[side].push({ name: downMatch[1], alive: false });
+          i++; continue;
+        }
+        break;
+      }
+
+      const narrative = [];
+      while (i < lines.length && !/^\[ TURN \d+ \]$/.test(lines[i]) && !OUTCOME_LINE_PATTERN.test(lines[i])) {
+        narrative.push(lines[i]);
+        i++;
+      }
+      turns.push({ turnNumber, snapshot, narrative });
+    }
+
+    return { intro, turns };
+  }
+
+  function renderUnitRow(u) {
+    if (!u.alive) {
+      return `<div class="unit-row down"><span class="unit-name">${u.name}</span><span class="down-tag">💀 전투불능</span></div>`;
+    }
+    const hpPct = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
+    const spPct = u.maxSp > 0 ? Math.max(0, Math.min(100, (u.sp / u.maxSp) * 100)) : 0;
+    return `
+      <div class="unit-row">
+        <span class="unit-name">${u.name}</span>
+        <div class="unit-bars">
+          <div class="bar-line"><span class="bar-tag">HP</span><div class="bar-wrap"><div class="bar-fill hp" style="width:${hpPct}%"></div></div><span class="bar-figure">${u.hp}/${u.maxHp}</span></div>
+          <div class="bar-line"><span class="bar-tag">SP</span><div class="bar-wrap"><div class="bar-fill sp" style="width:${spPct}%"></div></div><span class="bar-figure">${u.sp}/${u.maxSp}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function classifyLine(line) {
+    if (line.includes("[스킬]")) return "skill";
+    // "{증감량} {유형} ▷ {대상} (...)" — src/skillResolution.js·registries.js의
+    // statChangeLine()이 만드는 모양. 예전엔 "...에게 N의 데미지" 정규식으로
+    // 데미지만 잡았는데, " ▷ " 하나로 통일해서 앞으로 SP피해 외에 다른
+    // 증감 유형이 추가돼도 자동으로 같이 강조됨.
+    if (line.includes(" ▷ ")) return "damage";
+    return "";
+  }
+
+  function extractActorLine(line) {
+    const m = line.match(/^"(.+?)"\s*\((?:ALLY|ENEMY)\)\s*행동!$/);
+    return m ? m[1] : null;
+  }
+
+  // "{이름}, {스킬명}" — src/engine.js의 resolvePreparedSkill이 스킬 발동
+  // 시점에 내는 줄. 선딜레이가 있는 스킬의 발동은 게이지 루프가 아니라
+  // readyAtTick 도래 시점에 따로 처리되는 경로라 "(ALLY/ENEMY) 행동!" 마커가
+  // 안 붙는다 — 그래서 이 줄 자체를 새 블록의 시작으로도 인식해야 한다.
+  // 안 그러면 직전에 "행동!"을 낸 다른 유닛의 블록 밑에 잘못 묶여버림(실제로
+  // 그렇게 묶이고 있었음 — 파티원 3명이 같은 턴에 스킬을 발동하면 셋 다
+  // 마지막으로 "행동!"을 낸 한 명 블록 아래 뒤섞였음).
+  function extractSkillActivation(line) {
+    const m = line.match(/^([^,]+), (.+)$/);
+    return m ? { name: m[1], skill: m[2] } : null;
+  }
+
+  function splitNarrativeIntoBlocks(narrative, snapshot) {
+    const allyNames = new Set((snapshot?.ally || []).map((u) => u.name));
+    const enemyNames = new Set((snapshot?.enemy || []).map((u) => u.name));
+    const sideOf = (name) => allyNames.has(name) ? "ally" : enemyNames.has(name) ? "enemy" : null;
+
+    const blocks = [];
+    let current = null;
+    // "행동!" 마커는 즉발 액션(몬스터 기본 공격 등)에서만 나오고, 바로 다음
+    // 줄에 같은 유닛의 "{이름}, {행동명}" 줄이 따라온다(registries.js가 그
+    // 형태로 로그하도록 맞춰둠 — src/registries.js의 ATTACK 참조). 이 둘을
+    // 하나로 합쳐야 캐릭터 스킬(resolvePreparedSkill, 애초에 "행동!" 마커가
+    // 안 붙는 경로)과 똑같은 한 줄짜리 헤더가 된다. 아직 이 컨벤션으로 안
+    // 옮긴 다른 액션(포션/마법진 등)은 다음 줄이 안 맞으니 예전처럼 "행동!"
+    // 단독으로 plain 헤더 블록이 됨 — 회귀 없음.
+    let pendingLine = null;
+    let pendingName = null;
+    function flushPending() {
+      if (!pendingLine) return;
+      current = { side: sideOf(pendingName) || "ally", lines: [pendingLine] };
+      blocks.push(current);
+      pendingLine = null;
+      pendingName = null;
+    }
+
+    narrative.forEach((line) => {
+      const marker = extractActorLine(line);
+      if (marker) {
+        flushPending(); // 직전 "행동!"이 짝을 못 찾았으면 그대로 확정하고 새로 대기
+        pendingLine = line;
+        pendingName = marker;
+        return;
+      }
+
+      const activation = extractSkillActivation(line);
+      if (activation && activation.name === pendingName) {
+        // "행동!" 바로 다음이 같은 유닛의 발동줄 — 합쳐서 한 줄짜리 헤더로
+        current = { side: sideOf(activation.name) || "ally", lines: [line], skillHeader: true };
+        blocks.push(current);
+        pendingLine = null;
+        pendingName = null;
+        return;
+      }
+      flushPending();
+
+      if (activation) {
+        // "행동!" 없이 곧장 나온 발동줄(선딜레이 스킬의 발동 시점)
+        // 스냅샷 이름 목록으로 아군/적군을 가림 — 못 찾으면(예: 이미 죽어서
+        // 이번 턴 스냅샷에 없는 경우) 직전 블록의 진영을 이어받음.
+        const side = sideOf(activation.name) || (current ? current.side : "ally");
+        current = { side, lines: [line], skillHeader: true };
+        blocks.push(current);
+        return;
+      }
+      if (current) current.lines.push(line);
+    });
+    flushPending();
+
+    return blocks;
+  }
+
+  function renderBlock(block) {
+    const bodyLines = block.lines.map((line, idx) => {
+      if (idx === 0) {
+        if (block.skillHeader) {
+          // 볼드+밑줄은 스킬명에만 건다 — "{이름}, " 부분은 일반 텍스트.
+          const activation = extractSkillActivation(line);
+          return `<div class="log-line skill-activate">${activation.name}, <span class="skill-name-strong">${activation.skill}</span></div>`;
+        }
+        const name = extractActorLine(line) || line;
+        return `<div class="log-line actor">${name}</div>`;
+      }
+      const cls = classifyLine(line);
+      return `<div class="log-line ${cls}">${line}</div>`;
+    }).join("");
+    return `<div class="action-block ${block.side}">${bodyLines}</div>`;
+  }
+
+  const OUTCOME_META = {
+    allyWin: { cls: "win", eyebrow: "VICTORY", title: (u) => `${u}의 파티는 승리했다!` },
+    enemyWin: { cls: "lose", eyebrow: "DEFEAT", title: () => `패배했다...` },
+    draw: { cls: "draw", eyebrow: "STALEMATE", title: () => `비겼다.` },
+  };
+
+  function renderResultSideBox(label, side, counts, participants, damageDealt) {
+    const totalCurrentHp = participants.reduce((sum, p) => sum + p.currentHp, 0);
+    const totalMaxHp = participants.reduce((sum, p) => sum + p.maxHp, 0);
+    return `
+      <div class="result-side-box ${side}">
+        <div class="result-side-label">${label}</div>
+        <div class="result-survivors">${counts.alive} <span class="of">/ ${counts.total}</span></div>
+        <div class="result-sub">생존</div>
+        <div class="result-hp-block"><div class="result-hp-figure"><b>${totalCurrentHp}</b> / ${totalMaxHp} HP</div></div>
+        <div class="result-dmg-block"><div class="result-dmg-figure">상대에게 입힌 피해 <b>${damageDealt}</b></div></div>
+      </div>
+    `;
+  }
+
+  function renderResult(result) {
+    const meta = OUTCOME_META[result.outcome] || OUTCOME_META.draw;
+    return `
+      <div class="outcome-banner">
+        <div class="outcome-eyebrow">${meta.eyebrow}</div>
+        <div class="outcome-title ${meta.cls}">${meta.title(result.username || "플레이어")}</div>
+        <div class="outcome-turns">진행 턴수 <b>${result.turnsElapsed}</b></div>
+      </div>
+      <div class="result-sides">
+        ${renderResultSideBox("🛡️ 아군", "ally", result.survivorCounts.ally, result.participants.ally, result.damageDealt.ally)}
+        ${renderResultSideBox("💀 적군", "enemy", result.survivorCounts.enemy, result.participants.enemy, result.damageDealt.enemy)}
+      </div>
+      <div class="loot-panel">
+        <div class="loot-row"><span class="loot-label">✨ 경험치</span><span class="loot-value exp">+${result.expGained}</span></div>
+        <div class="loot-row"><span class="loot-label">💰 골드</span><span class="loot-value">+${result.goldGained}</span></div>
+        ${result.lootGained.length ? result.lootGained.map((it) => `
+          <div class="loot-row"><span class="loot-label">${it.name}</span><span class="loot-value">×${it.quantity}</span></div>
+        `).join("") : `<div class="loot-empty">획득한 아이템 없음</div>`}
+      </div>
+    `;
+  }
+
+  function renderBattleLog(logLines, result) {
+    const parsed = parseBattleLog(logLines);
+    let html = `<div class="intro-banner" style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mist-dim);padding:10px 0;">${parsed.intro.join("<br/>")}</div>`;
+
+    parsed.turns.forEach((t) => {
+      const blocks = splitNarrativeIntoBlocks(t.narrative, t.snapshot);
+      html += `
+        <div class="turn-block">
+          <div class="turn-label">TURN ${t.turnNumber}</div>
+          <table class="status-table">
+            <thead><tr><th class="ally-col">🛡️ 아군</th><th class="enemy-col">💀 적군</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="ally-col">${t.snapshot.ally.map(renderUnitRow).join("")}</td>
+                <td class="enemy-col">${t.snapshot.enemy.map(renderUnitRow).join("")}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="turn-narrative">${blocks.map(renderBlock).join("")}</div>
+        </div>
+      `;
+    });
+
+    html += `<div class="outro">${renderResult(result)}</div>`;
+    return html;
+  }
+
+  // ============================================================================
+  // 실제 전투 실행 — BattleAdapter.runBattle()에 지금 화면에 뜬 편성 그대로 넘김.
+  // ============================================================================
+  function getUsername() {
+    try { return localStorage.getItem("battleSim_username") || "플레이어"; }
+    catch { return "플레이어"; }
+  }
+
+  function runRealBattle() {
+    const btn = document.getElementById("runBattleBtn");
+    btn.disabled = true;
+    btn.textContent = "전투 진행 중...";
+
+    const roster = getRoster();
+    const params = new URLSearchParams(location.search);
+    const partyParam = params.get("party");
+    const battleId = params.get("battle");
+    const party = partyParam
+      ? roster.filter((r) => partyParam.split(",").includes(String(r.id)))
+      : roster;
+    party.forEach((p) => { if (p.activePresetIdx === undefined) p.activePresetIdx = 0; });
+
+    const enemies = spawnEnemies(battleId);
+    const enemySpawnKeys = enemies.map((e) => e.monsterId);
+
+    const logLines = [];
+    const result = window.BattleAdapter.runBattle({
+      allyRosterChars: party,
+      monsterTable: MONSTER_TABLE,
+      enemySpawnKeys,
+      maxTurns: 100,
+      username: getUsername(),
+      logger: (line) => logLines.push(line),
+    });
+
+    document.getElementById("battleLogWrap").innerHTML = renderBattleLog(logLines, result);
+
+    // 연습 모드 — 보상 지급도, 클리어 기록도, 쿨다운 갱신도 하지 않음.
+    // 순수하게 "이 빌드가 통하는지"만 확인하는 용도라 아무 흔적을 남기지 않음.
+    const isPractice = params.get("practice") === "1";
+    if (isPractice) {
+      const wrap = document.getElementById("battleLogWrap");
+      const notice = document.createElement("div");
+      notice.style.cssText = "margin:14px auto 0; max-width:900px; padding:12px 16px; border:1px dashed var(--cyan-dim); border-radius:8px; color:var(--cyan); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center;";
+      notice.textContent = "🧪 연습 모드 — 경험치·아이템·골드가 지급되지 않았고, 클리어 기록과 재도전 대기시간에도 영향이 없어요.";
+      wrap.parentNode.insertBefore(notice, wrap);
+    } else {
+      applyBattleRewards(result, roster);
+      if (result.outcome === "allyWin") markCleared(battleId);
+    }
+    btn.textContent = "⚔️ 다시 전투하기";
+    btn.disabled = false;
+  }
+
+  // ============================================================================
+  // 전투 결과를 실제로 저장함. 경험치는 로스터(캐릭터별 exp/level/expToNext)에,
+  // 골드는 계정 단위 키(battleSim_gold)에 직접, 아이템은 계정에 귀속된 창고
+  // 테이블(battleSim_warehouse)에 — 이 셋을 서로 다른 곳에 나눠 저장하는 이유:
+  // 골드가 창고 테이블 안에 있으면 골드를 참조할 때마다 창고 테이블을 거쳐야
+  // 해서(참조 -> 재참조) 비효율적이고 매번 그림이 지저분해짐. 골드는 여러 곳에서
+  // 자주, 직접 참조되는 값이라 최상위에 독립적으로 둠.
+  // ============================================================================
+  // 승리 시 클리어 기록 + 클리어 시각 저장.
+  // 예전엔 실제 전투 승리가 해금에 전혀 반영되지 않아서(개발자 버튼으로만
+  // 해금됐음) 전투를 이겨도 다음 전투가 안 열렸음. 시각은 특수의뢰의
+  // 재도전 대기(cooldownHours) 판정에 쓰임.
+  function markCleared(battleId) {
+    if (!battleId) return;
+    try {
+      const cleared = JSON.parse(localStorage.getItem("battleSim_clearedBattles")) || [];
+      if (!cleared.includes(battleId)) {
+        cleared.push(battleId);
+        localStorage.setItem("battleSim_clearedBattles", JSON.stringify(cleared));
+      }
+    } catch { /* 저장 실패는 무시 — 전투 결과 표시를 막지 않음 */ }
+    try {
+      const times = JSON.parse(localStorage.getItem("battleSim_battleClearTimes")) || {};
+      times[battleId] = Date.now();
+      localStorage.setItem("battleSim_battleClearTimes", JSON.stringify(times));
+    } catch { /* 위와 동일 */ }
+  }
+
+  function applyBattleRewards(result, roster) {
+    result.expByCharacter.forEach(({ id, gainExp }) => {
+      if (!gainExp) return;
+      const character = roster.find((r) => String(r.id) === String(id));
+      if (character) grantExp(character, gainExp);
+    });
+    saveRoster(roster);
+
+    if (result.goldGained) setGold(getGold() + result.goldGained);
+
+    if (result.lootGained.length) {
+      const warehouse = getWarehouse();
+      result.lootGained.forEach((loot) => {
+        // 병합 조건은 상점 구매와 동일하게 맞춤 — heldBy(누군가 장착 중인
+        // 개별 인스턴스)나 enhanceLevel(강화품)과는 절대 안 섞여야 함.
+        // 예전엔 이 조건이 없어서 드랍품이 강화된 같은 이름 장비에 합쳐지면서
+        // 강화 수치가 공짜로 늘어나는 문제가 있었음.
+        const existing = warehouse.find((w) =>
+          w.name === loot.name && w.category === loot.category && !w.heldBy && !w.enhanceLevel);
+        if (existing) {
+          existing.quantity += loot.quantity;
+        } else {
+          // 장비 스펙(combatReal/weight/twoHanded 등)을 그대로 실어서 저장 —
+          // 상점 구매와 같은 방식. 이게 없으면 드랍 장비를 장착해도 스탯이 0이 됨.
+          const { name, category, quantity, ...spec } = loot;
+          warehouse.push({ name, category, quantity, ...spec });
+        }
+      });
+      saveWarehouse(warehouse);
+    }
+  }
+
+  document.getElementById("runBattleBtn").addEventListener("click", runRealBattle);
+
+  applyBattleCaption();
+  render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>몬스터 로스터 · Monster Roster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { padding:32px 40px 22px; border-bottom:1px solid var(--line); }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:8px 0 4px; color:#f2efe8; }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .new-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:#1a1108; background:var(--ember); border:none;
+    padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:600; white-space:nowrap;
+  }
+  .new-btn:hover { opacity:0.9; }
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:14px;
+  }
+
+  main { flex:1; padding:24px 40px 48px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; }
+  a.card { text-decoration:none; color:inherit; }
+  .card {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+    transition:border-color 0.15s ease, transform 0.1s ease;
+  }
+  .card:hover { border-color:var(--gold); transform:translateY(-2px); }
+  .card-top { display:flex; align-items:center; gap:12px; }
+  .thumb {
+    width:52px; height:52px; border-radius:8px; flex-shrink:0;
+    background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .card-name { font-family:'Cinzel',serif; font-size:15px; color:#f2efe8; line-height:1.3; }
+  .card-id { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:2px; }
+  .card-row { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); display:flex; justify-content:space-between; }
+  .card-row .v { color:var(--gold); }
+  .open-hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); opacity:0; transition:opacity 0.15s ease; }
+  .card:hover .open-hint { opacity:1; }
+
+  .empty-state {
+    grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; padding:90px 20px; text-align:center; border:1px dashed var(--line); border-radius:12px;
+  }
+  .empty-state .e-icon { font-size:32px; }
+  .empty-state .e-title { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; }
+  .empty-state .e-desc { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); max-width:320px; line-height:1.6; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Monster Roster · 개발자 모드</div>
+      <h1>몬스터</h1>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="new-btn" id="uploadBtn" style="background:transparent;border:1px solid var(--line);color:var(--mist-dim);">⬆ 업로드</button>
+      <input type="file" id="uploadInput" accept="application/json" style="display:none;" />
+      <button class="new-btn" id="downloadBtn" style="background:transparent;border:1px solid var(--line);color:var(--mist-dim);">⬇ 다운로드</button>
+      <button class="new-btn" id="newBtn">+ 새 몬스터</button>
+    </div>
+  </div>
+  <div class="mock-badge">⚠ battle-view.html의 MONSTER_TABLE이 여기서 읽어옴 — 여기서 만든 몬스터가 실제 전투에 그대로 등장함</div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음(throw로
+  // 이 아래 나머지 스크립트 실행 자체를 중단시킴).
+  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
+    document.body.innerHTML = `
+      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+      </div>
+    `;
+    throw new Error("access-denied");
+  }
+
+  function getMonsterRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
+    catch { return []; }
+  }
+  function saveMonsterRoster(roster) {
+    localStorage.setItem("battleSim_monsterRoster", JSON.stringify(roster));
+  }
+
+  // ============================================================================
+  // 예전에 battle-view.html에 하드코딩돼있던 8종 고블린을 최초 1회 로스터로
+  // 옮겨옴(로스터가 비어있을 때만). 예전 데이터엔 combatReal/combatBonus/
+  // summonAbility가 애초에 없었으므로(실제로 이 몬스터들은 real ATK/DEF가 전부
+  // 0이라 전투에서 데미지를 못 주는 상태였음 — 마이그레이션 중 발견) 그대로
+  // 비워둠. 새 편집기에서 직접 채워 넣어야 함.
+  // ============================================================================
+  const LEGACY_MONSTER_SEED = [
+    // ========================================================================
+    // 고블린 마을 (Lv1~5 구간) — 유저와 같은 1차 직업 스킬을 씀.
+    // 설계 방침: 초반 구간에서는 "버프/디버프가 강력할수록 강하다"를 체감시키는
+    // 게 목표라, 상위 개체일수록 버프/디버프 패턴을 갖게 배치함.
+    //   척후병  평타만          — 순수 스펙 싸움(기준선)
+    //   전사    Bash            — 스킬 위력 체감
+    //   주술사  Healing         — 힐을 뚫으려면 화력/디버프가 필요해짐
+    //   고귀한  Encourage       — 적 전체 STR+50%, 버프의 위력을 보여줌
+    //   수문장  Weapon Break    — 유저 ATK-30%, 디버프의 위력을 보여줌
+    //   섭정    Charm/Fire Ball — INT 버프 + 광역 마법
+    //   왕      Break Down      — 공/방 동시 저하 + 강타
+    //   마차    SUMMON 전용     — 파괴될 때까지 무한 소환(처치 우선순위 학습)
+    // combatReal은 몬스터가 장비를 안 끼는 대신 "유저가 그 구간에 낄 법한
+    // 장비"만큼을 직접 얹어준 값(마을 구간 무기 Atk 10~20 상당을 기준).
+    // ========================================================================
+    { id:"goblin_scout", name:"고블린 척후병", portrait:"👺", realStats:{str:8,int:5,dex:10,spd:12,luk:5},
+      combatReal:{atk:6}, tier:"normal",
+      patterns:[{subject:"self",metric:"always",action:"ATTACK"}], expReward:8, goldReward:3,
+      dropTable:[{name:"고블린의 이빨",category:"material",chance:0.7,quantity:[1,2]}] },
+
+    { id:"goblin_warrior", name:"고블린 전사", portrait:"👹", realStats:{str:14,int:6,dex:9,spd:9,luk:5},
+      combatReal:{atk:14,def:3}, tier:"normal",
+      patterns:[
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"Bash"},
+        {subject:"self",metric:"always",action:"ATTACK"},
+      ], expReward:14, goldReward:5,
+      dropTable:[
+        {name:"고블린의 이빨",category:"material",chance:0.5,quantity:[1,2]},
+        {name:"이 빠진 도끼",category:"equipment",enhanceable:true,chance:0.08,quantity:[1,1],slot:"mainhand",equipmentType:"axe",combatReal:{atk:22},weight:0},
+      ] },
+
+    { id:"goblin_shaman", name:"고블린 주술사", portrait:"🧙", realStats:{str:6,int:15,dex:8,spd:8,luk:6},
+      combatReal:{matk:16,mdef:4}, tier:"normal",
+      patterns:[
+        {subject:"self",metric:"hp",comparator:"lte",value:70,action:"Healing"},
+        {subject:"self",metric:"always",action:"Fire Ball"},
+      ], expReward:15, goldReward:6,
+      dropTable:[
+        {name:"고블린의 이빨",category:"material",chance:0.3,quantity:[1,1]},
+        {name:"마력 가루",category:"material",chance:0.35,quantity:[1,3]},
+        {name:"주술사의 나뭇가지",category:"equipment",enhanceable:true,chance:0.08,quantity:[1,1],slot:"mainhand",equipmentType:"wand",combatReal:{atk:1,matk:17},weight:0},
+      ] },
+
+    // ========================================================================
+    // 고블린 왕국 (Lv10~15 구간)
+    // ========================================================================
+    { id:"goblin_noble", name:"고귀한 고블린", portrait:"🎩", realStats:{str:12,int:12,dex:12,spd:10,luk:10},
+      combatReal:{atk:16,matk:12,def:5,mdef:5}, tier:"normal",
+      patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Encourage",maxUses:1},
+        {subject:"self",metric:"always",action:"Bash"},
+      ], expReward:18, goldReward:8,
+      dropTable:[
+        {name:"고블린 왕국 통행증",category:"keyItem",chance:1.0,quantity:[1,1]},
+        {name:"고블린의 이빨",category:"material",chance:0.4,quantity:[1,2]},
+      ] },
+
+    { id:"goblin_elite_guard", name:"성채 수문장", portrait:"🛡️", realStats:{str:20,int:8,dex:10,spd:8,luk:6},
+      combatReal:{atk:24,def:10,mdef:6}, tier:"elite",
+      patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Weapon Break",maxUses:2},
+        {subject:"self",metric:"always",action:"Bash"},
+      ], expReward:25, goldReward:10,
+      dropTable:[
+        {name:"고블린의 이빨",category:"material",chance:0.6,quantity:[2,3]},
+        {name:"은빛 성채 열쇠",category:"material",chance:0.15,quantity:[1,1]},
+        {name:"수문장의 방패",category:"equipment",enhanceable:true,chance:0.07,quantity:[1,1],slot:"subhand",equipmentType:"shield",combatReal:{def:17,mdef:12},combatBonus:{def:32,mdef:26},weight:1,passiveBonus:{completeDefenseChancePct:10}},
+      ] },
+
+    // 마차 — 스스로는 거의 싸우지 않고(공격력 0) 오직 소환만 함. 파괴될 때까지
+    // 무한히 고블린을 뱉어내므로 "잡몹부터 치면 끝이 없다"는 판단을 요구함.
+    // 방어력은 높게 잡아서 화력을 모아야 부술 수 있게 함.
+    { id:"goblin_cart", name:"고블린 마차", portrait:"🛒", realStats:{str:4,int:4,dex:6,spd:14,luk:100},
+      // 화력 0인 "벽" — 내구도만 크게(HP 직접 지정). STR로 HP를 만들면 그 STR로
+      // 때리는 평타가 같이 세져버리므로 내구도와 화력을 분리해야 함.
+      //
+      // 소환 배율 2배 — 소환 계수 = SummonEff × LUK투자 × LUK성장인데 LUK만으로는
+      // 1.25배에서 상한에 걸림. LUK 100(1.0배) × SummonEff 100(2.0배)로 맞춤.
+      //
+      // 패턴 — 개전에 3체를 쏟고, 이후 체력이 75%/50%/25% 아래로 떨어질 때마다
+      // 각 1회씩 추가로 3체를 더 뱉음. 몬스터는 슬롯 제한이 없어서 이런 다단
+      // 패턴을 그대로 다 쓸 수 있음. 평상시엔 아무것도 안 함(화력 0이라
+      // 마차 자체는 위협이 아니고, 물량이 위협).
+      //
+      // 타임어택 설계 — 승패가 아니라 "몇 턴에 잡느냐"로 파티 성능을 재는
+      // 허수아비 겸 보너스 전투. 전투 턴 상한(100)은 그대로 두고, 적정 스펙
+      // (Lv15 1차전직 + 최적 스탯) 파티가 약 37턴, 버프를 쓰면 약 33턴에
+      // 잡도록 HP를 맞춤. 파티가 강해질수록 소요 턴이 눈에 띄게 줄어들어
+      // 스스로 성장을 확인할 수 있음. HP를 여기서 더 올리면(43만 이상)
+      // 편차가 급격히 벌어져 100턴 초과가 섞이기 시작하므로 이 선이 상한.
+      maxHp:300000, maxSp:200, openingAction:true,
+      combatReal:{def:20,mdef:20,summonEff:100}, tier:"elite",
+      patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:75,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:25,action:"SUMMON_OPENING",maxUses:1},
+      ],
+      summonAbility:{ candidates:[{monsterId:"goblin_scout",weight:45},{monsterId:"goblin_warrior",weight:40},{monsterId:"goblin_shaman",weight:15}] },
+      expReward:15, goldReward:8,
+      dropTable:[
+        {name:"고블린의 이빨",category:"material",chance:1.0,quantity:[3,6]},
+        {name:"은빛 성채 열쇠",category:"material",chance:0.5,quantity:[1,2]},
+        {name:"이 빠진 도끼",category:"equipment",enhanceable:true,chance:0.4,quantity:[1,1],slot:"mainhand",equipmentType:"axe",combatReal:{atk:22},weight:0},
+        {name:"주술사의 나뭇가지",category:"equipment",enhanceable:true,chance:0.4,quantity:[1,1],slot:"mainhand",equipmentType:"wand",combatReal:{atk:1,matk:17},weight:0},
+        {name:"수문장의 방패",category:"equipment",enhanceable:true,chance:0.3,quantity:[1,1],slot:"subhand",equipmentType:"shield",combatReal:{def:17,mdef:12},combatBonus:{def:32,mdef:26},weight:1,passiveBonus:{completeDefenseChancePct:10}},
+        {name:"거인의 반지",category:"equipment",enhanceable:true,chance:0.1,quantity:[1,1],slot:"accessory",weight:0,maxHpBonus:200},
+      ] },
+
+    { id:"goblin_regent", name:"섭정", portrait:"🧑‍⚖️", realStats:{str:18,int:22,dex:14,spd:12,luk:16},
+      combatReal:{atk:12,matk:30,def:8,mdef:12}, tier:"elite",
+      patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Charm",maxUses:1},
+        {subject:"self",metric:"always",action:"Fire Ball"},
+      ], expReward:70, goldReward:45,
+      dropTable:[
+        {name:"왕관 조각",category:"material",chance:0.18,quantity:[1,1]},
+        {name:"고블린의 이빨",category:"material",chance:0.7,quantity:[2,4]},
+        {name:"섭정의 인장",category:"equipment",enhanceable:true,chance:0.12,quantity:[1,1],slot:"jItem",combatReal:{mdef:11},combatBonus:{mdef:17},weight:0},
+      ] },
+
+    { id:"goblin_king", name:"고블린의 왕", portrait:"👑", realStats:{str:26,int:16,dex:14,spd:10,luk:14},
+      // 보스 — 평타 화력은 STR 26 수준으로 두고(탱커가 버틸 만한 수준),
+      // 내구도만 따로 크게 잡아서 장기전을 만듦. 이 구간에서 버프/디버프를
+      // 쌓는 쪽이 눈에 띄게 유리해지는 게 설계 의도.
+      maxHp:45000, maxSp:400,
+      // 화력은 낮추고(ATK 34→22) 내구도를 크게 올림 — 짧고 굵게 죽이는 보스가
+      // 아니라 오래 버티는 보스로 만들어야 버프/디버프를 쌓을 시간이 생김.
+      // 화력이 높으면 파티가 먼저 전멸해서 전투가 짧아지고, 그러면 버프에 쓴
+      // 1턴이 손해가 되어 "버프가 강하다"는 체감이 아예 안 나옴.
+      combatReal:{atk:22,matk:10,def:12,mdef:8}, tier:"boss",
+      patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Break Down",maxUses:3},
+        {subject:"self",metric:"hp",comparator:"lte",value:40,action:"Ultimate Strike"},
+        {subject:"self",metric:"always",action:"Bash"},
+      ], expReward:80, goldReward:50,
+      dropTable:[
+        // 왕은 편성에서 낮은 확률로만 등장하므로(전투 테이블 weight 참고)
+        // 드랍율까지 겹쳐서 "만나기도 어렵고 나오기도 어려운" 최상위 소재가 됨.
+        {name:"왕관 조각",category:"material",chance:0.35,quantity:[1,1]},
+        // 처치했더니 왕이 도망쳤고, 그 흔적을 쫓아 수송대를 털러 간다는 흐름.
+        {name:"오래된 바퀴 자국",category:"keyItem",chance:0.12,quantity:[1,1]},
+        {name:"고블린의 이빨",category:"material",chance:1.0,quantity:[3,5]},
+        {name:"왕의 대검",category:"equipment",enhanceable:true,chance:0.15,quantity:[1,1],slot:"mainhand",equipmentType:"greatsword",combatReal:{atk:97,def:8,mdef:4},combatBonus:{def:72,mdef:59},weight:2,twoHanded:true},
+      ] },
+  ];
+  const MONSTER_SEED_VERSION = "2026-08-14a";
+  function ensureMigrated() {
+    // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
+    if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
+      // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — monster-sheet.html 등에서
+      // 직접 손본 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함.
+      try { localStorage.setItem("battleSim_monsterSeedVersionBackup", JSON.stringify(getMonsterRoster())); } catch {}
+      saveMonsterRoster(LEGACY_MONSTER_SEED);
+      localStorage.setItem("battleSim_monsterSeedVersion", MONSTER_SEED_VERSION);
+    }
+  }
+  ensureMigrated();
+
+  function nextMonsterId(roster) {
+    let n = 1;
+    while (roster.some(m => m.id === `monster_${n}`)) n++;
+    return `monster_${n}`;
+  }
+
+  function render() {
+    const grid = document.getElementById("grid");
+    const roster = getMonsterRoster();
+    if (roster.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="e-icon">👹</div>
+          <div class="e-title">등록된 몬스터가 없습니다</div>
+          <div class="e-desc">"+ 새 몬스터" 버튼으로 첫 몬스터를 만들어보세요.</div>
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = "";
+    roster.forEach(m => {
+      const a = document.createElement("a");
+      a.className = "card";
+      a.href = `monster-sheet.html?id=${encodeURIComponent(m.id)}`;
+      a.innerHTML = `
+        <div class="card-top">
+          <div class="thumb">${m.portrait || "👹"}</div>
+          <div>
+            <div class="card-name">${m.name || "(이름 없음)"}</div>
+            <div class="card-id">${m.id}</div>
+          </div>
+        </div>
+        <div class="card-row"><span>경험치/골드</span><span class="v">${m.expReward ?? 0} / ${m.goldReward ?? 0}</span></div>
+        <div class="card-row"><span>패턴</span><span class="v">${(m.patterns || []).length}줄</span></div>
+        <div class="card-row"><span></span><span class="open-hint">편집 →</span></div>
+      `;
+      grid.appendChild(a);
+    });
+  }
+
+  function downloadJSON(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById("uploadBtn").addEventListener("click", () => {
+    document.getElementById("uploadInput").click();
+  });
+  document.getElementById("uploadInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); }
+      catch { alert("올바른 JSON 파일이 아니에요."); return; }
+      if (!Array.isArray(parsed)) { alert("몬스터 로스터 형식이 아니에요(배열이어야 함)."); return; }
+      if (!confirm("지금 이 브라우저에 저장된 몬스터 로스터를 파일 내용으로 완전히 덮어쓸까요?")) return;
+      saveMonsterRoster(parsed);
+      location.reload();
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    downloadJSON("monster-roster.json", getMonsterRoster());
+  });
+
+  document.getElementById("newBtn").addEventListener("click", () => {
+    const roster = getMonsterRoster();
+    const id = nextMonsterId(roster);
+    roster.push({
+      id, name: "새 몬스터", portrait: "👹",
+      realStats: { str:5, int:5, dex:5, spd:5, luk:5 },
+      combatReal: { atk:0, def:0, matk:0, mdef:0, summonEff:0 },
+      combatBonus: { atk:0, def:0, matk:0, mdef:0 },
+      expReward: 0, goldReward: 0, dropTable: [], patterns: [], summonAbility: { candidates: [] },
+    });
+    saveMonsterRoster(roster);
+    location.href = `monster-sheet.html?id=${encodeURIComponent(id)}`;
+  });
+
+  render();
+</script>
+</body>
+</html>

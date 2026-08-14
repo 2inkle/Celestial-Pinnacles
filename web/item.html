@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>아이템 · Item</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; transition:color 0.15s ease;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:28px 40px 18px; border-bottom:1px solid var(--line); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  header .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  header h1 { font-family:'Cinzel',serif; font-weight:700; font-size:26px; margin:8px 0 4px; color:#f2efe8; }
+  header .desc { font-size:13px; color:var(--mist-dim); max-width:600px; line-height:1.6; margin-top:8px; }
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:12px;
+  }
+
+  .filter-bar { display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .filter-bar label { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  select#categoryFilter, select#slotFilter {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:7px 12px; cursor:pointer;
+  }
+  select#categoryFilter:focus, select#slotFilter:focus { outline:none; border-color:var(--gold); }
+  select#slotFilter:disabled { opacity:0.4; cursor:not-allowed; }
+
+  main { flex:1; padding:24px 40px 48px; max-width:960px; margin:0 auto; width:100%; }
+
+  .item-row {
+    display:flex; align-items:center; gap:14px; padding:13px 16px; border:1px solid var(--line);
+    border-radius:10px; background:var(--panel); margin-bottom:8px;
+  }
+  .item-icon {
+    width:42px; height:42px; border-radius:9px; background:var(--panel-raised); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0;
+  }
+  .item-main { flex:1; min-width:0; }
+  .item-name { font-family:'Cinzel',serif; font-size:14px; color:#f2efe8; }
+  .item-desc { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:3px; line-height:1.5; }
+  .item-cat-badge {
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.04em; padding:2px 8px; border-radius:10px;
+    border:1px solid; white-space:nowrap; flex-shrink:0;
+  }
+  .item-cat-badge.equipment { color:var(--ember); border-color:var(--ember-dim); }
+  .item-cat-badge.material  { color:var(--cyan);  border-color:var(--cyan-dim); }
+  .item-cat-badge.keyItem   { color:var(--gold);  border-color:var(--gold-dim); }
+  .item-slot-badge {
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.04em; padding:2px 8px; border-radius:10px;
+    border:1px solid var(--line); color:var(--mist-dim); white-space:nowrap; flex-shrink:0;
+  }
+  .item-qty {
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:#f2efe8; min-width:52px; text-align:right; flex-shrink:0;
+  }
+
+  .section-label {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; color:var(--mist-dim);
+    text-transform:uppercase; margin:22px 0 10px;
+  }
+  .section-label:first-child { margin-top:0; }
+  .slot-subhead {
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.06em; color:var(--gold);
+    margin:12px 0 6px 4px;
+  }
+
+  .empty-wrap {
+    text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px;
+  }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Item Storage</div>
+      <h1>아이템</h1>
+      <div class="desc">용병단이 보유한 모든 아이템이에요. 장비는 용병 개개인이, 소재·열쇠 아이템은 용병단 공용 창고가 갖고 있어요.</div>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <label for="categoryFilter">카테고리</label>
+    <select id="categoryFilter"></select>
+    <label for="slotFilter">슬롯 <span style="color:var(--mist-dim); font-weight:normal;">(장비 전용)</span></label>
+    <select id="slotFilter"></select>
+  </div>
+  <div class="mock-badge">⚠ 정적 목업 — 실제 사용/소모·거래 기능은 미구현, 조회 전용</div>
+</header>
+
+<main id="mainArea"></main>
+
+<script>
+  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
+  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
+  (function() {
+    try {
+      const username = localStorage.getItem("battleSim_username") || "2inkle";
+      if (username === "2inkle") {
+        const slot = document.getElementById("devToolsNavSlot");
+        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
+      }
+    } catch {}
+  })();
+
+  function getRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
+    catch { return []; }
+  }
+  function getWarehouse() {
+    try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
+    catch { return []; }
+  }
+
+  // ============================================================================
+  // 아이템 카테고리 레지스트리 — 새 카테고리가 필요하면 이 객체에 한 줄만
+  // 추가하면 필터 드롭다운·배지 표시에 전부 자동 반영됨.
+  //   equipment — 장비. 특정 캐릭터가 착용/소지(캐릭터별 inventory·equipment)함.
+  //   material  — 소재. 용병단 공용 창고 소유.
+  //   keyItem   — 열쇠 아이템(통행증 등). 용병단 공용 창고 소유.
+  // ============================================================================
+  const ITEM_CATEGORY_TYPES = {
+    equipment: { label: "장비", icon: "⚔️" },
+    material:  { label: "소재", icon: "🧪" },
+    keyItem:   { label: "열쇠 아이템", icon: "🗝️" },
+    // stash — 보물상자류. 그 자체론 아무 능력치가 없고, 열쇠공에게 수수료를
+    // 내고 개봉하면 안의 아이템이 무작위로 나옴(개봉 기능 자체는 아직 미구현 —
+    // 지금은 "이런 아이템이 존재한다"만 표현).
+    stash:     { label: "보물상자", icon: "🎁" },
+    // 새 카테고리 예시: currency: { label:"화폐", icon:"💰" }
+  };
+
+  // ============================================================================
+  // 장비 슬롯 레지스트리 — character-sheet.html의 EQUIPMENT_SLOT_TYPES와 동일한
+  // 12종. 장비 종류가 많아질수록 슬롯별로 나눠 봐야 찾기 쉬워서, 여기서도
+  // 슬롯별 소분류 + 필터에 씀. 새 슬롯이 생기면 character-sheet.html과 함께
+  // 여기도 맞춰줘야 함(중복 관리 지점).
+  // ============================================================================
+  const EQUIPMENT_SLOT_TYPES = {
+    mainhand:  { label: "Mainhand",  order: 1 },
+    subhand:   { label: "Subhand",   order: 2 },
+    armor:     { label: "Armor",     order: 3 },
+    cloak:     { label: "Cloak",     order: 4 },
+    shoes:     { label: "Shoes",     order: 5 },
+    head:      { label: "Head",      order: 6 },
+    accessory: { label: "Accessory", order: 7 },
+    jItem:     { label: "J.Item",    order: 8 },
+    item:      { label: "Item",      order: 9 },
+    avatar:    { label: "Avatar",    order: 10 },
+    skillSeal: { label: "SkillSeal", order: 11 },
+    uItem:     { label: "U.Item",    order: 12 },
+  };
+  const EQUIPMENT_SLOT_KEYS = Object.entries(EQUIPMENT_SLOT_TYPES).sort((a, b) => a[1].order - b[1].order).map(([k]) => k);
+
+  // 장비 아이템의 옵션을 간단히 문자열로 표현(character-sheet.html의 describeItem
+  // 간이 버전 — 이 화면은 조회 전용이라 필요한 필드만 표시).
+  function describeEquipmentItem(item) {
+    const parts = [];
+    if (item.equipmentType) parts.push(item.equipmentType);
+    const combatReal = item.combatReal || {};
+    const combatBonus = item.combatBonus || {};
+    [["ATK", "atk"], ["MATK", "matk"], ["DEF", "def"], ["MDEF", "mdef"]].forEach(([label, key]) => {
+      if (combatReal[key] || combatBonus[key]) parts.push(`${label} ${combatReal[key] || 0}+${combatBonus[key] || 0}`);
+    });
+    if (item.statRealBonus) {
+      Object.entries(item.statRealBonus).forEach(([k, v]) => { if (v) parts.push(`real${k.toUpperCase()} +${v}`); });
+    }
+    if (item.statBonus) {
+      Object.entries(item.statBonus).forEach(([k, v]) => { if (v) parts.push(`${k.toUpperCase()} +${v}`); });
+    }
+    if (item.patternSlotBonus) parts.push(`패턴 슬롯 +${item.patternSlotBonus}`);
+    if (item.weight) parts.push(`무게 ${item.weight}`);
+    if (item.requiredJob) parts.push(`"${item.requiredJob}" 계열 전용`);
+    if (item.twoHanded) parts.push(`양손 무기`);
+    if (item.grantsSkill) parts.push(`"${item.grantsSkill}" 사용 가능(SkillSeal)`);
+    return parts.join(" · ") || "옵션 없음";
+  }
+
+  // 로스터 전체(인벤토리 + 장착 중)를 훑어서 장비 아이템을 이름별로 집계.
+  // 같은 이름의 장비를 여러 명이 갖고 있으면 수량·보유자 목록으로 합쳐짐.
+  function collectEquipmentItems() {
+    const roster = getRoster();
+    const byName = new Map();
+
+    roster.forEach((c) => {
+      const owned = [...(c.inventory || []), ...Object.values(c.equipment || {}).filter(Boolean)];
+      owned.forEach((item) => {
+        if (!byName.has(item.name)) byName.set(item.name, { item, owners: [] });
+        byName.get(item.name).owners.push(c.name);
+      });
+    });
+
+    return [...byName.values()].map(({ item, owners }) => ({
+      name: item.name,
+      category: "equipment",
+      slot: item.slot || null,
+      quantity: owners.length,
+      description: describeEquipmentItem(item),
+      owners,
+    }));
+  }
+
+  function collectWarehouseItems() {
+    return getWarehouse().map((it) => ({
+      name: it.name,
+      category: it.category,
+      slot: null,
+      quantity: it.quantity,
+      description: it.description || "",
+      owners: null,
+    }));
+  }
+
+  function renderCategoryOptions() {
+    const sel = document.getElementById("categoryFilter");
+    sel.innerHTML = `<option value="all">전체</option>` +
+      Object.entries(ITEM_CATEGORY_TYPES).map(([key, meta]) => `<option value="${key}">${meta.icon} ${meta.label}</option>`).join("");
+    sel.addEventListener("change", () => {
+      syncSlotFilterAvailability();
+      renderMain();
+    });
+  }
+
+  function renderSlotOptions() {
+    const sel = document.getElementById("slotFilter");
+    sel.innerHTML = `<option value="all">전체</option>` +
+      EQUIPMENT_SLOT_KEYS.map((key) => `<option value="${key}">${EQUIPMENT_SLOT_TYPES[key].label}</option>`).join("");
+    sel.addEventListener("change", renderMain);
+  }
+
+  // 카테고리가 "장비"나 "전체"가 아니면 슬롯 필터는 의미가 없으니 비활성화하고 초기화
+  function syncSlotFilterAvailability() {
+    const category = document.getElementById("categoryFilter").value;
+    const slotSel = document.getElementById("slotFilter");
+    const relevant = category === "all" || category === "equipment";
+    slotSel.disabled = !relevant;
+    if (!relevant) slotSel.value = "all";
+  }
+
+  function renderItemRow(it) {
+    const meta = ITEM_CATEGORY_TYPES[it.category] || { label: it.category, icon: "❓" };
+    const ownerNote = it.owners ? `보유: ${it.owners.join(", ")}` : it.description;
+    const slotTag = it.slot && EQUIPMENT_SLOT_TYPES[it.slot] ? `<span class="item-slot-badge">${EQUIPMENT_SLOT_TYPES[it.slot].label}</span>` : "";
+    return `
+      <div class="item-row">
+        <div class="item-icon">${meta.icon}</div>
+        <div class="item-main">
+          <div class="item-name">${it.name}</div>
+          <div class="item-desc">${ownerNote}</div>
+        </div>
+        ${slotTag}
+        <span class="item-cat-badge ${it.category}">${meta.label}</span>
+        <div class="item-qty">×${it.quantity}</div>
+      </div>
+    `;
+  }
+
+  function renderMain() {
+    const categoryFilterVal = document.getElementById("categoryFilter").value;
+    const slotFilterVal = document.getElementById("slotFilter").value;
+    const all = [...collectEquipmentItems(), ...collectWarehouseItems()];
+
+    let filtered = categoryFilterVal === "all" ? all : all.filter((it) => it.category === categoryFilterVal);
+    // 슬롯 필터가 걸려 있으면 장비만 남기고(비장비는 슬롯 개념이 없어서 제외), 그 슬롯인 것만
+    if (slotFilterVal !== "all") {
+      filtered = filtered.filter((it) => it.category === "equipment" && it.slot === slotFilterVal);
+    }
+
+    const main = document.getElementById("mainArea");
+
+    if (!all.length) {
+      main.innerHTML = `
+        <div class="empty-wrap">
+          보유한 아이템이 없습니다.<br />
+          전투에서 얻거나 상점에서 구매하면 여기 표시됩니다.
+        </div>
+      `;
+      return;
+    }
+
+    if (!filtered.length) {
+      main.innerHTML = `<div class="empty-wrap">이 조건에 해당하는 아이템이 없습니다.</div>`;
+      return;
+    }
+
+    // 카테고리별로 묶고, 장비는 다시 슬롯별로 소분류(찾기 쉽게)
+    const grouped = {};
+    filtered.forEach((it) => {
+      if (!grouped[it.category]) grouped[it.category] = [];
+      grouped[it.category].push(it);
+    });
+
+    main.innerHTML = Object.entries(grouped).map(([cat, items]) => {
+      if (cat !== "equipment") {
+        return `
+          <div class="section-label">${(ITEM_CATEGORY_TYPES[cat] || {}).icon || ""} ${(ITEM_CATEGORY_TYPES[cat] || {}).label || cat} (${items.length})</div>
+          ${items.map(renderItemRow).join("")}
+        `;
+      }
+      // 장비는 슬롯별 소분류(EQUIPMENT_SLOT_TYPES 순서대로), 슬롯 정보 없는 예전 데이터는 "기타"로
+      const bySlot = {};
+      items.forEach((it) => {
+        const key = it.slot && EQUIPMENT_SLOT_TYPES[it.slot] ? it.slot : "_unknown";
+        if (!bySlot[key]) bySlot[key] = [];
+        bySlot[key].push(it);
+      });
+      const slotOrder = [...EQUIPMENT_SLOT_KEYS, "_unknown"];
+      return `
+        <div class="section-label">${ITEM_CATEGORY_TYPES.equipment.icon} ${ITEM_CATEGORY_TYPES.equipment.label} (${items.length})</div>
+        ${slotOrder.filter((k) => bySlot[k]).map((k) => `
+          <div class="slot-subhead">${k === "_unknown" ? "기타" : EQUIPMENT_SLOT_TYPES[k].label} (${bySlot[k].length})</div>
+          ${bySlot[k].map(renderItemRow).join("")}
+        `).join("")}
+      `;
+    }).join("");
+  }
+
+  renderCategoryOptions();
+  renderSlotOptions();
+  syncSlotFilterAvailability();
+  renderMain();
+</script>
+
+</body>
+</html>

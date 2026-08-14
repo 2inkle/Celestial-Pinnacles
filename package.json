@@ -1,0 +1,11 @@
+{
+  "name": "battle-sim-core",
+  "version": "0.1.0",
+  "description": "5대 스탯 + 패턴 슬롯 + DB 임포트 기반 전투 시뮬레이션 코어",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>전투 시뮬레이션 코어 · 데모</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--ink);
+    color: var(--mist);
+    font-family: 'Inter', sans-serif;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  header .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 26px;
+    margin: 6px 0 0;
+    color: #f2efe8;
+    letter-spacing: 0.02em;
+  }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 260px 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+  }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  section {
+    background: var(--ink);
+    padding: 20px;
+    min-width: 0;
+  }
+
+  h2.section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--mist-dim);
+    margin: 0 0 14px;
+  }
+
+  /* --- 로스터 --- */
+  .roster-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    color: inherit;
+    font-family: inherit;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+  }
+  .roster-item:hover { border-color: var(--mist-dim); }
+  .roster-item.active {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold) inset;
+  }
+  .roster-item .r-name {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    color: #f2efe8;
+  }
+  .roster-item .r-side {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  .roster-item .r-side.ally { color: var(--cyan); }
+  .roster-item .r-side.enemy { color: var(--ember); }
+
+  /* --- 스탯 시트 --- */
+  .char-title {
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    color: #f2efe8;
+    margin: 0 0 2px;
+  }
+  .char-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--mist-dim);
+    margin-bottom: 18px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat-cell {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .stat-cell .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--mist-dim);
+    text-transform: uppercase;
+  }
+  .stat-cell .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    color: #f2efe8;
+    margin-top: 2px;
+  }
+  .stat-cell .derived {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    margin-top: 4px;
+  }
+
+  .resource-bar-row { margin-bottom: 10px; }
+  .resource-bar-row .rb-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--mist-dim);
+  }
+  .resource-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--panel-raised);
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .resource-bar > i { display: block; height: 100%; border-radius: 4px; }
+  .resource-bar.hp > i { background: var(--ember); }
+  .resource-bar.sp > i { background: var(--cyan); }
+
+  /* --- 패턴 슬롯 (signature element) --- */
+  .pattern-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .rune-slot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .rune-slot .idx {
+    width: 20px;
+    text-align: center;
+    color: var(--mist-dim);
+  }
+  .rune-slot .body { flex: 1; color: var(--mist); }
+  .rune-slot .body b { color: #f2efe8; font-weight: 600; }
+  .rune-slot.active {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 12px -4px var(--gold);
+  }
+  .rune-slot.active .idx { color: var(--gold); }
+  .rune-slot.locked { opacity: 0.45; }
+  .rune-slot.locked .lock { color: var(--mist-dim); }
+  @media (prefers-reduced-motion: no-preference) {
+    .rune-slot.active { animation: rune-pulse 2.6s ease-in-out infinite; }
+  }
+  @keyframes rune-pulse {
+    0%, 100% { box-shadow: 0 0 12px -4px var(--gold); }
+    50% { box-shadow: 0 0 18px -2px var(--gold); }
+  }
+
+  /* --- 전투 터미널 --- */
+  .battle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--ember);
+    color: #1a1108;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    margin-bottom: 14px;
+    width: 100%;
+  }
+  .battle-btn:hover { filter: brightness(1.08); }
+  .battle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #log {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    background: #0e0d14;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    height: 480px;
+    overflow-y: auto;
+  }
+  #log .line { opacity: 0; animation: line-in 0.18s ease forwards; }
+  @media (prefers-reduced-motion: reduce) {
+    #log .line { opacity: 1; animation: none; }
+  }
+  @keyframes line-in { to { opacity: 1; } }
+  #log .win { color: var(--gold); }
+  #log .crit { color: var(--ember); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+<header>
+  <div class="eyebrow">Battle Sim Core · Browser Demo</div>
+  <h1>전투 시뮬레이션 정보창</h1>
+</header>
+
+<main>
+  <section>
+    <h2 class="section-title">로스터</h2>
+    <div id="roster"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">캐릭터 정보창</h2>
+    <div id="statSheet"></div>
+  </section>
+
+  <section>
+    <h2 class="section-title">전투 터미널</h2>
+    <button class="battle-btn" id="battleBtn">아군 파티로 전투 시작</button>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script>
+/* ============================================================================
+   아래는 project/src/*.js 의 로직을 브라우저(단일 파일, 모듈 없이)에서
+   그대로 재현한 것입니다. 구조와 계산식은 Node 버전과 동일합니다.
+============================================================================ */
+
+// --- 레지스트리 ---
+const ConditionRegistry = {
+  conditions: new Map(),
+  register(key, fn) { this.conditions.set(key, fn); },
+  check(key, actor, ctx, value) {
+    const fn = this.conditions.get(key);
+    return fn ? fn(actor, ctx, value) : false;
+  }
+};
+ConditionRegistry.register("ALWAYS", () => true);
+ConditionRegistry.register("MY_HP_LESS_THAN_PCT", (actor, ctx, value) => (actor.currentHp / actor.maxHp) * 100 <= value);
+ConditionRegistry.register("FACTION_RESOURCE_GREATER_THAN", (actor, ctx, value) => ctx.resourceManager.getResource(actor.side, "MAGIC_CIRCLE") >= value);
+
+const ActionRegistry = {
+  actions: new Map(),
+  register(key, fn) { this.actions.set(key, fn); },
+  execute(key, actor, ctx) {
+    const fn = this.actions.get(key);
+    return fn ? fn(actor, ctx) : 0;
+  }
+};
+ActionRegistry.register("ATTACK", (actor, ctx) => {
+  const target = ctx.getOpponents(actor).find(e => e.isAlive);
+  if (!target) return 0;
+  const damage = Math.floor(actor.effectiveStr * 2);
+  const isCrit = Math.random() * 100 <= actor.critRate;
+  const finalDamage = isCrit ? Math.floor(damage * 1.5) : damage;
+  target.currentHp = Math.max(0, target.currentHp - finalDamage);
+  ctx.log(`⚔️ [공격] ${actor.name} → ${target.name} (${finalDamage} 데미지${isCrit ? " 💥치명타!" : ""}) [남은 HP: ${target.currentHp}/${target.maxHp}]`, isCrit ? "crit" : "");
+  return 0;
+});
+ActionRegistry.register("USE_POTION", (actor, ctx) => {
+  const heal = 100;
+  actor.currentHp = Math.min(actor.maxHp, actor.currentHp + heal);
+  ctx.log(`🧪 [아이템] ${actor.name}이(가) 포션을 사용! HP +${heal} (현재 ${actor.currentHp}/${actor.maxHp})`);
+  return 0;
+});
+ActionRegistry.register("CREATE_MAGIC_CIRCLE", (actor, ctx) => {
+  ctx.log(`🪄 [스킬] ${actor.name}이(가) 마법진 생성 주문을 외웁니다.`);
+  ctx.resourceManager.addResource(actor.side, "MAGIC_CIRCLE", 2, (l) => ctx.log(l));
+  return 0;
+});
+ActionRegistry.register("DETONATE_MAGIC_CIRCLE", (actor, ctx) => {
+  const ok = ctx.resourceManager.consumeResource(actor.side, "MAGIC_CIRCLE", 3, (l) => ctx.log(l));
+  if (ok) {
+    ctx.log(`💥 [연계 필살기] ${actor.name}이(가) 마법진 3개를 소모하여 대폭발을 일으킵니다!`);
+    ctx.getOpponents(actor).filter(e => e.isAlive).forEach(e => {
+      const dmg = Math.floor(actor.effectiveInt * 3.5);
+      e.currentHp = Math.max(0, e.currentHp - dmg);
+      ctx.log(`   💣 ${e.name}에게 ${dmg}의 피해! (남은 HP: ${e.currentHp}/${e.maxHp})`);
+    });
+  }
+  return 0;
+});
+
+class FactionResourceManager {
+  constructor() { this.resources = { ally: new Map(), enemy: new Map() }; }
+  registerResource(f, k, initial = 0, max = 99) { this.resources[f].set(k, { current: initial, max }); }
+  addResource(f, k, amount, log = () => {}) {
+    const r = this.resources[f]?.get(k); if (!r) return 0;
+    const prev = r.current; r.current = Math.min(r.max, r.current + amount);
+    log(`   ✨ [진영 자원] ${f.toUpperCase()}: "${k}" +${r.current - prev} (${r.current}/${r.max})`);
+    return r.current - prev;
+  }
+  consumeResource(f, k, amount, log = () => {}) {
+    const r = this.resources[f]?.get(k); if (!r || r.current < amount) return false;
+    r.current -= amount;
+    log(`   🔥 [진영 자원] ${f.toUpperCase()}: "${k}" -${amount} (${r.current}/${r.max})`);
+    return true;
+  }
+  getResource(f, k) { return this.resources[f]?.get(k)?.current || 0; }
+}
+
+class BattleCharacter {
+  constructor(name, side, realStats = {}) {
+    this.name = name; this.side = side;
+    this.job = { name: "용병", baseHp: 200, baseSp: 50, baseSpeed: 50 };
+    this.realStr = realStats.str ?? 10;
+    this.realInt = realStats.int ?? 10;
+    this.realDex = realStats.dex ?? 10;
+    this.realSpd = realStats.spd ?? 10;
+    this.realLuk = realStats.luk ?? 10;
+    this.bonusStr = 0; this.bonusInt = 0; this.bonusDex = 0; this.bonusSpd = 0; this.bonusLuk = 0;
+    this.actionGauge = 0;
+    this.patternSlots = [];
+    this.currentHp = this.maxHp;
+    this.currentSp = this.maxSp;
+  }
+  get isAlive() { return this.currentHp > 0; }
+  calcEff(real, bonus) { return Math.max(real * 0.5, Math.min(real * 20, real + bonus)); }
+  get effectiveStr() { return this.calcEff(this.realStr, this.bonusStr); }
+  get effectiveInt() { return this.calcEff(this.realInt, this.bonusInt); }
+  get effectiveDex() { return this.calcEff(this.realDex, this.bonusDex); }
+  get effectiveSpd() { return this.calcEff(this.realSpd, this.bonusSpd); }
+  get effectiveLuk() { return this.calcEff(this.realLuk, this.bonusLuk); }
+  get rawSpeed() { return this.job.baseSpeed + this.effectiveSpd * 2; }
+  get effectiveSpeed() { return 10 * Math.sqrt(this.rawSpeed); }
+  get critRate() { return Math.min(100, this.effectiveLuk * 0.5); }
+  get maxHp() { return this.job.baseHp + Math.floor(this.realStr * 20); }
+  get maxSp() { return (this.job.baseSp || 50) + Math.floor(this.realInt * 10); }
+  get maxPatternSlots() { return 1 + Math.floor(this.realInt / 10); }
+  get weightCapacity() { return 10 + Math.floor(this.realDex / 5); }
+}
+
+const CharacterImporter = {
+  importCharacter(data) {
+    const c = new BattleCharacter(data.name, data.side, data.stats || {});
+    if (data.job) Object.assign(c.job, data.job);
+    if (data.bonusStats) {
+      c.bonusStr = data.bonusStats.str || 0;
+      c.bonusInt = data.bonusStats.int || 0;
+      c.bonusDex = data.bonusStats.dex || 0;
+      c.bonusSpd = data.bonusStats.spd || 0;
+      c.bonusLuk = data.bonusStats.luk || 0;
+    }
+    c.currentHp = c.maxHp; c.currentSp = c.maxSp;
+    c.patternSlots = this.importPatterns(data.patterns, data.name, c.maxPatternSlots);
+    return c;
+  },
+  importPatterns(patterns, owner, maxSlots = Infinity) {
+    if (!Array.isArray(patterns)) return [];
+    const validated = [];
+    for (let idx = 0; idx < patterns.length; idx++) {
+      if (validated.length >= maxSlots) break;
+      const p = patterns[idx];
+      if (!p || !ConditionRegistry.conditions.has(p.cond) || !ActionRegistry.actions.has(p.act)) continue;
+      validated.push({ cond: p.cond, val: p.val ?? 0, act: p.act });
+    }
+    return validated;
+  }
+};
+
+class BattleEngine {
+  static TURN_TICK_LIMIT = 1000;
+  static GAUGE_THRESHOLD = 100000;
+  constructor(allies, enemies, logger) {
+    this.units = [...allies, ...enemies];
+    this.allies = allies; this.enemies = enemies; this.logger = logger;
+    this.units.forEach(u => { u.currentHp = u.maxHp; u.currentSp = u.maxSp; u.actionGauge = 0; });
+    this.resourceManager = new FactionResourceManager();
+    this.resourceManager.registerResource("ally", "MAGIC_CIRCLE", 0, 10);
+    this.resourceManager.registerResource("enemy", "MAGIC_CIRCLE", 0, 10);
+  }
+  log(line, cls) { this.logger(line, cls); }
+  getOpponents(actor) { return actor.side === "ally" ? this.enemies : this.allies; }
+  checkBattleStatus() { return this.allies.some(u => u.isAlive) && this.enemies.some(u => u.isAlive); }
+  startBattle(maxTurns = 2) {
+    this.log(`⚔️ 전투 시작`);
+    let totalTick = 0;
+    for (let turn = 1; turn <= maxTurns; turn++) {
+      if (!this.checkBattleStatus()) break;
+      this.log(`── TURN ${turn} 시작 ──`);
+      let tick = 0;
+      while (tick <= BattleEngine.TURN_TICK_LIMIT && this.checkBattleStatus()) {
+        const alive = this.units.filter(u => u.isAlive);
+        let minTicks = Infinity, next = null;
+        alive.forEach(u => {
+          const remain = Math.max(0, BattleEngine.GAUGE_THRESHOLD - u.actionGauge);
+          const needed = remain / u.effectiveSpeed;
+          if (needed < minTicks) { minTicks = needed; next = u; }
+        });
+        if (tick + minTicks > 1000) {
+          const rem = 1000 - tick;
+          alive.forEach(u => { u.actionGauge += u.effectiveSpeed * rem; });
+          tick = 1000; totalTick += rem;
+          this.log(`⌛ 턴 종료, 게이지 이월`);
+          break;
+        }
+        tick += minTicks; totalTick += minTicks;
+        alive.forEach(u => { u.actionGauge += u.effectiveSpeed * minTicks; });
+        this.log(`⏱️ [Turn ${turn} · ${Math.round(tick)}/1000] ${next.name}(${next.side}) 행동`);
+        this.executeAction(next);
+      }
+    }
+    const winner = this.allies.some(u => u.isAlive) ? "아군(ALLY)" : "적군(ENEMY)";
+    this.log(`🏆 전투 종료 · 승리 진영: ${winner}`, "win");
+  }
+  executeAction(actor) {
+    const slots = actor.patternSlots.slice(0, actor.maxPatternSlots);
+    let executed = false;
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      if (ConditionRegistry.check(slot.cond, actor, this, slot.val)) {
+        this.log(`   👉 패턴 [${i + 1}/${actor.maxPatternSlots}] 발동 ("${slot.cond}")`);
+        ActionRegistry.execute(slot.act, actor, this);
+        executed = true;
+        break;
+      }
+    }
+    if (!executed) this.log(`   ⚠️ 조건 미충족 (PASS)`);
+    actor.actionGauge -= BattleEngine.GAUGE_THRESHOLD;
+  }
+}
+
+// --- Mock DB (Node 버전 mockDb.js 와 동일한 시드) ---
+const DB = {
+  characters: [
+    { character_id: 1, name: "전략가 메를린", side: "ally", real_str: 10, real_int: 30, real_dex: 10, real_spd: 25, real_luk: 10 },
+    { character_id: 2, name: "고속 연금술사", side: "ally", real_str: 15, real_int: 20, real_dex: 15, real_spd: 60, real_luk: 15 },
+    { character_id: 3, name: "강철 오크 보스", side: "enemy", real_str: 100, real_int: 10, real_dex: 10, real_spd: 25, real_luk: 5 }
+  ],
+  items: [
+    { item_id: 100, name: "현자의 지팡이", int_bonus: 15 },
+    { item_id: 101, name: "연금술사의 장갑", dex_bonus: 5, spd_bonus: 10 }
+  ],
+  equipment: [
+    { character_id: 1, item_id: 100 },
+    { character_id: 2, item_id: 101 }
+  ],
+  patternRows: {
+    1: [
+      { cond: "MY_HP_LESS_THAN_PCT", val: 30, act: "USE_POTION" },
+      { cond: "FACTION_RESOURCE_GREATER_THAN", val: 3, act: "DETONATE_MAGIC_CIRCLE" },
+      { cond: "ALWAYS", val: 0, act: "CREATE_MAGIC_CIRCLE" },
+      { cond: "ALWAYS", val: 0, act: "ATTACK" }
+    ],
+    2: [
+      { cond: "FACTION_RESOURCE_GREATER_THAN", val: 3, act: "DETONATE_MAGIC_CIRCLE" },
+      { cond: "MY_HP_LESS_THAN_PCT", val: 30, act: "USE_POTION" },
+      { cond: "ALWAYS", val: 0, act: "ATTACK" }
+    ],
+    3: [
+      { cond: "ALWAYS", val: 0, act: "ATTACK" },
+      { cond: "MY_HP_LESS_THAN_PCT", val: 50, act: "USE_POTION" },
+      { cond: "ALWAYS", val: 0, act: "CREATE_MAGIC_CIRCLE" } // maxPatternSlots(2) 초과 -> 잠김
+    ]
+  }
+};
+
+function buildImportData(characterId) {
+  const row = DB.characters.find(c => c.character_id === characterId);
+  const bonusStats = DB.equipment
+    .filter(e => e.character_id === characterId)
+    .reduce((acc, e) => {
+      const item = DB.items.find(i => i.item_id === e.item_id);
+      if (!item) return acc;
+      acc.str += item.str_bonus || 0; acc.int += item.int_bonus || 0;
+      acc.dex += item.dex_bonus || 0; acc.spd += item.spd_bonus || 0; acc.luk += item.luk_bonus || 0;
+      return acc;
+    }, { str: 0, int: 0, dex: 0, spd: 0, luk: 0 });
+  return {
+    name: row.name, side: row.side,
+    stats: { str: row.real_str, int: row.real_int, dex: row.real_dex, spd: row.real_spd, luk: row.real_luk },
+    bonusStats,
+    patterns: DB.patternRows[characterId] || []
+  };
+}
+
+const CONDITION_LABEL = {
+  ALWAYS: "항상",
+  MY_HP_LESS_THAN_PCT: "HP ≤",
+  FACTION_RESOURCE_GREATER_THAN: "마법진 ≥"
+};
+const ACTION_LABEL = {
+  ATTACK: "공격", USE_POTION: "포션 사용",
+  CREATE_MAGIC_CIRCLE: "마법진 생성", DETONATE_MAGIC_CIRCLE: "마법진 폭발"
+};
+
+// ============================================================================
+// UI 렌더링
+// ============================================================================
+const rosterEl = document.getElementById("roster");
+const statSheetEl = document.getElementById("statSheet");
+const logEl = document.getElementById("log");
+const battleBtn = document.getElementById("battleBtn");
+
+let selectedId = 1;
+
+function renderRoster() {
+  rosterEl.innerHTML = "";
+  DB.characters.forEach(row => {
+    const btn = document.createElement("button");
+    btn.className = "roster-item" + (row.character_id === selectedId ? " active" : "");
+    btn.innerHTML = `<span class="r-name">${row.name}</span><span class="r-side ${row.side}">${row.side.toUpperCase()}</span>`;
+    btn.onclick = () => { selectedId = row.character_id; renderRoster(); renderStatSheet(); };
+    rosterEl.appendChild(btn);
+  });
+}
+
+function renderStatSheet() {
+  const importData = buildImportData(selectedId);
+  const rawPatterns = importData.patterns;
+  const c = CharacterImporter.importCharacter(importData); // 실제 전투에 쓰일 형태 (초과분 절삭됨)
+
+  statSheetEl.innerHTML = `
+    <div class="char-title">${c.name}</div>
+    <div class="char-sub">${c.side === "ally" ? "아군" : "적군"} · ${c.job.name}</div>
+
+    <div class="resource-bar-row">
+      <div class="rb-label"><span>HP</span><span>${c.currentHp} / ${c.maxHp}</span></div>
+      <div class="resource-bar hp"><i style="width:${(c.currentHp / c.maxHp) * 100}%"></i></div>
+    </div>
+    <div class="resource-bar-row">
+      <div class="rb-label"><span>SP</span><span>${c.currentSp} / ${c.maxSp}</span></div>
+      <div class="resource-bar sp"><i style="width:${(c.currentSp / c.maxSp) * 100}%"></i></div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="label">STR 힘</div><div class="value">${c.realStr}</div><div class="derived">Max HP +${c.realStr * 20}</div></div>
+      <div class="stat-cell"><div class="label">INT 지능</div><div class="value">${c.realInt}</div><div class="derived">패턴 슬롯 ${c.maxPatternSlots}개</div></div>
+      <div class="stat-cell"><div class="label">DEX 민첩</div><div class="value">${c.realDex}</div><div class="derived">무게 제한 ${c.weightCapacity}</div></div>
+      <div class="stat-cell"><div class="label">SPD 속도</div><div class="value">${c.realSpd}</div><div class="derived">행동속도 ${c.effectiveSpeed.toFixed(1)}</div></div>
+      <div class="stat-cell"><div class="label">LUK 행운</div><div class="value">${c.realLuk}</div><div class="derived">치명타율 ${c.critRate}%</div></div>
+    </div>
+
+    <h2 class="section-title">패턴 슬롯 (${Math.min(rawPatterns.length, c.maxPatternSlots)}/${c.maxPatternSlots} 활성 · 저장 ${rawPatterns.length}줄)</h2>
+    <div class="pattern-list">
+      ${rawPatterns.map((p, i) => {
+        const active = i < c.maxPatternSlots;
+        return `<div class="rune-slot ${active ? "active" : "locked"}">
+          <span class="idx">${i + 1}</span>
+          <span class="body">${CONDITION_LABEL[p.cond] || p.cond}${p.val ? " " + p.val : ""} → <b>${ACTION_LABEL[p.act] || p.act}</b></span>
+          ${active ? "" : '<span class="lock">🔒</span>'}
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function appendLog(line, cls) {
+  const div = document.createElement("div");
+  div.className = "line" + (cls ? " " + cls : "");
+  div.textContent = line;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+battleBtn.addEventListener("click", () => {
+  logEl.innerHTML = "";
+  battleBtn.disabled = true;
+  battleBtn.textContent = "전투 진행 중…";
+
+  const merlin = CharacterImporter.importCharacter(buildImportData(1));
+  const alchemist = CharacterImporter.importCharacter(buildImportData(2));
+  const boss = CharacterImporter.importCharacter(buildImportData(3));
+
+  const engine = new BattleEngine([merlin, alchemist], [boss], appendLog);
+  engine.startBattle(2);
+
+  battleBtn.disabled = false;
+  battleBtn.textContent = "아군 파티로 전투 시작";
+  renderStatSheet(); // 전투 후 HP 변화 반영
+});
+
+renderRoster();
+renderStatSheet();
+</script>
+</body>
+</html>

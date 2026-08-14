@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>직업 테이블 편집 · Job Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item { font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim); text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent; }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:24px 40px 16px; border-bottom:1px solid var(--line); }
+  .back-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none; }
+  .back-link:hover { color:var(--gold); }
+  .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:8px; }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; }
+  h1 { font-family:'Cinzel',serif; font-weight:700; font-size:24px; margin:6px 0 0; color:#f2efe8; }
+  .header-actions { display:flex; gap:10px; }
+  .action-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12px; padding:9px 16px; border-radius:8px; cursor:pointer;
+    background:transparent; border:1px solid var(--line); color:var(--mist-dim);
+  }
+  .action-btn:hover { color:var(--mist); border-color:var(--mist-dim); }
+  .action-btn.primary { background:var(--ember); border:none; color:#1a1108; font-weight:600; }
+  .action-btn.primary:hover { opacity:0.9; }
+
+  main { flex:1; padding:24px 40px 60px; max-width:900px; margin:0 auto; width:100%; }
+  h2.part-title { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; margin:26px 0 12px; }
+  h2.part-title:first-child { margin-top:0; }
+  .part-hint { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); margin:-8px 0 14px; }
+
+  .job-block { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .job-block-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .job-name-input { font-family:'Cinzel',serif; font-size:14px; background:transparent; border:none; border-bottom:1px solid var(--line); color:#f2efe8; padding:3px 0; width:160px; }
+  .job-name-input:focus { outline:none; border-color:var(--gold); }
+  .remove-btn { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px solid var(--line); color:var(--mist-dim); padding:5px 9px; border-radius:5px; cursor:pointer; }
+  .remove-btn:hover { color:var(--danger); border-color:var(--danger-dim); }
+
+  .adv-row { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:var(--panel-raised); }
+  .adv-row-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .adv-row-head input.to-job { font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--panel); border:1px solid var(--line); border-radius:6px; color:var(--mist); padding:5px 8px; flex:1; }
+  .adv-row-head input.portrait { width:48px; font-family:'JetBrains Mono',monospace; font-size:14px; text-align:center; background:var(--panel); border:1px solid var(--line); border-radius:6px; color:var(--mist); padding:5px; }
+  .req-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+  .req-row select, .req-row input { font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--panel); border:1px solid var(--line); border-radius:5px; color:var(--mist); padding:4px 6px; }
+  .req-row select { width:90px; }
+  .req-row input { flex:1; }
+  .add-req-btn { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px dashed var(--line); color:var(--mist-dim); padding:4px 10px; border-radius:5px; cursor:pointer; }
+  .add-req-btn:hover { color:var(--gold); }
+
+  .add-adv-btn, .add-job-btn {
+    font-family:'JetBrains Mono',monospace; font-size:11px; background:transparent; border:1px dashed var(--line);
+    color:var(--mist-dim); padding:7px 12px; border-radius:6px; cursor:pointer; width:100%;
+  }
+  .add-adv-btn:hover, .add-job-btn:hover { color:var(--gold); border-color:var(--gold-dim); }
+
+  .types-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .types-row input.job-name-input2 { width:120px; font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--panel-raised); border:1px solid var(--line); border-radius:6px; color:#f2efe8; padding:6px 9px; }
+  .types-row input.types-list { flex:1; font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-raised); border:1px solid var(--line); border-radius:6px; color:var(--mist); padding:6px 9px; }
+
+  .save-bar { position:sticky; bottom:0; background:var(--ink); padding:14px 0; text-align:center; }
+  .save-flag { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); margin-top:6px; }
+  .save-flag.dirty { color:var(--gold); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <a class="back-link" href="dev-tools.html">← 개발자 도구로</a>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Job Table</div>
+      <h1>직업 테이블</h1>
+    </div>
+    <div class="header-actions">
+      <button class="action-btn" id="uploadBtn">⬆ 업로드</button>
+      <input type="file" id="uploadInput" accept="application/json" style="display:none;" />
+      <button class="action-btn" id="downloadBtn">⬇ 다운로드</button>
+      <button class="action-btn primary" id="saveBtn">저장</button>
+    </div>
+  </div>
+</header>
+
+<main id="mainArea"></main>
+
+<script>
+  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
+  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
+    document.body.innerHTML = `
+      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+      </div>
+    `;
+    throw new Error("access-denied");
+  }
+
+  // ============================================================================
+  // 직업 테이블 — { advancement:{ "사제":[{toJob,portrait,requirements[]}] },
+  // allowedEquipmentTypes:{ "사제":["staff",...] } } 형태로 localStorage에 저장.
+  // character-sheet.html이 여기서 읽어옴(예전엔 하드코딩돼있었음).
+  // ============================================================================
+  function getJobTable() {
+    try { return JSON.parse(localStorage.getItem("battleSim_jobTable")) || { advancement:{}, allowedEquipmentTypes:{} }; }
+    catch { return { advancement:{}, allowedEquipmentTypes:{} }; }
+  }
+  function saveJobTable(t) {
+    localStorage.setItem("battleSim_jobTable", JSON.stringify(t));
+  }
+  function downloadJSON(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // 최초 1회만 예전에 character-sheet.html에 하드코딩돼있던 값으로 시딩.
+  const LEGACY_JOB_SEED = {
+    "advancement": {
+      "사제": [
+        {
+          "toJob": "비숍",
+          "portrait": "🕊️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        },
+        {
+          "toJob": "드루이드",
+          "portrait": "🌿",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        },
+        {
+          "toJob": "광신도",
+          "portrait": "🕯️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            },
+            {
+              "type": "item",
+              "value": "부정한 성배"
+            }
+          ]
+        }
+      ],
+      "비숍": [
+        {
+          "toJob": "카디널",
+          "portrait": "🎖️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ],
+      "드루이드": [
+        {
+          "toJob": "하이드루이드",
+          "portrait": "🐺",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ],
+      "전사": [
+        {
+          "toJob": "가드",
+          "portrait": "🛡️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        },
+        {
+          "toJob": "위치헌터",
+          "portrait": "🔮",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        }
+      ],
+      "가드": [
+        {
+          "toJob": "로열가드",
+          "portrait": "⚔️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ],
+      "위치헌터": [
+        {
+          "toJob": "인퀴지터",
+          "portrait": "✝️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        },
+        {
+          "toJob": "데몬헌터",
+          "portrait": "🗡️",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ],
+      "마법사": [
+        {
+          "toJob": "워록",
+          "portrait": "🔮",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        }
+      ],
+      "워록": [
+        {
+          "toJob": "둠로드",
+          "portrait": "💀",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        },
+        {
+          "toJob": "아크메이지",
+          "portrait": "✨",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ],
+      "헌터": [
+        {
+          "toJob": "스나이퍼",
+          "portrait": "🎯",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 15
+            }
+          ]
+        }
+      ],
+      "스나이퍼": [
+        {
+          "toJob": "화이트아크",
+          "portrait": "🏹",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        },
+        {
+          "toJob": "아케인아처",
+          "portrait": "🔯",
+          "requirements": [
+            {
+              "type": "level",
+              "value": 30
+            }
+          ]
+        }
+      ]
+    },
+    "allowedEquipmentTypes": {
+      "전사": [
+        "sword",
+        "greatsword",
+        "axe",
+        "hatchet",
+        "pike",
+        "mace",
+        "shield",
+        "armguard",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "helm",
+        "item",
+        "accessory"
+      ],
+      "가드": [
+        "sword",
+        "greatsword",
+        "axe",
+        "hatchet",
+        "pike",
+        "mace",
+        "subsword",
+        "subhatchet",
+        "subpike",
+        "submace",
+        "shield",
+        "armguard",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "helm",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "로열가드": [
+        "sword",
+        "greatsword",
+        "axe",
+        "hatchet",
+        "pike",
+        "mace",
+        "subsword",
+        "subhatchet",
+        "subpike",
+        "submace",
+        "shield",
+        "armguard",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "helm",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "위치헌터": [
+        "sword",
+        "pike",
+        "dagger",
+        "shield",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "인퀴지터": [
+        "sword",
+        "greatsword",
+        "pike",
+        "dagger",
+        "shield",
+        "maingauche",
+        "rune",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "데몬헌터": [
+        "axe",
+        "hatchet",
+        "tome",
+        "maingauche",
+        "armguard",
+        "armor",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "마법사": [
+        "wand",
+        "staff",
+        "tome",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory"
+      ],
+      "워록": [
+        "wand",
+        "staff",
+        "tome",
+        "rune",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "helm",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "둠로드": [
+        "wand",
+        "staff",
+        "sword",
+        "tome",
+        "rune",
+        "cloth",
+        "cap",
+        "helm",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "아크메이지": [
+        "wand",
+        "staff",
+        "tome",
+        "dagger",
+        "maingauche",
+        "rune",
+        "cloth",
+        "cap",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "사제": [
+        "wand",
+        "mace",
+        "staff",
+        "tome",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory"
+      ],
+      "비숍": [
+        "wand",
+        "mace",
+        "staff",
+        "tome",
+        "rune",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "카디널": [
+        "wand",
+        "mace",
+        "staff",
+        "tome",
+        "rune",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "드루이드": [
+        "wand",
+        "mace",
+        "staff",
+        "tome",
+        "rune",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "하이드루이드": [
+        "wand",
+        "mace",
+        "submace",
+        "staff",
+        "tome",
+        "rune",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "cap",
+        "item",
+        "accessory",
+        "jItem"
+      ],
+      "헌터": [
+        "bow",
+        "arrowcase",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "cap"
+      ],
+      "스나이퍼": [
+        "bow",
+        "arrowcase",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "cap",
+        "jItem"
+      ],
+      "화이트아크": [
+        "bow",
+        "arrowcase",
+        "cloth",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "cap",
+        "jItem"
+      ],
+      "아케인아처": [
+        "bow",
+        "arrowcase",
+        "robe",
+        "cloak",
+        "shoes",
+        "item",
+        "accessory",
+        "cap",
+        "jItem"
+      ]
+    }
+  };
+  // 시드 버전 방식 — 예전엔 "한 번 심었으면 다시 안 심음"(플래그가 "1"인지만
+  // 확인)이라, 시드 내용을 갱신해도 이미 플레이한 사람에게는 영원히 반영되지
+  // 않았음(직업 트리를 10개 라인으로 늘려도 화면엔 사제 3라인만 보이던 문제).
+  // 이제 SEED_VERSION이 저장된 값과 다르면 무조건 다시 심음. 시드를 고칠
+  // 때마다 아래 버전 문자열만 올리면 전원에게 반영됨.
+  const JOB_SEED_VERSION = "2026-08-09a";
+  if (localStorage.getItem("battleSim_jobSeedVersion") !== JOB_SEED_VERSION) {
+    // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — 편집기에서 직접 손본
+    // 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함. 필요하면
+    // localStorage의 "battleSim_jobSeedVersionBackup"에서 되살릴 수 있음.
+    try { localStorage.setItem("battleSim_jobSeedVersionBackup", JSON.stringify(getJobTable())); } catch {}
+    saveJobTable(LEGACY_JOB_SEED);
+    localStorage.setItem("battleSim_jobSeedVersion", JOB_SEED_VERSION);
+  }
+
+  let jobData = getJobTable();
+  let isDirty = false;
+  function markDirty() { isDirty = true; renderSaveFlag(); }
+  function renderSaveFlag() {
+    const el = document.getElementById("saveFlag");
+    if (el) { el.textContent = isDirty ? "저장 안 된 변경사항 있음" : "저장됨"; el.className = "save-flag" + (isDirty ? " dirty" : ""); }
+  }
+
+  function advRowHTML(baseJob, adv, idx) {
+    return `
+      <div class="adv-row" data-base="${baseJob}" data-idx="${idx}">
+        <div class="adv-row-head">
+          <input type="text" class="portrait" value="${adv.portrait || ""}" placeholder="🎖️" />
+          <input type="text" class="to-job" value="${adv.toJob || ""}" placeholder="전직할 직업명" />
+          <button class="remove-btn remove-adv">✕</button>
+        </div>
+        <div class="reqs">
+          ${(adv.requirements || []).map((r, ri) => `
+            <div class="req-row" data-ri="${ri}">
+              <select class="req-type">
+                <option value="level" ${r.type==="level"?"selected":""}>level</option>
+                <option value="item" ${r.type==="item"?"selected":""}>item</option>
+              </select>
+              <input type="text" class="req-value" value="${r.value ?? ""}" placeholder="값" />
+              <button class="remove-btn remove-req">✕</button>
+            </div>
+          `).join("")}
+        </div>
+        <button class="add-req-btn add-req">+ 조건 추가</button>
+      </div>
+    `;
+  }
+
+  function render() {
+    const el = document.getElementById("mainArea");
+    let html = `<h2 class="part-title">승급 트리</h2><div class="part-hint">기반 직업 → 전직 가능한 직업들(레벨/아이템 조건)</div>`;
+    Object.keys(jobData.advancement).forEach((baseJob) => {
+      html += `
+        <div class="job-block" data-base-job="${baseJob}">
+          <div class="job-block-head">
+            <input type="text" class="job-name-input base-job-input" value="${baseJob}" data-job="${baseJob}" />
+            <button class="remove-btn remove-base-job" data-job="${baseJob}">✕ 기반 직업 삭제</button>
+          </div>
+          ${jobData.advancement[baseJob].map((adv, i) => advRowHTML(baseJob, adv, i)).join("")}
+          <button class="add-adv-btn add-adv" data-base="${baseJob}">+ 전직 경로 추가</button>
+        </div>
+      `;
+    });
+    html += `<button class="add-job-btn" id="addBaseJobBtn">+ 새 기반 직업 추가</button>`;
+
+    html += `<h2 class="part-title">직업별 착용 가능 equipmentType</h2><div class="part-hint">콤마로 구분해서 입력. 비워두면 그 직업은 제한 없음(전 타입 착용 가능)</div>`;
+    const allJobs = [...new Set([...Object.keys(jobData.advancement), ...Object.keys(jobData.allowedEquipmentTypes)])];
+    html += `<div id="typesList">`;
+    allJobs.forEach((job) => {
+      html += `
+        <div class="types-row" data-job="${job}">
+          <input type="text" class="job-name-input2 types-job-name" value="${job}" />
+          <input type="text" class="types-list" value="${(jobData.allowedEquipmentTypes[job] || []).join(", ")}" placeholder="예: sword, greatsword, shield" />
+          <button class="remove-btn remove-types-row">✕</button>
+        </div>
+      `;
+    });
+    html += `</div><button class="add-job-btn" id="addTypesJobBtn">+ 직업별 착용 가능 타입 추가</button>`;
+
+    el.innerHTML = html;
+    bindEvents(el);
+  }
+
+  function bindEvents(el) {
+    // 승급 트리
+    el.querySelectorAll(".base-job-input").forEach(inp => inp.addEventListener("change", e => {
+      const oldJob = e.target.dataset.job;
+      const newJob = e.target.value.trim();
+      if (!newJob || newJob === oldJob) { e.target.value = oldJob; return; }
+      if (jobData.advancement[newJob]) { alert("이미 있는 직업명입니다."); e.target.value = oldJob; return; }
+      jobData.advancement[newJob] = jobData.advancement[oldJob];
+      delete jobData.advancement[oldJob];
+      markDirty(); render();
+    }));
+    el.querySelectorAll(".remove-base-job").forEach(btn => btn.addEventListener("click", () => {
+      if (!confirm(`"${btn.dataset.job}" 기반 직업과 그 전직 경로를 전부 삭제할까요?`)) return;
+      delete jobData.advancement[btn.dataset.job];
+      markDirty(); render();
+    }));
+    el.querySelectorAll(".add-adv").forEach(btn => btn.addEventListener("click", () => {
+      jobData.advancement[btn.dataset.base].push({ toJob:"새 직업", portrait:"❓", requirements:[{type:"level", value:1}] });
+      markDirty(); render();
+    }));
+    const addBaseJobBtn = el.querySelector("#addBaseJobBtn");
+    if (addBaseJobBtn) addBaseJobBtn.addEventListener("click", () => {
+      let n = 1;
+      while (jobData.advancement[`새 기반직업${n}`]) n++;
+      jobData.advancement[`새 기반직업${n}`] = [];
+      markDirty(); render();
+    });
+
+    el.querySelectorAll(".adv-row").forEach(row => {
+      const baseJob = row.dataset.base;
+      const idx = Number(row.dataset.idx);
+      const adv = jobData.advancement[baseJob][idx];
+      row.querySelector(".portrait").addEventListener("input", e => { adv.portrait = e.target.value; markDirty(); });
+      row.querySelector(".to-job").addEventListener("input", e => { adv.toJob = e.target.value; markDirty(); });
+      row.querySelector(".remove-adv").addEventListener("click", () => {
+        jobData.advancement[baseJob].splice(idx, 1); markDirty(); render();
+      });
+      row.querySelectorAll(".req-row").forEach(reqRow => {
+        const ri = Number(reqRow.dataset.ri);
+        const req = adv.requirements[ri];
+        reqRow.querySelector(".req-type").addEventListener("change", e => { req.type = e.target.value; markDirty(); });
+        reqRow.querySelector(".req-value").addEventListener("input", e => {
+          req.value = req.type === "level" ? Number(e.target.value) || 0 : e.target.value;
+          markDirty();
+        });
+        reqRow.querySelector(".remove-req").addEventListener("click", () => {
+          adv.requirements.splice(ri, 1); markDirty(); render();
+        });
+      });
+      row.querySelector(".add-req").addEventListener("click", () => {
+        adv.requirements = adv.requirements || [];
+        adv.requirements.push({ type:"level", value:1 });
+        markDirty(); render();
+      });
+    });
+
+    // 착용 가능 타입
+    el.querySelectorAll(".types-row").forEach(row => {
+      const originalJob = row.dataset.job;
+      const nameInput = row.querySelector(".types-job-name");
+      const listInput = row.querySelector(".types-list");
+      nameInput.addEventListener("change", e => {
+        const newJob = e.target.value.trim();
+        if (!newJob) { e.target.value = originalJob; return; }
+        const list = jobData.allowedEquipmentTypes[originalJob] || [];
+        delete jobData.allowedEquipmentTypes[originalJob];
+        jobData.allowedEquipmentTypes[newJob] = list;
+        markDirty(); render();
+      });
+      listInput.addEventListener("input", e => {
+        const types = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+        jobData.allowedEquipmentTypes[originalJob] = types;
+        markDirty();
+      });
+      row.querySelector(".remove-types-row").addEventListener("click", () => {
+        delete jobData.allowedEquipmentTypes[originalJob];
+        markDirty(); render();
+      });
+    });
+    const addTypesJobBtn = el.querySelector("#addTypesJobBtn");
+    if (addTypesJobBtn) addTypesJobBtn.addEventListener("click", () => {
+      let n = 1;
+      while (jobData.allowedEquipmentTypes[`새 직업${n}`]) n++;
+      jobData.allowedEquipmentTypes[`새 직업${n}`] = [];
+      markDirty(); render();
+    });
+  }
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    saveJobTable(jobData);
+    isDirty = false; renderSaveFlag();
+  });
+  document.getElementById("uploadBtn").addEventListener("click", () => {
+    document.getElementById("uploadInput").click();
+  });
+  document.getElementById("uploadInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); }
+      catch { alert("올바른 JSON 파일이 아니에요."); return; }
+      if (!parsed.advancement || !parsed.allowedEquipmentTypes) { alert("직업 테이블 형식이 아니에요(advancement/allowedEquipmentTypes 필드가 있어야 함)."); return; }
+      if (!confirm("지금 이 브라우저에 저장된 직업 테이블을 파일 내용으로 완전히 덮어쓸까요?")) return;
+      saveJobTable(parsed);
+      location.reload();
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", () => {
+    downloadJSON("job-table.json", jobData);
+  });
+
+  render();
+  document.querySelector("main").insertAdjacentHTML("afterend", `<div class="save-bar"><div class="save-flag" id="saveFlag">저장됨</div></div>`);
+</script>
+</body>
+</html>

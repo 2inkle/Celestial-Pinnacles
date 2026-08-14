@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>몬스터 편집 · Monster Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  .global-nav { background:var(--panel); border-bottom:1px solid var(--line); }
+  .global-nav-inner { display:flex; gap:2px; max-width:1200px; margin:0 auto; padding:0 40px; }
+  .gnav-item {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:0.05em; color:var(--mist-dim);
+    text-decoration:none; padding:13px 18px; border-bottom:2px solid transparent;
+  }
+  .gnav-item:hover { color:var(--mist); }
+  .gnav-item.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  header { padding:24px 40px 16px; border-bottom:1px solid var(--line); }
+  .back-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none; }
+  .back-link:hover { color:var(--gold); }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; margin-top:8px; display:block; }
+  .mock-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--mist-dim);
+    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:10px;
+  }
+
+  main { flex:1; padding:24px 40px 60px; max-width:820px; margin:0 auto; width:100%; }
+  .block { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+  .section-title { font-family:'Cinzel',serif; font-size:15px; color:#f2efe8; margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; }
+  .section-title .hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); font-weight:normal; }
+
+  .field-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .field-row label { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); width:110px; flex-shrink:0; }
+  .field-row input[type=text], .field-row input[type=number] {
+    flex:1; font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:7px 10px;
+  }
+  .field-row input:focus { outline:none; border-color:var(--gold); }
+  .field-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; }
+  .field-grid .fg-item label { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); display:block; margin-bottom:4px; }
+  .field-grid .fg-item input { width:100%; font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--panel-raised); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  .field-grid .fg-item input:focus { outline:none; border-color:var(--gold); }
+
+  .drop-row, .summon-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .drop-row input, .summon-row input { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-raised); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  .drop-row input.di-name { flex:1.4; }
+  .drop-row select.di-cat { width:110px; font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--panel-raised); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  .drop-row input.di-chance { width:64px; }
+  .drop-row input.di-qmin, .drop-row input.di-qmax { width:52px; }
+  .drop-row .di-sep { color:var(--mist-dim); font-size:11px; }
+  .summon-row select.si-monster { flex:1; font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--panel-raised); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  .summon-row input.si-weight { width:64px; }
+
+  .mini-btn { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px solid var(--line); color:var(--mist-dim); padding:5px 9px; border-radius:5px; cursor:pointer; }
+  .mini-btn:hover { color:var(--mist); border-color:var(--mist-dim); }
+  .mini-btn.danger:hover { color:var(--danger); border-color:var(--danger-dim); }
+  .add-btn { font-family:'JetBrains Mono',monospace; font-size:11px; background:transparent; border:1px dashed var(--line); color:var(--mist-dim); padding:7px 14px; border-radius:6px; cursor:pointer; width:100%; margin-top:4px; }
+  .add-btn:hover { color:var(--gold); border-color:var(--gold-dim); }
+
+  /* 패턴 빌더 — character-sheet.html과 동일한 마크업/클래스 그대로 재사용 */
+  .pattern-row { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px; background:var(--panel-raised); }
+  .row-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .row-head .idx { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--gold); }
+  .row-actions { display:flex; gap:4px; }
+  .builder-line { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+  .builder-line:last-child { margin-bottom:0; }
+  .cb-tag { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); width:34px; flex-shrink:0; }
+  .builder-line select, .builder-line input[type=number] {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel); color:var(--mist);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+  }
+  .builder-line select:focus, .builder-line input:focus { outline:none; border-color:var(--gold); }
+  .cb-value { width:64px; }
+  .max-uses-line { font-size:12px; color:var(--mist-dim); }
+  .cb-max-uses { width:56px; }
+
+  .save-btn {
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--ember); color:#1a1108; border:none;
+    border-radius:8px; padding:11px 22px; cursor:pointer; font-weight:600; width:100%; margin-top:6px;
+  }
+  .save-btn:hover { opacity:0.9; }
+  .save-flag { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-align:center; margin-top:8px; }
+  .save-flag.dirty { color:var(--gold); }
+
+  .empty-wrap { text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px; }
+  .empty-wrap a { color:var(--gold); }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+  
+
+
+<header>
+  <a class="back-link" href="monster-roster.html">← 몬스터 목록으로</a>
+  <span class="eyebrow">Monster Sheet · 개발자 모드</span>
+  <div class="mock-badge">⚠ 스탯/패턴을 전부 직접 입력·구성 — 레벨업·장비·직업 개념 없음, 캐릭터와 같은 조건/액션 체계 사용</div>
+</header>
+
+<main id="mainArea"></main>
+
+<script>
+  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
+  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
+    document.body.innerHTML = `
+      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+      </div>
+    `;
+    throw new Error("access-denied");
+  }
+
+  function getMonsterRoster() {
+    try { return JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
+    catch { return []; }
+  }
+  function saveMonsterRoster(roster) {
+    localStorage.setItem("battleSim_monsterRoster", JSON.stringify(roster));
+  }
+
+  // ============================================================================
+  // 스킬 목록 — 직업/레벨 개념 없이 등록된 스킬 전부를 후보로 씀(캐릭터의
+  // "습득" 단계가 없음). 이제 character-sheet.html과 완전히 같은 공용 소스
+  // (battleSim_skillTable, dev-tools의 skill-table-editor.html에서 관리)를
+  // 읽어옴 — 예전엔 각자 하드코딩된 사본이 있어서 "마도사"/"마법사"처럼 이름이
+  // 어긋나는 실수가 실제로 있었는데, 이제 소스가 하나뿐이라 그럴 일이 없음.
+  // ============================================================================
+  function getSkillTable() {
+    try { return JSON.parse(localStorage.getItem("battleSim_skillTable")) || { commonSkills:[], jobSkills:{} }; }
+    catch { return { commonSkills:[], jobSkills:{} }; }
+  }
+  const COMMON_SKILLS = getSkillTable().commonSkills;
+  const SKILL_TABLE = getSkillTable().jobSkills;
+  function allSkillsFlat() {
+    return [...COMMON_SKILLS, ...Object.values(SKILL_TABLE).flat()];
+  }
+
+  // ============================================================================
+  // 패턴 조건/액션 — character-sheet.html과 완전히 동일한 체계를 그대로 씀.
+  // "몬스터니까 이렇게도 행동할 수 있다"는 예외를 만들면 유저가 로그만 보고
+  // 패턴을 유추하는 게 의미 없어지므로, 절대 몬스터 전용 조건/액션을 따로
+  // 만들지 않음 — 새 조건/액션이 필요하면 여기가 아니라 character-sheet.html
+  // 쪽에 추가해서 양쪽에 동시 반영해야 함(지금은 수동 동기화).
+  // ============================================================================
+  const CONDITION_TYPES = {
+    always:   { label:"조건 없음(항상)", needsDetail:false },
+    hp:       { label:"HP",           needsDetail:true, unit:"%" },
+    sp:       { label:"SP",           needsDetail:true, unit:"%" },
+    resource: { label:"자원 개수",      needsDetail:true, unit:"개" },
+    notGuarding: { label:"Guard 중이 아닐 때", needsDetail:false },
+  };
+  const COMPARATOR_LABEL = { gte:"이상", gt:"초과", lte:"이하", lt:"미만", eq:"같음" };
+  const SUBJECT_LABEL = { self:"자신", allyAll:"아군 전체", allyOne:"특정 아군", enemyAll:"적 전체", enemyOne:"특정 적", allyFaction:"우리 진영 자원", enemyFaction:"상대 진영 자원" };
+  const ACTION_OPTIONS = ["마법진 생성", "마법진 폭발", "소환"];
+
+  function actionOptionsFor() {
+    return [...new Set([...ACTION_OPTIONS, ...allSkillsFlat().map(s => s.name)])];
+  }
+
+  const params = new URLSearchParams(location.search);
+  const monsterId = params.get("id");
+  const roster = getMonsterRoster();
+  const committedIndex = roster.findIndex(m => m.id === monsterId);
+  const committed = committedIndex === -1 ? null : roster[committedIndex];
+  let data = committed ? JSON.parse(JSON.stringify(committed)) : null;
+  if (data) {
+    data.realStats = data.realStats || { str:0, int:0, dex:0, spd:0, luk:0 };
+    data.combatReal = data.combatReal || { atk:0, def:0, matk:0, mdef:0, summonEff:0 };
+    data.combatBonus = data.combatBonus || { atk:0, def:0, matk:0, mdef:0 };
+    data.dropTable = data.dropTable || [];
+    data.patterns = data.patterns || [];
+    data.summonAbility = data.summonAbility || { candidates: [] };
+    data.expReward = data.expReward ?? 0;
+    data.goldReward = data.goldReward ?? 0;
+  }
+  let isDirty = false;
+  function markDirty() { isDirty = true; renderSaveFlag(); }
+  function save() {
+    const fresh = getMonsterRoster();
+    const idx = fresh.findIndex(m => m.id === monsterId);
+    if (idx === -1) return;
+    fresh[idx] = JSON.parse(JSON.stringify(data));
+    saveMonsterRoster(fresh);
+    isDirty = false;
+    renderSaveFlag();
+  }
+  function renderSaveFlag() {
+    const el = document.getElementById("saveFlag");
+    if (!el) return;
+    el.textContent = isDirty ? "저장 안 된 변경사항 있음" : "저장됨";
+    el.className = "save-flag" + (isDirty ? " dirty" : "");
+  }
+
+  const ITEM_CATEGORY_OPTIONS = ["equipment", "material", "keyItem", "stash"];
+
+  function buildRowHTML(row, idx) {
+    const type = CONDITION_TYPES[row.metric] || CONDITION_TYPES.always;
+    const showDetail = type.needsDetail;
+    return `
+      <div class="pattern-row" data-idx="${idx}">
+        <div class="row-head">
+          <span class="idx">패턴 ${idx + 1}</span>
+          <div class="row-actions">
+            <button class="mini-btn move-up" title="위로" ${idx === 0 ? "disabled" : ""}>↑</button>
+            <button class="mini-btn move-down" title="아래로">↓</button>
+            <button class="mini-btn danger remove-row" title="삭제">✕</button>
+          </div>
+        </div>
+        <div class="builder-line">
+          <span class="cb-tag">IF</span>
+          <select class="cb-subject">
+            ${Object.entries(SUBJECT_LABEL).map(([k,v]) => `<option value="${k}" ${row.subject===k?"selected":""}>${v}</option>`).join("")}
+          </select>
+          <select class="cb-metric">
+            ${Object.entries(CONDITION_TYPES).map(([k,t]) => `<option value="${k}" ${row.metric===k?"selected":""}>${t.label}</option>`).join("")}
+          </select>
+          <span class="cb-cond-detail" style="${showDetail ? "display:flex;gap:6px;align-items:center;" : "display:none;"}">
+            <select class="cb-comparator">
+              ${Object.entries(COMPARATOR_LABEL).map(([k,v]) => `<option value="${k}" ${row.comparator===k?"selected":""}>${v}</option>`).join("")}
+            </select>
+            <input type="number" class="cb-value" value="${row.value ?? 0}" min="0" />
+            <select class="cb-unit">
+              ${["%","pt","개","턴"].map(u => `<option ${(row.unit || type.unit)===u?"selected":""}>${u}</option>`).join("")}
+            </select>
+          </span>
+        </div>
+        <div class="builder-line and-chain-line">
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" class="cb-and-next" ${row.andNext ? "checked" : ""} />
+            다음 패턴과 동시에 만족해야 발동(이 줄의 액션은 안 씀)
+          </label>
+        </div>
+        <div class="builder-line" style="${row.andNext ? "display:none;" : ""}">
+          <span class="cb-tag">THEN</span>
+          <select class="cb-action">
+            ${actionOptionsFor().map(a => `<option ${row.action===a?"selected":""}>${a}</option>`).join("")}
+          </select>
+        </div>
+        <div class="builder-line max-uses-line" style="${row.andNext ? "display:none;" : ""}">
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" class="cb-max-uses-toggle" ${row.maxUses != null ? "checked" : ""} />
+            이 슬롯은 전투 중 최대
+          </label>
+          <input type="number" class="cb-max-uses" value="${row.maxUses ?? 1}" min="1"
+            style="${row.maxUses != null ? "" : "display:none;"}" />
+          <span class="cb-max-uses-suffix" style="${row.maxUses != null ? "" : "display:none;"}">회만 발동</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function render() {
+    const el = document.getElementById("mainArea");
+    if (!data) {
+      el.innerHTML = `
+        <div class="empty-wrap">
+          ❓ 몬스터를 찾을 수 없습니다.<br/>
+          <a href="monster-roster.html">← 몬스터 목록으로</a>
+        </div>
+      `;
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="block">
+        <h2 class="section-title">기본 정보</h2>
+        <div class="field-row"><label>ID(키)</label><input type="text" id="fId" value="${data.id}" /></div>
+        <div class="field-row"><label>이름</label><input type="text" id="fName" value="${data.name || ""}" /></div>
+        <div class="field-row"><label>포트레이트</label><input type="text" id="fPortrait" value="${data.portrait || ""}" placeholder="이모지 1개" /></div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">스탯 <span class="hint">직접 입력(포인트 투자 없음)</span></h2>
+        <div class="field-grid">
+          ${["str","int","dex","spd","luk"].map(k => `
+            <div class="fg-item"><label>${k.toUpperCase()}</label><input type="number" class="f-stat" data-key="${k}" value="${data.realStats[k]}" /></div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">전투 스탯 <span class="hint">real / bonus 직접 입력(장비 개념 없음)</span></h2>
+        <div class="field-grid">
+          ${["atk","def","matk","mdef"].map(k => `
+            <div class="fg-item"><label>real${k.toUpperCase()}</label><input type="number" class="f-real" data-key="${k}" value="${data.combatReal[k] || 0}" /></div>
+          `).join("")}
+        </div>
+        <div class="field-grid" style="margin-top:8px;">
+          ${["atk","def","matk","mdef"].map(k => `
+            <div class="fg-item"><label>${k.toUpperCase()} bonus</label><input type="number" class="f-bonus" data-key="${k}" value="${data.combatBonus[k] || 0}" /></div>
+          `).join("")}
+        </div>
+        <div class="field-row" style="margin-top:8px;"><label>SummonEff</label><input type="number" id="fSummonEff" value="${data.combatReal.summonEff || 0}" /></div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">내구도 <span class="hint">비워두면 스탯 공식(200+STR×20 / 50+INT×10)을 따름. 값을 넣으면 스탯과 무관하게 그 수치로 고정 — 내구도와 화력을 따로 잡아야 하는 보스/오브젝트용</span></h2>
+        <div class="field-row"><label>최대 HP</label><input type="number" id="fMaxHp" value="${data.maxHp ?? ""}" placeholder="공식 사용" /></div>
+        <div class="field-row"><label>최대 SP</label><input type="number" id="fMaxSp" value="${data.maxSp ?? ""}" placeholder="공식 사용" /></div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">보상</h2>
+        <div class="field-row"><label>경험치</label><input type="number" id="fExp" value="${data.expReward}" /></div>
+        <div class="field-row"><label>골드</label><input type="number" id="fGold" value="${data.goldReward}" /></div>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">드랍 테이블</h2>
+        <div id="dropList">
+          ${data.dropTable.map((d, i) => `
+            <div class="drop-row" data-idx="${i}">
+              <input type="text" class="di-name" placeholder="아이템명" value="${d.name || ""}" />
+              <select class="di-cat">${ITEM_CATEGORY_OPTIONS.map(c => `<option ${d.category===c?"selected":""}>${c}</option>`).join("")}</select>
+              <input type="number" class="di-chance" placeholder="확률" min="0" max="1" step="0.05" value="${d.chance ?? 1}" />
+              <span class="di-sep">×</span>
+              <input type="number" class="di-qmin" placeholder="최소" min="0" value="${(d.quantity && d.quantity[0]) ?? 1}" />
+              <span class="di-sep">~</span>
+              <input type="number" class="di-qmax" placeholder="최대" min="0" value="${(d.quantity && d.quantity[1]) ?? 1}" />
+              <button class="mini-btn danger remove-drop" title="삭제">✕</button>
+            </div>
+          `).join("")}
+        </div>
+        <button class="add-btn" id="addDropBtn">+ 드랍 항목 추가</button>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">소환 능력 <span class="hint">비워두면 소환 못 함</span></h2>
+        <div id="summonList">
+          ${data.summonAbility.candidates.map((c, i) => `
+            <div class="summon-row" data-idx="${i}">
+              <select class="si-monster">
+                <option value="">(몬스터 선택)</option>
+                ${roster.filter(m => m.id !== data.id).map(m => `<option value="${m.id}" ${c.monsterId===m.id?"selected":""}>${m.name}(${m.id})</option>`).join("")}
+              </select>
+              <input type="number" class="si-weight" placeholder="가중치" min="1" value="${c.weight ?? 1}" />
+              <button class="mini-btn danger remove-summon" title="삭제">✕</button>
+            </div>
+          `).join("")}
+        </div>
+        <button class="add-btn" id="addSummonBtn">+ 소환 후보 추가</button>
+      </div>
+
+      <div class="block">
+        <h2 class="section-title">패턴 <span class="hint">캐릭터와 완전히 동일한 조건/액션 체계</span></h2>
+        <div id="patternList">
+          ${data.patterns.map((row, idx) => buildRowHTML(row, idx)).join("")}
+        </div>
+        <button class="add-btn" id="addPatternBtn">+ 패턴 추가</button>
+      </div>
+
+      <button class="save-btn" id="saveBtn">저장</button>
+      <div class="save-flag" id="saveFlag"></div>
+    `;
+    renderSaveFlag();
+    bindEvents(el);
+  }
+
+  function bindEvents(el) {
+    el.querySelector("#fId").addEventListener("input", e => { data.id = e.target.value; markDirty(); });
+    el.querySelector("#fName").addEventListener("input", e => { data.name = e.target.value; markDirty(); });
+    el.querySelector("#fPortrait").addEventListener("input", e => { data.portrait = e.target.value; markDirty(); });
+
+    el.querySelectorAll(".f-stat").forEach(inp => inp.addEventListener("input", e => {
+      data.realStats[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+    }));
+    el.querySelectorAll(".f-real").forEach(inp => inp.addEventListener("input", e => {
+      data.combatReal[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+    }));
+    el.querySelectorAll(".f-bonus").forEach(inp => inp.addEventListener("input", e => {
+      data.combatBonus[e.target.dataset.key] = Number(e.target.value) || 0; markDirty();
+    }));
+    el.querySelector("#fSummonEff").addEventListener("input", e => { data.combatReal.summonEff = Number(e.target.value) || 0; markDirty(); });
+    el.querySelector("#fExp").addEventListener("input", e => { data.expReward = Number(e.target.value) || 0; markDirty(); });
+    el.querySelector("#fGold").addEventListener("input", e => { data.goldReward = Number(e.target.value) || 0; markDirty(); });
+    // 빈 문자열이면 필드 자체를 지워서 "공식 사용" 상태로 되돌림(0을 넣는 것과
+    // 구분해야 함 — maxHp:0은 "HP 0인 몬스터"라는 유효한 값이므로).
+    el.querySelector("#fMaxHp").addEventListener("input", e => {
+      if (e.target.value.trim() === "") delete data.maxHp; else data.maxHp = Number(e.target.value) || 0;
+      markDirty();
+    });
+    el.querySelector("#fMaxSp").addEventListener("input", e => {
+      if (e.target.value.trim() === "") delete data.maxSp; else data.maxSp = Number(e.target.value) || 0;
+      markDirty();
+    });
+
+    // 드랍 테이블 — 이 폼은 name/category/chance/quantity 4개만 편집하지만,
+    // 장비 드랍은 combatReal/weight/equipmentType/enhanceable/price 등
+    // 폼에 없는 필드도 갖고 있음(직접 시드 JS에서 채워둔 것). 예전엔 여기서
+    // 폼 4개 필드만으로 새 객체를 통째로 만들어서 저장할 때마다 그 필드들이
+    // 전부 날아갔음(2026-08-14 발견·수정) — 인덱스가 같은 기존 항목에
+    // spread로 얹어서 폼이 관리하는 필드만 덮어쓰는 방식으로 바꿈. add/remove는
+    // 항상 data.dropTable을 직접 바꾼 뒤 곧바로 render()해서 인덱스가 다시
+    // 맞춰지므로, 이 함수가 호출되는 시점(입력 중)엔 인덱스 대응이 항상 유효함.
+    function readDropRows() {
+      return [...el.querySelectorAll(".drop-row")].map((row, i) => ({
+        ...(data.dropTable[i] || {}),
+        name: row.querySelector(".di-name").value,
+        category: row.querySelector(".di-cat").value,
+        chance: Number(row.querySelector(".di-chance").value) || 0,
+        quantity: [Number(row.querySelector(".di-qmin").value) || 0, Number(row.querySelector(".di-qmax").value) || 0],
+      }));
+    }
+    el.querySelectorAll("#dropList input, #dropList select").forEach(inp => inp.addEventListener("input", () => {
+      data.dropTable = readDropRows(); markDirty();
+    }));
+    el.querySelectorAll(".remove-drop").forEach(btn => btn.addEventListener("click", e => {
+      const idx = Number(e.target.closest(".drop-row").dataset.idx);
+      data.dropTable.splice(idx, 1); markDirty(); render();
+    }));
+    el.querySelector("#addDropBtn").addEventListener("click", () => {
+      data.dropTable.push({ name:"", category:"material", chance:1, quantity:[1,1] });
+      markDirty(); render();
+    });
+
+    // 소환 능력
+    function readSummonRows() {
+      return [...el.querySelectorAll(".summon-row")].map(row => ({
+        monsterId: row.querySelector(".si-monster").value,
+        weight: Number(row.querySelector(".si-weight").value) || 1,
+      })).filter(c => c.monsterId);
+    }
+    el.querySelectorAll("#summonList input, #summonList select").forEach(inp => inp.addEventListener("input", () => {
+      data.summonAbility.candidates = readSummonRows(); markDirty();
+    }));
+    el.querySelectorAll(".remove-summon").forEach(btn => btn.addEventListener("click", e => {
+      const idx = Number(e.target.closest(".summon-row").dataset.idx);
+      data.summonAbility.candidates.splice(idx, 1); markDirty(); render();
+    }));
+    el.querySelector("#addSummonBtn").addEventListener("click", () => {
+      data.summonAbility.candidates.push({ monsterId:"", weight:1 });
+      markDirty(); render();
+    });
+
+    // 패턴 빌더
+    el.querySelectorAll(".pattern-row").forEach(rowEl => {
+      const idx = Number(rowEl.dataset.idx);
+      const row = data.patterns[idx];
+      rowEl.querySelector(".remove-row").addEventListener("click", () => {
+        data.patterns.splice(idx, 1); markDirty(); render();
+      });
+      rowEl.querySelector(".move-up").addEventListener("click", () => {
+        if (idx === 0) return;
+        [data.patterns[idx-1], data.patterns[idx]] = [data.patterns[idx], data.patterns[idx-1]];
+        markDirty(); render();
+      });
+      rowEl.querySelector(".move-down").addEventListener("click", () => {
+        if (idx === data.patterns.length - 1) return;
+        [data.patterns[idx+1], data.patterns[idx]] = [data.patterns[idx], data.patterns[idx+1]];
+        markDirty(); render();
+      });
+      rowEl.querySelector(".cb-subject").addEventListener("change", e => { row.subject = e.target.value; markDirty(); });
+      rowEl.querySelector(".cb-metric").addEventListener("change", e => {
+        row.metric = e.target.value;
+        const type = CONDITION_TYPES[row.metric];
+        if (type.needsDetail) { row.comparator = row.comparator || "gte"; row.value = row.value ?? 0; row.unit = row.unit || type.unit; }
+        markDirty(); render();
+      });
+      const cmp = rowEl.querySelector(".cb-comparator");
+      if (cmp) cmp.addEventListener("change", e => { row.comparator = e.target.value; markDirty(); });
+      const val = rowEl.querySelector(".cb-value");
+      if (val) val.addEventListener("input", e => { row.value = Number(e.target.value); markDirty(); });
+      const unit = rowEl.querySelector(".cb-unit");
+      if (unit) unit.addEventListener("change", e => { row.unit = e.target.value; markDirty(); });
+      rowEl.querySelector(".cb-action").addEventListener("change", e => { row.action = e.target.value; markDirty(); });
+      rowEl.querySelector(".cb-and-next").addEventListener("change", e => {
+        row.andNext = e.target.checked;
+        markDirty(); render();
+      });
+      rowEl.querySelector(".cb-max-uses-toggle").addEventListener("change", e => {
+        row.maxUses = e.target.checked ? (row.maxUses ?? 1) : null;
+        markDirty(); render();
+      });
+      const maxUsesInput = rowEl.querySelector(".cb-max-uses");
+      if (maxUsesInput) maxUsesInput.addEventListener("input", e => { row.maxUses = Math.max(1, Number(e.target.value) || 1); markDirty(); });
+    });
+    el.querySelector("#addPatternBtn").addEventListener("click", () => {
+      data.patterns.push({ subject:"self", metric:"always", action:actionOptionsFor()[0] });
+      markDirty(); render();
+    });
+
+    el.querySelector("#saveBtn").addEventListener("click", save);
+  }
+
+  render();
+</script>
+</body>
+</html>
