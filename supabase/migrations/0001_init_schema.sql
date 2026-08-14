@@ -82,14 +82,17 @@ $$;
 -- ----------------------------------------------------------------------------
 -- 2. characters — battleSim_roster(캐릭터 배열)
 --
--- equipment는 캐릭터 객체 안 12슬롯 JSONB로 그대로 유지함(localStorage 원본
--- 형태 그대로). 다만 실측 결과 warehouse 쪽에도 heldBy로 "이 캐릭터가 장착
--- 중"이라는 정보가 별도로 존재해서, 이 두 표현이 서로 어긋나면(동기화 버그)
--- 진실이 두 곳에 있는 문제가 생길 수 있다 — 이 스키마는 일단 원본 형태를
--- 그대로 옮기는 것을 우선했고, 실제 마이그레이션 작업 시 "장비의 진실 공급원을
--- warehouse_items.held_by 하나로 합칠지" 여부를 별도로 결정할 것(character-sheet.html
--- 등 프론트 로직이 지금 character.equipment를 직접 읽는 코드가 많아서, 스키마
--- 레벨보다 애플리케이션 레벨에서 먼저 정리가 필요함).
+-- equipment 컬럼을 두지 않는다 — warehouse_items.held_by를 장비 장착 여부의
+-- 유일한 진실 공급원으로 삼기로 결정함(2026-08-14, 사용자 결정). 이유:
+-- 1) "아이템을 표기하는 모든 화면"(창고, 캐릭터 시트, 강화소, 공방 등)이
+--    결국 다 warehouse_items를 조회해야 하는데, equipment를 캐릭터 쪽에
+--    따로 두면 그 화면들이 두 테이블을 항상 맞춰봐야 해서 동기화 버그
+--    여지가 생긴다. 2) "창고 화면에는 장착 중인 아이템을 보여줄 생각이
+--    없다"는 요구사항 자체가 이미 "필터링은 조회 시점의 문제"임을 말해준다
+--    — held_by IS NULL로 걸러내면 되는 것이지 테이블을 분리할 이유가 아님.
+-- 캐릭터가 장착 중인 장비 목록이 필요한 화면(character-sheet.html 등)은
+-- `select * from warehouse_items where held_by = <character_id>`로 조회.
+-- 창고(미보유) 목록이 필요한 화면은 `where held_by is null and user_id = ...`.
 -- ----------------------------------------------------------------------------
 
 create table public.characters (
@@ -102,7 +105,6 @@ create table public.characters (
   exp_to_next integer not null default 100,
   portrait text,
   real_stats jsonb not null default '{}'::jsonb,       -- {str,int,dex,spd,luk}
-  equipment jsonb not null default '{}'::jsonb,          -- 12개 고정 슬롯 키 -> 아이템 객체|null
   learned_skill_names text[] not null default '{}',
   personal_resources jsonb not null default '{}'::jsonb, -- { arrows: {current,max}, ... }
   row_position text not null default 'front' check (row_position in ('front', 'back')),
@@ -119,11 +121,20 @@ create trigger characters_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
--- 3. warehouse_items — battleSim_warehouse(공용 창고, 캐릭터 소속 아님)
+-- 3. warehouse_items — 유저가 보유한 모든 아이템의 유일한 테이블
+--    (battleSim_warehouse + 캐릭터별 장착 장비를 통합함, 2026-08-14 결정)
 --
--- 장비 장착도 이 테이블의 held_by로 표현됨(원본 localStorage 설계 그대로 —
--- 장착 중엔 quantity가 항상 1). 스택 병합(name+category+held_by 없음+
--- enhanceLevel 없음+craftMaterial 일치) 로직은 애플리케이션 레벨에서 유지.
+-- 장착 여부는 held_by 하나로 표현(null=미장착/창고, 캐릭터 id=그 캐릭터가
+-- 장착 중 — 장착 중엔 quantity가 항상 1). "창고에는 장착 중인 장비를 보여줄
+-- 생각이 없다" 같은 화면별 요구사항은 테이블을 나누는 이유가 아니라 조회
+-- 시점의 WHERE 절 문제로 취급함:
+--   - 창고 화면(미보유만):        where held_by is null and user_id = ...
+--   - 캐릭터 장착 장비 조회:      where held_by = <character_id>
+--   - 강화소/공방 등 "아이템을 표기하는 모든 화면"도 전부 이 한 테이블만
+--     보되, 필요한 필터만 각 페이지에서 걸면 됨 — 진실 공급원이 하나라
+--     캐릭터 쪽 정보와 어긋날 일이 없음.
+-- 스택 병합(name+category+held_by 없음+enhanceLevel 없음+craftMaterial 일치)
+-- 로직은 애플리케이션 레벨에서 유지.
 -- ----------------------------------------------------------------------------
 
 create table public.warehouse_items (

@@ -476,13 +476,19 @@ admin만 수정/삭제.
 - `battleSim_gold`의 기본값이 파일마다 500/0으로 갈려 있었음(hire.html·
   battle-view.html은 500, workshop.html·shop.html은 0) — 스키마의
   `profiles.gold` 기본값은 500으로 통일.
-- 캐릭터의 `equipment`(12슬롯 JSONB)와 `warehouse_items.held_by`가 "이
-  캐릭터가 이 장비를 장착 중"이라는 같은 사실을 서로 다른 두 곳에 표현하고
-  있다(로컬스토리지 원본부터 이런 구조). 스키마는 일단 원본 형태를 그대로
-  옮겼지만, 실제 마이그레이션 시엔 진실 공급원을 하나로 합칠지(예:
-  `held_by`만 남기고 `equipment`는 뷰로 계산) 애플리케이션 레벨에서 별도
-  결정 필요 — character-sheet.html 등 프론트가 지금 `character.equipment`를
-  직접 읽는 코드가 많아서 스키마만으로는 못 끝냄.
+- **(2026-08-14 결정, 반영됨)** 캐릭터의 `equipment`(12슬롯)와
+  `warehouse_items.held_by`가 "이 캐릭터가 이 장비를 장착 중"이라는 같은
+  사실을 서로 다른 두 곳에 표현하던 문제(로컬스토리지 원본부터 이런
+  구조)는 `warehouse_items.held_by`를 유일한 진실 공급원으로 삼는 것으로
+  해결함 — `characters` 테이블에는 애초에 `equipment` 컬럼을 두지 않는다.
+  "창고 화면에는 장착 중인 아이템을 보여줄 생각이 없다" 같은 화면별
+  요구사항은 테이블 분리 이유가 아니라 조회 시점 필터(`held_by is null`
+  vs `held_by = <character_id>`)로 처리한다는 게 사용자 판단 — 아이템을
+  표기하는 모든 화면(창고/캐릭터 시트/강화소/공방 등)이 결국 같은
+  테이블을 봐야 하므로, 두 곳에 진실을 나누면 동기화 버그 여지만 남는다는
+  근거. `character-sheet.html` 등 프론트가 지금 `character.equipment`를
+  직접 읽는 코드는 실제 마이그레이션(애플리케이션 레벨) 시 전부
+  `warehouse_items` 조회로 바꿔야 함 — 아직 스키마만 반영된 상태.
 - `feature_requests.html`이 지금은 admin 전용 페이지지만, 원래 설계 의도(전체
   유저가 보는 공용 게시판)에 맞춰 RLS는 "로그인 유저 전체 읽기"로 열어뒀다 —
   나중에 이 페이지를 일반 유저에게 공개하려면 애플리케이션 쪽 접근 제어만
