@@ -442,13 +442,54 @@ Supabase 기본 보호기능(이메일 인증/CAPTCHA/rate limit)에 맡김. 디
 논의"에 정리된 대로, 로그인은 됐지만 그 뒤로 이어지는 실제 유저별 DB
 스키마·`localStorage` → 서버 이전은 아직 시작 전이다.
 
-## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-13, DB 스키마는 아직 구현 안 함)
+## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 초안 작성됨·아직 미적용)
 
-지금은 게임 데이터가 전부 `localStorage` 단일 브라우저 저장이다(로그인 자체는
-위 "로그인" 섹션 참조. `battleSim_username`은 `"2inkle"` 문자열 비교로 개발자
-여부만 가르는 임시 장치로 아직 남아있음). 실제 다중 사용자 서비스로 갈 때
-다음을 API/DB 설계 단계에서 결정해야 한다. **README.md는 낡은
-내용이라 참고하지 말 것** — 아래는 현재 코드(`web/*.html`)를 직접 훑어서 낸 결론.
+**`supabase/migrations/0001_init_schema.sql`에 초기 스키마 SQL을 작성해뒀다**
+(Supabase Dashboard의 SQL Editor에 붙여넣거나 `supabase db push`로 적용하는
+용도, 아직 실제 프로젝트에는 적용 전 — 게임은 여전히 `localStorage` 단일
+저장소로만 동작함). 아래 문단들은 그 스키마를 설계하며 실제 코드(`web/*.html`)를
+다시 훑어 확인한 최신 결론이고, 스키마 파일 자체에도 같은 근거가 주석으로
+남아있다. **README.md는 낡은 내용이라 참고하지 말 것.**
+
+작성한 테이블: `profiles`(유저 프로필+골드+관리자 플래그, `battleSim_username`의
+`"2inkle"` 문자열 비교를 `is_admin` boolean으로 정식 대체), `characters`,
+`warehouse_items`, `battle_progress`(clearedBattles/battleClearTimes/
+battleAttemptTimes 통합), `shop_purchased`, `feature_requests`, `game_content`
+(skillTable/jobTable/monsterRoster/shopTable을 JSONB 통짜로 — 4개 에디터가
+전부 "블롭 전체 읽고 통째로 저장" 방식이라 정규화보다 이 형태가 프론트 변경을
+최소화함). RLS는 본인 소유 행만 CRUD가 기본, `game_content`는 전체 공개
+읽기+admin만 쓰기, `feature_requests`는 로그인 유저 전체 읽기+본인 글 작성+
+admin만 수정/삭제.
+
+**스키마 설계 중 실측으로 새로 확인한 것들**(예전 버전 이 섹션에는 없었던
+내용):
+- `battleSim_hiredPoolIds`는 코드 전체에서 `removeItem` 호출(village.html
+  리셋 시)만 있고 `getItem`/`setItem`이 어디에도 없다 — 죽은 키. DB 스키마
+  대상에서 뺐다.
+- `battleSim_lastResult`(sessionStorage)도 실측 결과 `setItem` 호출이 코드
+  어디에도 없다 — `battle-view.html`/`battle-select.html`이 골드/창고/로스터/
+  클리어기록을 직접 갱신하고, `battle-result.html`은 자체 주석에 "연결 아직
+  안 됨"이라 적어두고 하드코딩된 `EXAMPLE_RESULT`로 대체 중. DB 대상 아님(예전
+  결론과 동일).
+- `battleSim_shopPurchased`(아이템별 누적 구매수량, stock 검사용)가 기존 이
+  섹션 목록에 빠져있었음 — `shop_purchased` 테이블로 추가함.
+- `battleSim_gold`의 기본값이 파일마다 500/0으로 갈려 있었음(hire.html·
+  battle-view.html은 500, workshop.html·shop.html은 0) — 스키마의
+  `profiles.gold` 기본값은 500으로 통일.
+- 캐릭터의 `equipment`(12슬롯 JSONB)와 `warehouse_items.held_by`가 "이
+  캐릭터가 이 장비를 장착 중"이라는 같은 사실을 서로 다른 두 곳에 표현하고
+  있다(로컬스토리지 원본부터 이런 구조). 스키마는 일단 원본 형태를 그대로
+  옮겼지만, 실제 마이그레이션 시엔 진실 공급원을 하나로 합칠지(예:
+  `held_by`만 남기고 `equipment`는 뷰로 계산) 애플리케이션 레벨에서 별도
+  결정 필요 — character-sheet.html 등 프론트가 지금 `character.equipment`를
+  직접 읽는 코드가 많아서 스키마만으로는 못 끝냄.
+- `feature_requests.html`이 지금은 admin 전용 페이지지만, 원래 설계 의도(전체
+  유저가 보는 공용 게시판)에 맞춰 RLS는 "로그인 유저 전체 읽기"로 열어뒀다 —
+  나중에 이 페이지를 일반 유저에게 공개하려면 애플리케이션 쪽 접근 제어만
+  풀면 되고 스키마/RLS 변경은 불필요.
+
+아래는 이 스키마를 만들기 전, DB 전환 자체를 검토하며 정리했던 원래 분류다
+(위 실측 내용과 함께 참고할 것):
 
 - **유저별 DB가 필요한 데이터**: `battleSim_roster`(캐릭터), `battleSim_gold`,
   `battleSim_warehouse`(미장착 장비/소재/파견 티켓 — 파견 티켓도 그냥 warehouse
