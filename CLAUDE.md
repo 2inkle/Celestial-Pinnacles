@@ -535,12 +535,45 @@ DB에서 `gen_random_uuid()`로 자동 생성되므로 예전의 "유저이름_�
 즉시 새 버전이 로드됨. 이후 페이지 전환을 배포 직후 검증할 때 재현되면
 같은 방법을 쓸 것.
 
-**다음 전환 후보**: 남은 페이지들(`village.html`/`character-sheet.html`/
-`shop.html`/`refinery.html`/`workshop.html`/`dispatch.html`/`guild.html`/
-`battle-select.html`/`battle-view.html`)은 이 두 페이지에서 확립한 패턴
-(auth-guard/DB row 매핑/warehouse_items join)을 재사용하되, `character-sheet.html`
-(장비 장착/해제, 스탯 배분, 전직 등 가장 복잡)과 `dispatch.html`/`battle-view.html`
-(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 특히 더 큰 별도 설계가 필요함.
+**`village.html` 3차 전환 완료**(2026-08-14): 골드 표시/리셋/예제 캐릭터
+생성/무작위 용병 10명 생성을 characters/profiles 기준으로 교체. 예제
+캐릭터 생성은 insert 후 반환된 DB 생성 uuid로 바로 Sheet 이동.
+
+**`character-sheet.html` 전환 완료**(2026-08-14) — 프로젝트에서 가장 크고
+복잡한 페이지(1820→1923줄). `localStorage` 5개 키(username/skillTable/
+jobTable/roster/warehouse) 전부 제거:
+- 스킬/직업 테이블은 `game_content`에서 병렬 조회, 최상단 `const`를 `let`으로
+  바꿔 async 부트스트랩에서 할당(`COMMON_SKILLS`/`SKILL_TABLE`/
+  `JOB_ADVANCEMENT_TABLE`/`JOB_ALLOWED_EQUIPMENT_TYPES`).
+- 캐릭터는 로스터 전체가 아니라 `characters` 행 하나만 조회, 섹션별 저장은
+  `SAVE_SECTIONS`를 "메모리 필드→DB 컬럼" 매핑으로 바꿔 개별 UPDATE.
+- **장비 장착/해제를 `warehouse_items.held_by` 직접 조작으로 완전히
+  재설계**: 장착은 풀 행 quantity가 1이면 `held_by`만 갱신, 2 이상이면
+  감소+새 행 insert. 해제는 매칭되는 풀 행(이름+분류+강화등급+제작재료
+  일치)이 있으면 병합 후 보유 행 삭제, 없으면 `held_by`만 null로 되돌림.
+  `characters.equipment` 컬럼이 없어져서 예전에 "장비는 즉시 별도 저장"
+  하던 이유 자체가 사라짐 — DB 갱신이 곧 확정.
+- 관리자 판별은 `AuthGuard.isAdmin()`으로 교체("🧪 개발자 도구" 블록만
+  게이팅 — 화살 지급 등 나머지 🧪 버튼은 원래도 admin 게이팅이 없었음,
+  원본 코드 확인해서 회귀 아님을 검증함).
+- 관전(스펙테이트) 경로는 자연 소멸 — RLS가 남의 캐릭터 행 자체를 안
+  내려주므로 "없음"과 "내 것 아님"이 클라이언트에서 구분 불가능해져서 둘 다
+  동일한 not-found 화면으로 처리.
+- `characters.key_items`(전직 조건용 개인 플래그) 컬럼이 없던 것을
+  `0006_characters_key_items.sql`로 추가.
+- **실측 검증**(실제 UI 클릭 기준): 스탯 STR +3 저장 → DB에 13 반영 확인,
+  Healing 스킬 습득 저장 → DB에 반영 확인, quantity:2 테스트 장비 실제
+  장착(풀 1로 감소+보유 행 신규 생성, 스탯 화면에 INT +5·Max SP 200 즉시
+  반영) → 해제(풀로 quantity 2 병합, 보유 행 삭제) 전 과정 정확히 동작
+  확인. 존재하지 않는 id 접근 시 not-found 화면 정상. 콘솔 에러 0건.
+  테스트 데이터 전부 정리함.
+
+**다음 전환 후보**: 남은 페이지들(`shop.html`/`refinery.html`/
+`workshop.html`/`dispatch.html`/`guild.html`/`battle-select.html`/
+`battle-view.html`)은 이 세 페이지에서 확립한 패턴(auth-guard/DB row 매핑/
+warehouse_items의 `held_by` 직접 조작)을 재사용하되, `dispatch.html`/
+`battle-view.html`(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 특히 더 큰
+별도 설계가 필요함.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
