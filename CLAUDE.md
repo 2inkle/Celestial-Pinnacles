@@ -568,12 +568,24 @@ jobTable/roster/warehouse) 전부 제거:
   확인. 존재하지 않는 id 접근 시 not-found 화면 정상. 콘솔 에러 0건.
   테스트 데이터 전부 정리함.
 
+**`guild.html` 전환 완료**(2026-08-14) — 사용자 판단으로 "연결점이 적은
+페이지부터" 순서를 정함(`dispatch.html`/`battle-view.html`처럼 여러
+시스템이 얽힌 페이지는 뒤로 미룸). 파견 의뢰권 발행/수주를
+`warehouse_items`("파견 의뢰권" 행) + `profiles.last_ticket_claim_at`
+기준으로 교체. `last_ticket_claim_at`은 계정 생성 트리거가 이미 `now()`로
+채워두므로(0002) 예전의 "기록 없으면 지금으로 초기화" 로직이 불필요해짐.
+30초 주기 렌더는 DB 재조회 없이 로컬 변수로 시간 계산만 반복(값 변경은
+"수주하기" 클릭 시에만 DB 반영). **실측 검증**: `last_ticket_claim_at`을
+DB에서 65분 전으로 임시 조정 → 페이지가 정확히 "2장 대기"로 계산 →
+수주하기 클릭 → 창고 수량 10→12, `last_ticket_claim_at`이 정확히 60분
+(2×30분)만 이동하고 남은 5분은 이월되는 것까지 확인(즉시 `now()`로
+리셋되지 않음 = 절삭 로직이 정확히 포팅됨) → 테스트 후 원상 복구.
+
 **다음 전환 후보**: 남은 페이지들(`shop.html`/`refinery.html`/
-`workshop.html`/`dispatch.html`/`guild.html`/`battle-select.html`/
-`battle-view.html`)은 이 세 페이지에서 확립한 패턴(auth-guard/DB row 매핑/
-warehouse_items의 `held_by` 직접 조작)을 재사용하되, `dispatch.html`/
-`battle-view.html`(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 특히 더 큰
-별도 설계가 필요함.
+`workshop.html`/`battle-select.html`)은 이 네 페이지에서 확립한 패턴
+(auth-guard/DB row 매핑/warehouse_items의 `held_by` 직접 조작)을
+재사용하면 됨. `dispatch.html`/`battle-view.html`(보상 지급 — 서버 검증
+이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로 남겨둠.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
