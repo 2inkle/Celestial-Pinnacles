@@ -460,9 +460,9 @@ policy`로 정확히 거부됨. 실제 로그인 세션(Discord OAuth)으로 본
 아무 행이나 못 씀). 테스트로 만든 캐릭터 행은 확인 후 삭제해서 정리함.
 검증 중 발견: 이 스키마 적용 **이전에** 이미 존재하던 계정(트리거가 아직
 없던 시점에 가입)은 `on_auth_user_created` 트리거가 소급 적용되지 않아
-`profiles` 행이 비어있다 — 버그 아니고 트리거의 정상 동작 범위 밖. 필요시
-`auth.users`를 기준으로 백필하는 1회성 INSERT로 해결 가능(아직 미실행,
-지금은 테스트 계정 하나뿐이라 급하지 않음).
+`profiles` 행이 비어있었다 — 버그 아니고 트리거의 정상 동작 범위 밖. 실제
+테스트 계정(`2inkle`)에 대해 `auth.users` 기준 백필 INSERT를 1회 실행해서
+해결함(gold=3000/파견 의뢰권 10장으로, 아래 0002 적용 후 값과 동일하게 맞춤).
 
 **`supabase/migrations/0002_new_account_defaults.sql`도 작성·적용함**(신규
 계정 기본값, 2026-08-14 사용자 결정): 용병(캐릭터)은 보유하지 않음(자연스러운
@@ -473,7 +473,28 @@ policy`로 정확히 거부됨. 실제 로그인 세션(Discord OAuth)으로 본
 고치는 대신 0002로 분리함(마이그레이션 불변성 원칙) — `profiles.gold`
 컬럼 기본값을 `alter column ... set default 3000`으로 바꾸고,
 `handle_new_user()` 트리거 함수를 `create or replace`로 갱신해서 파견
-의뢰권 지급 INSERT를 추가함.
+의뢰권 지급 INSERT를 추가함. 실제 테스트 계정으로 백필 후 브라우저 세션에서
+`gold:3000`/`파견 의뢰권 quantity:10`이 정확히 조회되는 것까지 확인함.
+
+**보안 구멍 발견 및 수정 — `is_admin` 자기 승격 가능했음** (2026-08-14):
+`2inkle` 계정을 관리자로 부트스트랩하는 과정(`update profiles set
+is_admin = true where user_id = auth.uid()`를 로그인된 클라이언트에서 직접
+호출)이 그대로 성공하는 걸 실측으로 확인함 — `profiles`의 UPDATE RLS
+정책이 "본인 행인지"만 검사하고 "어떤 컬럼을 바꾸는지"는 안 가려서,
+**로그인한 아무 유저나 자기 자신을 관리자로 승격시킬 수 있는 상태였다**.
+`supabase/migrations/0003_prevent_self_admin_promotion.sql`로 막음 — "이미
+관리자인 계정만 `is_admin` 값을 바꿀 수 있다"는 BEFORE UPDATE 트리거 추가.
+**트리거 설계 중 자체 검토로 결함 하나를 더 잡음**: 처음엔 `auth.uid()`
+값과 무관하게 무조건 `is_admin(auth.uid())` 판정만 걸었는데, Dashboard SQL
+Editor는 JWT 세션이 없어 `auth.uid()`가 항상 NULL이고 `is_admin(NULL)`은
+항상 false라서, 이 상태로 적용하면 **SQL Editor로도 이후 영원히 `is_admin`을
+못 바꾸게 막혀버리는 자기모순**이 생긴다(아직 관리자 UI가 없어서 SQL Editor가
+사실상 유일한 관리 통로인데 그 통로 자체가 잠김). 최종 조건은
+`auth.uid() is not null and not is_admin(auth.uid())`일 때만 차단 —
+SQL Editor(Dashboard 접근 권한 = 이미 프로젝트 소유자 수준 신뢰) 경로는
+예외로 통과시키고, 로그인한 일반 클라이언트가 자기 자신을 승격시키는 실제
+공격 경로(항상 유효한 `auth.uid()`를 가짐)만 정확히 막음. 최초 관리자
+부트스트랩(`2inkle` 계정)은 이 마이그레이션 적용 **전에** 이미 완료함.
 
 작성한 테이블: `profiles`(유저 프로필+골드+관리자 플래그, `battleSim_username`의
 `"2inkle"` 문자열 비교를 `is_admin` boolean으로 정식 대체), `characters`,
