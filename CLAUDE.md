@@ -17,21 +17,29 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
   실측 검증함(타 유저 사칭 쓰기 차단 확인). `profiles.is_admin`으로
   관리자 판별 전환, 자기 자신을 관리자로 승격시킬 수 있던 구멍도 막음
   (상세: "로그인/서버 DB 전환 시 API 설계 논의" 섹션).
-- **게임 페이지 전체(10개) Supabase 전환 + 실측 검증 완료**:
+- **게임 페이지 전체(12개) Supabase 전환 + 실측 검증 완료**:
   `roster-index.html`/`hire.html`/`village.html`/`character-sheet.html`/
   `guild.html`/`shop.html`/`refinery.html`/`workshop.html`/
-  `battle-select.html`/`dispatch.html`/`battle-view.html`(+공유 스크립트
-  `battle-encounters.js`/`battle-adapter.js`). `localStorage`
-  (`battleSim_*`)는 이제 게임 어디에서도 안 쓰임 — DB가 유일한 진실
-  공급원. 각 페이지 전환 세부 내용과 실측 결과는 "게임 페이지의 Supabase
-  전환" 섹션에 페이지별로 기록돼 있음.
-- **전환 중 발견해서 고친 심각한 버그 2건**:
+  `battle-select.html`/`dispatch.html`/`battle-view.html`/
+  `roster-select.html`/`item.html`(+공유 스크립트 `battle-encounters.js`/
+  `battle-adapter.js`). `localStorage`(`battleSim_*`)는 이제 게임 어디에서도
+  안 쓰임 — DB가 유일한 진실 공급원. 각 페이지 전환 세부 내용과 실측
+  결과는 "게임 페이지의 Supabase 전환" 섹션에 페이지별로 기록돼 있음.
+  **`roster-select.html`/`item.html`은 처음 10개 전환 작업에서 통째로
+  빠뜨렸다가 다음 날 플레이 테스트("용병이 있는데 안 보인다" 신고)로
+  발견해서 추가 전환함** — 비슷한 누락이 또 있을까 걱정되면 `grep -rl
+  "battleSim_" web/*.html web/*.js`로 재점검할 것(방법은 "게임 페이지의
+  Supabase 전환" 섹션 맨 아래에 기록해둠).
+- **전환 중 발견해서 고친 심각한 버그 3건**:
   1) `battle-adapter.js`가 스킬 테이블을 여전히 `localStorage`에서
      읽고 있었는데 그 키를 채워주는 곳이 하나도 안 남아서 **모든 전투가
      스킬 없이 맨주먹으로만 돌고 있었음**(크래시가 없어서 티가 안 났음).
   2) 전투 결과 배너가 항상 "플레이어"로 뜨던 기존 버그(`src/engine.js`의
      `startBattle`이 `username`을 반환 객체에 안 담고 있었음, DB 전환과
-     무관한 첫 커밋부터의 버그) — 둘 다 수정 완료, 회귀 테스트 통과.
+     무관한 첫 커밋부터의 버그).
+  3) 전직하면 하위 직업 스킬을 영영 못 배우던 버그(`jobSkillTable()`이
+     지금 직업 스킬만 봤음, 플레이 테스트로 발견) — 전부 수정 완료,
+     회귀 테스트 통과·실제 UI로 재검증함.
 
 ### 남은 것 (우선순위 순)
 
@@ -773,17 +781,42 @@ equipment 필드가 이제 없어져서(equipment는 `warehouse_items.held_by`�
   확인함) — 오늘 DB 전환과 무관. 고치려면 `startBattle`의 반환 객체에
   `username`을 포함시키면 됨.
 
-**정리 — Supabase 전환 완료된 전체 페이지(10개)**: `roster-index.html`/
-`hire.html`/`village.html`/`character-sheet.html`/`guild.html`/`shop.html`/
-`refinery.html`/`workshop.html`/`battle-select.html`/`dispatch.html`/
-`battle-view.html`(+ 공유 스크립트 `battle-encounters.js`/`battle-adapter.js`).
+**정리 — Supabase 전환 완료된 전체 페이지(10개, 2026-08-15에 2개 추가 발견돼 12개로 정정)**:
+`roster-index.html`/`hire.html`/`village.html`/`character-sheet.html`/
+`guild.html`/`shop.html`/`refinery.html`/`workshop.html`/
+`battle-select.html`/`dispatch.html`/`battle-view.html`/`roster-select.html`/
+`item.html`(+ 공유 스크립트 `battle-encounters.js`/`battle-adapter.js`).
+
+**2026-08-15 발견 — 전환 목록에서 완전히 빠뜨렸던 페이지 2개**: 플레이
+테스트 중 "용병이 있는데 로스터 선택 화면에서 하나도 안 보인다"는 신고로
+발견함. `roster-select.html`(전투 시작 전 파티 선택 화면)과 `item.html`
+(인벤토리 조회 화면) 둘 다 nav.js에 실제로 연결돼 있는 라이브 페이지인데
+전날 "게임 페이지 10개 전환" 작업 목록에서 통째로 빠졌었음 — 여전히
+`localStorage.getItem("battleSim_roster"/"battleSim_warehouse")`를 읽고
+있어서 매번 빈 배열만 나왔음. 이 사고를 계기로 `grep -rl "battleSim_"
+web/*.html web/*.js`로 전체 재점검함 — 나온 결과 중 실제 라이브 코드가
+남아있던 건 이 둘뿐이었고, 나머지는 전부 이미 알려진 관리자 편집기
+페이지들(아래) 아니면 이미 전환된 파일들의 과거 설명 주석뿐이었음.
+`roster-select.html`은 겸사겸사 자체적으로 갖고 있던 낡은
+`BATTLE_NAMES`/`BATTLE_MONSTER_POOLS` 사본(2026-08-14에 다른 3곳에서
+고쳤던 것과 동일한 종류의 버그가 이 파일에만 남아있었음 — "gate-ambush"
+존재+"goblin-cart-raid" 누락)도 같이 공용 소스로 정리함. 둘 다 실제 UI로
+검증 완료(로스터 선택→전투 진입, 인벤토리 장착/창고 아이템 정확히 분류
+표시).
+
+**앞으로 이런 종류의 누락을 다시 만들면**: `grep -rl "battleSim_" web/*.html
+web/*.js`로 전체를 훑어서 관리자 편집기(아래) 목록에 없는 파일이 나오면
+그게 놓친 페이지임 — 이번에 발견한 방법 그대로 재사용 가능.
+
 **아직 안 옮긴 것**: 관리자 전용 편집기 4개(`skill-table-editor.html`/
 `job-table-editor.html`/`shop-table-editor.html`/`monster-roster.html`/
 `monster-sheet.html`)와 `dev-tools.html`/`feature-requests.html` — 전부
 `battleSim_username==="2inkle"` 기반 접근 제어를 그대로 쓰고 있어서
 `profiles.is_admin`으로 옮기는 작업과 함께 별도로 처리해야 함(nav.js는
 이미 옮겼지만 이 페이지들 자체의 내부 로직은 아직 손 안 댐). 게임 플레이
-경험과는 무관한 관리자 도구라 우선순위가 낮음.
+경험과는 무관한 관리자 도구라 우선순위가 낮음. `battle-result.html`도
+`battleSim_`을 안 쓰지만 이건 원래도 실제 데이터에 연결 안 된 초안
+페이지(`EXAMPLE_RESULT` 하드코딩)라 전환 대상이 아님 — 헷갈리지 말 것.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
