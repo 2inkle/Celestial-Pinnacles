@@ -167,6 +167,40 @@ create index warehouse_items_user_id_idx on public.warehouse_items(user_id);
 create index warehouse_items_held_by_idx on public.warehouse_items(held_by);
 
 -- ----------------------------------------------------------------------------
+-- 3-1. 장비 조회 패턴 메모 (2026-08-14) — 다음 작업(character-sheet.html을
+-- warehouse_items 기준으로 옮길 때)을 위해 여기 남겨둠. 스키마 자체에 강제하는
+-- 제약은 아니고, 지금 web/character-sheet.html이 localStorage 기준으로 이미
+-- 정확히 이렇게 동작하고 있는 두 단계 조회를 옮겨적은 것 — 로직은 그대로
+-- 재사용하고 조회 대상만 localStorage 배열 → 이 테이블로 바뀌면 됨.
+--
+-- (a) "지금 장착 중인 장비" 표시 — job 필터 불필요(장착 시점에 이미 검증된
+--     상태라 있는 그대로 보여주면 됨):
+--       select * from warehouse_items where held_by = <character_id>;
+--
+-- (b) "장착 가능한 후보" 표시(장착 UI, 창고 풀에서 고르는 화면) — 두 단계:
+--     1) DB에서: 미보유 + equipment 분류만 가져옴
+--          select * from warehouse_items
+--          where user_id = auth.uid()   -- RLS가 이미 강제하므로 방어적 표기일 뿐
+--            and held_by is null
+--            and category = 'equipment';
+--     2) 애플리케이션 레벨에서: 그 목록에 캐릭터의 job/슬롯 호환성 필터를 건다
+--        (character-sheet.html의 isItemEquippableBy와 동일한 두 갈래 판정):
+--          - item.required_job이 있으면 → 캐릭터 job이 그 계열(혹은 하위 전직)인지
+--            (isJobOrDescendantOf 판정, job_content.advancement 트리 따라감)
+--          - item.slot이 "슬롯 타입 제한 대상"(무기/방어구류: mainhand/subhand/
+--            armor/shoes/head)이면 → job_content.allowedEquipmentTypes[job]에
+--            그 슬롯의 equipmentType이 포함돼 있는지
+--          - jItem/avatar/skillSeal 등은 이 타입 제한과 무관(각자 다른 규칙:
+--            jItem은 required_job 단독으로 결정, avatar/skillSeal은 무기/방어구가
+--            아니라 해당 없음) — CLAUDE.md 원본 주석과 동일한 예외 취급 유지.
+--
+-- 이 필터를 DB 쿼리 단(RLS 정책이나 뷰)으로 밀어넣을지, 지금처럼 애플리케이션
+-- 레벨 JS로 유지할지는 아직 미정 — job_content(job-table)이 game_content
+-- 테이블 안 JSONB라 SQL에서 직접 조인하기 번거로워서, 우선은 애플리케이션
+-- 레벨 유지 쪽이 더 실용적으로 보이지만 확정은 아님.
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------
 -- 4. battle_progress — clearedBattles/battleClearTimes/battleAttemptTimes 통합
 --
 -- CLAUDE.md에서 이미 "세 개를 battle_progress(user_id, battle_id, ...) 한
