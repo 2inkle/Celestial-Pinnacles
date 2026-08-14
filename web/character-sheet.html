@@ -211,7 +211,7 @@
 <header>
   <a class="back-link" href="roster-index.html">← 용병단으로</a>
   <span class="eyebrow">Character Sheet</span>
-  <span class="mock-badge">⚠ 정적 목업 — 패턴 빌더는 화면 상에서만 동작, 서버 저장 없음</span>
+  <span class="mock-badge">⚠ 테스트 빌드 — 섹션별 저장 버튼을 누르면 계정에 저장됩니다</span>
 </header>
 
 <main>
@@ -222,18 +222,14 @@
   <section id="advancementSection" style="grid-column:1/-1;"></section>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 네비게이션 — 2inkle 계정에서만 보임(다른 페이지들과 동일한
-  // 조건부 노출 원칙, character-sheet.html의 "🧪 개발자 도구" 섹션과 같은 이유).
-  (function() {
-    try {
-      const username = localStorage.getItem("battleSim_username") || "2inkle";
-      if (username === "2inkle") {
-        const slot = document.getElementById("devToolsNavSlot");
-        if (slot) slot.outerHTML = '<a href="dev-tools.html" class="gnav-item">🛠 개발자도구</a>';
-      }
-    } catch {}
-  })();
+  // 개발자도구 네비게이션 노출은 nav.js가 profiles.is_admin으로 직접 판정함 —
+  // 예전엔 이 페이지가 localStorage("battleSim_username")를 읽어 같은 일을
+  // 중복으로 했었는데(그 키를 set하는 흐름이 아예 없어서 사실상 항상 노출),
+  // 페이지별 사본을 없애고 nav.js 한 곳으로 일원화함.
 
 // ============================================================================
 // 목업 데이터 (mockDb 시드와 동일 인물 기준으로 확장)
@@ -424,16 +420,13 @@ const PRE_DELAY_TYPES = {
 // 전부 선택 필드라 값을 아직 안 정한 스킬은 필드 자체를 생략해도 되고, 그 항목은
 // Sheet 화면에서 조용히 생략됨.
 // ============================================================================
-function getSkillTable() {
-  try { return JSON.parse(localStorage.getItem("battleSim_skillTable")) || { commonSkills:[], jobSkills:{} }; }
-  catch { return { commonSkills:[], jobSkills:{} }; }
-}
-// 스킬 테이블은 이제 dev-tools의 skill-table-editor.html에서 관리하는 공용
-// 소스(battleSim_skillTable)에서 읽어옴 — character-sheet.html/monster-sheet.html
-// 둘 다 같은 데이터를 봄(예전엔 각자 하드코딩된 사본이 있어서 "마도사"/"마법사"
-// 처럼 이름이 어긋나는 실수가 실제로 있었음).
-const COMMON_SKILLS = getSkillTable().commonSkills;
-const SKILL_TABLE = getSkillTable().jobSkills;
+// 스킬 테이블은 이제 game_content 테이블(key='skillTable')에서 읽어옴 —
+// character-sheet.html/monster-sheet.html 둘 다 같은 데이터를 봄(예전엔 각자
+// 하드코딩된 사본이 있어서 "마도사"/"마법사"처럼 이름이 어긋나는 실수가 실제로
+// 있었음). 값이 비동기로 도착하므로 const가 아니라 let — 아래 부트스트랩
+// IIFE가 첫 렌더 전에 채워 넣는다(렌더 함수들은 클로저로 이 변수를 봄).
+let COMMON_SKILLS = [];
+let SKILL_TABLE = {};
 
 // ============================================================================
 // 전직(승급) 요구조건 레지스트리 — COST_TYPES와 동일한 설계 언어.
@@ -471,13 +464,9 @@ function hasItem(data, itemName) {
 // 만들고 싶으면 SKILL_TABLE에 "비숍": [...] 식으로 배열을 추가하면 됨(지금은
 // 비어있어 전직 직후엔 습득 가능한 스킬이 없이 시작함 — 다음 작업으로 채우면 됨).
 // ============================================================================
-function getJobTable() {
-  try { return JSON.parse(localStorage.getItem("battleSim_jobTable")) || { advancement:{}, allowedEquipmentTypes:{} }; }
-  catch { return { advancement:{}, allowedEquipmentTypes:{} }; }
-}
-// 승급 트리 — 이제 dev-tools의 job-table-editor.html에서 관리하는 공용 소스
-// (battleSim_jobTable)에서 읽어옴(예전엔 여기 하드코딩돼있었음).
-const JOB_ADVANCEMENT_TABLE = getJobTable().advancement;
+// 승급 트리 — 이제 game_content 테이블(key='jobTable')에서 읽어옴(예전엔 여기
+// 하드코딩 → localStorage였음). COMMON_SKILLS와 같은 이유로 let.
+let JOB_ADVANCEMENT_TABLE = {};
 
 function getAvailableAdvancements(data) {
   return (JOB_ADVANCEMENT_TABLE[data.job] || []).filter((adv) =>
@@ -498,114 +487,108 @@ function isJobOrDescendantOf(job, ancestorJob) {
 }
 
 // ============================================================================
-// 로스터 저장소 연동
-// 고용소(hire.html)에서 고용한 용병이 여기 저장된 로스터에 담겨 있음.
-// 정적 목업이라 스탯/패턴 편집은 여전히 화면 위에서만 반영되고 저장은 안 됨 —
-// 로스터 자체(보유 여부)만 브라우저에 남아 페이지를 오가도 유지됨.
+// Supabase 연동 — 캐릭터는 characters 테이블, 장비는 warehouse_items 테이블.
+// 예전엔 battleSim_roster/battleSim_warehouse(localStorage)를 통째로 읽고 통째로
+// 저장하는 방식이었음. 이제:
+//   - 캐릭터 편집은 섹션별로 characters 행의 해당 컬럼만 update
+//   - 장착/해제는 warehouse_items.held_by를 직접 갱신(= 유일한 진실 공급원,
+//     characters 테이블엔 equipment 컬럼 자체가 없음)
 // ============================================================================
-function getRoster() {
-  try { return JSON.parse(localStorage.getItem("battleSim_roster")) || []; }
-  catch { return []; }
-}
-function saveRoster(roster) {
-  localStorage.setItem("battleSim_roster", JSON.stringify(roster));
-}
-function getWarehouse() {
-  try { return JSON.parse(localStorage.getItem("battleSim_warehouse")) || []; }
-  catch { return []; }
-}
-function saveWarehouse(warehouse) {
-  localStorage.setItem("battleSim_warehouse", JSON.stringify(warehouse));
-}
-
 const params = new URLSearchParams(location.search);
-const charId = params.get("id"); // id가 "유저이름_순번" 형태의 문자열이라 숫자 변환 안 함
-const roster = getRoster();
-const committedIndex = roster.findIndex(c => c.id === charId);
-const committed = committedIndex === -1 ? null : roster[committedIndex];
+const charId = params.get("id"); // characters.id (uuid)
 
-function getUsername() {
-  try { return localStorage.getItem("battleSim_username") || "2inkle"; }
-  catch { return "2inkle"; }
+// 아래 값들은 전부 부트스트랩 IIFE가 비동기로 채움. 렌더 함수들은 함수 선언
+// (호이스팅)이라 파싱 시점 순서와 무관하게 이 변수들을 클로저로 참조함.
+let session = null;
+let isOwner = false;   // characters 행의 user_id가 내 세션과 같은지(RLS가 이미 막지만 표시용으로도 씀)
+let isAdmin = false;   // profiles.is_admin — 개발자 도구 노출 조건
+let data = null;       // 편집용 작업 사본(camelCase). data.equipment는 held_by로 조립한 파생값
+let equipPool = [];    // 창고 풀(held_by IS NULL)의 장비 목록. 각 원소에 원본 DB 행이 _raw로 붙어있음
+
+// ============================================================================
+// DB 행(snake_case) → 기존 렌더 코드가 기대하는 camelCase 모양으로 변환.
+// roster-index.html/hire.html과 같은 어댑터 컨벤션 — 렌더 함수 자체는 안 건드림.
+// ============================================================================
+function mapCharacterRow(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    job: row.job,
+    level: row.level,
+    exp: row.exp,
+    expToNext: row.exp_to_next,
+    portrait: row.portrait,
+    realStats: row.real_stats || {},
+    learnedSkillNames: row.learned_skill_names || [],
+    personalResources: row.personal_resources || {},
+    row: row.row_position,
+    guardAllies: row.guard_allies,
+    presets: row.presets || [],
+    keyItems: row.key_items || [],
+  };
 }
 
-// charId("유저이름_번호")에서 유저이름만 정확히 뽑아냄 — 유저이름 자체에 밑줄이
-// 들어갈 수 있어서(예: "2inkle_owo") startsWith가 아니라 "마지막 밑줄+숫자"를
-// 잘라내는 방식으로 함(character-sheet.html 개발자 도구 노출 조건과 동일한 로직).
-// 이 값과 현재 로그인 유저가 다르면 "남의 캐릭터"이므로 편집을 막아야 함 —
-// URL의 id만 바꿔서 남의 캐릭터에 직접 접근하는 경우(관전 목적이 아니라
-// 미배분 포인트를 악의적으로 조작하는 것 등)를 방지하기 위함.
-const ownerUsername = (() => {
-  const m = typeof charId === "string" ? charId.match(/^(.+)_(\d+)$/) : null;
-  return m ? m[1] : null;
-})();
-const isOwner = ownerUsername !== null && ownerUsername === getUsername();
-
-if (committed) {
-  if (!committed.learnedSkillNames) {
-    committed.learnedSkillNames = (committed.learnedSkills || []).map(s => s.name);
-  }
-  if (!committed.personalResources) committed.personalResources = {};
-  if (committed.row !== "front" && committed.row !== "back") committed.row = "front";
-  if (typeof committed.guardAllies !== "boolean") committed.guardAllies = false;
-  // "공격"이 COMMON_SKILLS로 전환되기 전에 만들어진 캐릭터도 계속 쓸 수 있도록 보정
-  if (!committed.learnedSkillNames.includes("공격")) committed.learnedSkillNames.unshift("공격");
-
-  // 장비 슬롯 4종(무기/장갑/방어구/장신구) -> 12종 마이그레이션. 매핑 안 되거나
-  // 이미 그 슬롯이 찬 경우엔 창고 풀로 돌려서 아이템을 잃어버리지 않게 함
-  // (개인 인벤토리는 더 이상 안 쓰므로).
-  const NEW_SLOT_KEYS = ["mainhand","subhand","armor","cloak","shoes","head","accessory","jItem","item","avatar","skillSeal","uItem"];
-  const OLD_SLOT_MAP = { "무기":"mainhand", "방어구":"armor", "장신구":"accessory", "장갑":"head" };
-  if (!committed.equipment) {
-    committed.equipment = {};
-    NEW_SLOT_KEYS.forEach((k) => { committed.equipment[k] = null; });
-  } else {
-    const needsMigration = Object.keys(committed.equipment).some((k) => OLD_SLOT_MAP[k]) || NEW_SLOT_KEYS.some((k) => !(k in committed.equipment));
-    if (needsMigration) {
-      const migrated = {};
-      NEW_SLOT_KEYS.forEach((k) => { migrated[k] = null; });
-      const displaced = [];
-      Object.entries(committed.equipment).forEach(([oldKey, item]) => {
-        if (!item) return;
-        const newKey = OLD_SLOT_MAP[oldKey] || (NEW_SLOT_KEYS.includes(oldKey) ? oldKey : null);
-        if (newKey && !migrated[newKey]) migrated[newKey] = item;
-        else displaced.push(item);
-      });
-      if (displaced.length) {
-        const warehouse = getWarehouse();
-        displaced.forEach((item) => {
-          const existing = warehouse.find((w) => w.name === item.name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
-          if (existing) existing.quantity += 1;
-          else warehouse.push({ ...item, category: "equipment", quantity: 1 });
-        });
-        saveWarehouse(warehouse);
-      }
-      committed.equipment = migrated;
-    }
-  }
-
-  // 위 마이그레이션/기본값 보정은 "사용자 편집"이 아니라 데이터 정합성 문제라
-  // 섹션별 저장 버튼을 기다리지 않고 즉시 반영해둠(사용자가 아무것도 안 만져도
-  // 다음에 열었을 때 또 마이그레이션할 필요 없도록).
-  saveRoster(roster);
+function mapItemRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    quantity: row.quantity,
+    description: row.description,
+    slot: row.slot,
+    heldBy: row.held_by,
+    enhanceLevel: row.enhance_level,
+    craftMaterial: row.craft_material,
+    appraised: row.appraised,
+    combatReal: row.combat_real,
+    combatBonus: row.combat_bonus,
+    statBonus: row.stat_bonus,
+    passiveBonus: row.passive_bonus,
+    maxHpBonus: row.max_hp_bonus,
+    maxSpBonus: row.max_sp_bonus,
+    weight: row.weight,
+    twoHanded: row.two_handed,
+    setId: row.set_id,
+    requiredJob: row.required_job,
+    statRealBonus: row.stat_real_bonus,
+    patternSlotBonus: row.pattern_slot_bonus,
+    critMultiplier: row.crit_multiplier,
+    conditionalPassiveMods: row.conditional_passive_mods,
+    grantsResource: row.grants_resource,
+    equipmentType: row.equipment_type,
+    avatarPortrait: row.avatar_portrait,
+    grantsSkill: row.grants_skill,
+    consumable: row.consumable,
+    usesPerBattle: row.uses_per_battle,
+    enhanceable: row.enhanceable,
+    _raw: row, // 스택 분할(insert) 시 snake_case 원본이 그대로 필요해서 같이 들고 다님
+  };
 }
 
-// data는 이제 로스터 원본(committed)의 참조가 아니라 "편집용 작업 사본"(깊은
-// 복사)임 — 섹션별 저장 버튼을 눌러야만 이 안의 변경분이 그 섹션에 해당하는
-// 필드만 committed(및 localStorage)로 넘어감. SAVE_SECTIONS/saveSection() 참고.
-const data = committed ? JSON.parse(JSON.stringify(committed)) : null;
+// DB/네트워크 오류는 조용히 삼키지 않음 — 창고 거래가 절반만 반영되는 상황을
+// 사용자가 모르고 지나가면 안 되므로 콘솔 + 알림 양쪽에 남김.
+function reportError(where, err) {
+  console.error(`[character-sheet] ${where}`, err);
+  alert(`저장/갱신에 실패했습니다 (${where}): ${err?.message || err}`);
+}
 
 // ============================================================================
 // 섹션별 저장 — 버튼마다 "이 필드들만" 커밋하도록 매핑. 예를 들어 패턴을
-// 편집하다가 스탯 섹션의 저장 버튼을 눌러도 realStats만 반영되고 presets(패턴)는
-// 여전히 미저장 상태로 남음.
+// 편집하다가 스탯 섹션의 저장 버튼을 눌러도 real_stats만 반영되고 presets(패턴)는
+// 여전히 미저장 상태로 남음. 값은 "메모리 필드명 → DB 컬럼명".
+//
+// ⚠ equipment 섹션에서 "equipment"가 빠졌음 — characters 테이블에 equipment
+// 컬럼이 없다(warehouse_items.held_by가 유일한 진실 공급원). 장착/해제는 저장
+// 버튼과 무관하게 즉시 warehouse_items에 반영되고, 이 섹션 버튼은 이제
+// personal_resources만 커밋함.
 // ============================================================================
 const SAVE_SECTIONS = {
-  profile:   { fields: ["row", "guardAllies", "job", "level", "portrait", "keyItems"] },
-  stat:      { fields: ["realStats"] },
-  equipment: { fields: ["equipment", "personalResources"] },
-  skill:     { fields: ["learnedSkillNames"] },
-  pattern:   { fields: ["presets"] },
+  profile:   { fields: { row:"row_position", guardAllies:"guard_allies", job:"job", level:"level", portrait:"portrait", keyItems:"key_items" } },
+  stat:      { fields: { realStats:"real_stats" } },
+  equipment: { fields: { personalResources:"personal_resources" } },
+  skill:     { fields: { learnedSkillNames:"learned_skill_names" } },
+  pattern:   { fields: { presets:"presets" } },
 };
 const dirtyFlags = { profile:false, stat:false, equipment:false, skill:false, pattern:false };
 
@@ -613,28 +596,27 @@ function markDirty(section) {
   dirtyFlags[section] = true;
 }
 
-// 이 섹션에 속한 필드만 골라서 로스터(및 localStorage)에 반영. 저장 직전에
-// getRoster()로 최신 상태를 다시 읽어서 그 위에 얹으므로, 다른 곳(다른 섹션의
-// 저장, 또는 다른 탭)에서 이미 반영된 내용을 덮어쓰지 않음.
-function saveSection(section) {
+// 이 섹션에 속한 컬럼만 골라서 characters 행에 update. 다른 섹션의 컬럼은
+// 아예 payload에 안 들어가므로, 다른 곳에서 이미 반영된 내용을 덮어쓰지 않음
+// (예전에 "로스터 전체를 다시 읽어서 그 위에 얹던" 이유가 여기선 자연히 해결됨).
+async function saveSection(section) {
   // 소유자가 아니면(=URL의 id를 바꿔서 남의 캐릭터에 들어온 경우) 절대 저장 안 함.
-  // 저장은 결국 이 함수 하나로 다 모이므로, 다른 버튼을 아무리 눌러 화면상
-  // 상태를 바꿔도 새로고침하면 원래대로 돌아옴 — 실질적인 방어는 여기서 끝남.
+  // RLS가 서버에서 한 번 더 막지만, 화면 흐름상으로도 여기서 끊음.
   if (!isOwner) return;
 
-  // ⚠ 무게 초과를 여기서 막으면 안 됨. 장착/해제 핸들러는 창고 쪽
-  // (returnToWarehousePool/equipFromWarehouse)을 먼저 즉시 반영한 뒤에
-  // 이 함수를 부르기 때문에, 여기서 저장을 거부하면 "창고에는 반영됐는데
-  // 캐릭터에는 저장 안 된" 불일치가 남아 장비가 복제되거나 사라짐.
-  // 무게 제한은 (1) 장착 시점 차단(isItemEquippableBy) (2) 저장 버튼 비활성화
+  // ⚠ 무게 초과를 여기서 막으면 안 됨(예전 주석 그대로 유효) — 무게 제한은
+  // (1) 장착 시점 차단(isItemEquippableBy) (2) 저장 버튼 비활성화
   // (renderSectionSaveButton) 두 곳에서 거름.
-  const freshRoster = getRoster();
-  const idx = freshRoster.findIndex(c => c.id === charId);
-  if (idx === -1) return;
-  SAVE_SECTIONS[section].fields.forEach((field) => {
-    freshRoster[idx][field] = data[field];
+  const payload = {};
+  Object.entries(SAVE_SECTIONS[section].fields).forEach(([field, column]) => {
+    payload[column] = data[field];
   });
-  saveRoster(freshRoster);
+  const { error } = await window.sbClient
+    .from("characters")
+    .update(payload)
+    .eq("id", charId)
+    .eq("user_id", session.user.id);
+  if (error) { reportError(`${section} 저장`, error); return; }
   dirtyFlags[section] = false;
 }
 
@@ -679,11 +661,11 @@ function renderSectionSaveButton(section) {
 // 섹션 저장 버튼은 여러 렌더 함수에 걸쳐 반복 등장하므로, 매번 다시 바인딩하는
 // 대신 문서 레벨에서 한 번만 위임 등록(버튼이 재렌더로 새로 생겨도 버블링으로
 // 그대로 잡힘).
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-save-section]");
   if (!btn || btn.disabled) return;
   const section = btn.dataset.saveSection;
-  saveSection(section);
+  await saveSection(section);
   if (section === "profile") renderProfile();
   else if (section === "stat" || section === "equipment" || section === "skill") renderStatSection();
   else if (section === "pattern") renderPatternSection();
@@ -723,9 +705,9 @@ function renderProfile() {
       </button>
     </div>
 
-    ${ownerUsername === "2inkle" ? `
+    ${isAdmin ? `
     <div class="block">
-      <h2 class="section-title">🧪 개발자 도구 <span class="hint">밸런스/기믹 테스트용 — 2inkle 계정에서만 보임</span></h2>
+      <h2 class="section-title">🧪 개발자 도구 <span class="hint">밸런스/기믹 테스트용 — 관리자 계정에서만 보임</span></h2>
       <div class="skill-list">
         <div class="skill-item">
           <div class="sk-main"><span class="sk-name">레벨 +5</span></div>
@@ -948,45 +930,100 @@ const EQUIPMENT_SLOT_KEYS = Object.entries(EQUIPMENT_SLOT_TYPES).sort((a, b) => 
 // requiredJob이 있으면 J.Item 규칙(isJobOrDescendantOf) 적용.
 // ============================================================================
 // 장비 소유 모델 — 캐릭터 개인 인벤토리(data.inventory)는 더 이상 안 씀.
-// 대신 창고(battleSim_warehouse) 안에서 장비 항목을 두 가지 상태로 다룸:
-//   풀(pool)   — heldBy 없음. quantity로 뭉쳐서 관리(같은 이름+분류는 병합).
+// warehouse_items 테이블 안에서 장비 항목을 두 가지 상태로 다룸:
+//   풀(pool)   — held_by IS NULL. quantity로 뭉쳐서 관리(같은 이름+분류는 병합).
 //                누구나 장착 후보로 가져갈 수 있음.
-//   보유(held) — heldBy: 캐릭터id. quantity 항상 1(개별 인스턴스). 그 캐릭터가
-//                장착 중인 바로 그 장비 — 다른 캐릭터에게는 후보로 안 보임.
-// 장착: 풀에서 1개를 꺼내(quantity -1, 0 되면 그 행 삭제) 완전히 같은 스펙의
-//   새 행을 만들어 heldBy를 붙여 창고에 넣고, 그 데이터를 character.equipment
-//   [슬롯]에도 그대로 복사해둠(전투 엔진이 character.equipment를 직접 읽으므로).
-// 해제: heldBy가 붙은 그 행을 지우고, 풀에 병합(없으면 새로 만듦) — 해제하는
-//   즉시 "누구 것도 아닌 공용 재고"로 돌아가 다른 캐릭터도 다시 가져갈 수 있음
-//   (캐릭터 개인이 아이템을 독점하지 않는다는 원칙).
+//   보유(held) — held_by: 캐릭터 uuid. quantity 항상 1(개별 인스턴스). 그
+//                캐릭터가 장착 중인 바로 그 장비 — 다른 캐릭터에겐 안 보임.
+// 장착: 풀 행의 quantity가 1이면 그 행에 held_by만 붙임(행 이동 없음). 2 이상이면
+//   quantity를 1 줄이고 같은 스펙의 새 행을 quantity:1 + held_by로 insert.
+// 해제: 같은 스펙의 풀 행이 있으면 그 행 quantity +1 하고 held 행을 삭제,
+//   없으면 held 행의 held_by만 NULL로 되돌림(행을 지웠다 만들 필요 없음).
+// data.equipment는 이제 저장되는 필드가 아니라 held_by 조회 결과로 매번
+// 조립되는 파생값 — characters 테이블에 equipment 컬럼 자체가 없음.
 // ============================================================================
-function equipFromWarehouse(character, poolItem) {
-  const warehouse = getWarehouse();
-  const idx = warehouse.findIndex((w) => w === poolItem || (w.name === poolItem.name && w.category === poolItem.category && !w.heldBy && (w.enhanceLevel||0) === (poolItem.enhanceLevel||0)));
-  if (idx === -1) return null;
-  warehouse[idx].quantity -= 1;
-  if (warehouse[idx].quantity <= 0) warehouse.splice(idx, 1);
 
-  const { quantity, heldBy, ...spec } = poolItem;
-  const heldInstance = { ...spec, quantity: 1, heldBy: character.id };
-  warehouse.push(heldInstance);
-  saveWarehouse(warehouse);
-  return heldInstance;
+// 풀 행에서 "held 인스턴스" insert payload(snake_case)를 만듦. 이미 DB 행이라
+// 컬럼명은 그대로 두고 id/quantity/held_by/created_at만 갈아끼움.
+function buildHeldInsertPayload(poolRow) {
+  const { id, quantity, held_by, created_at, ...rest } = poolRow;
+  return { ...rest, user_id: session.user.id, quantity: 1, held_by: charId };
 }
-function returnToWarehousePool(item) {
-  if (!item) return;
-  const warehouse = getWarehouse();
-  // heldBy가 붙어있던 그 개별 인스턴스를 제거(이름+분류+heldBy로 특정)
-  const heldIdx = warehouse.findIndex((w) => w.name === item.name && w.category === item.category && w.heldBy === item.heldBy && w.heldBy);
-  if (heldIdx !== -1) warehouse.splice(heldIdx, 1);
 
-  const { quantity, heldBy, ...spec } = item;
-  // enhanceLevel도 같이 봐야 함 — 강화된 장비(예: 대검+10)는 기본형(대검+0)과
-  // 스펙이 다른 별개 아이템이라 절대 같이 뭉치면 안 됨.
-  const poolExisting = warehouse.find((w) => w.name === item.name && w.category === item.category && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
-  if (poolExisting) poolExisting.quantity += 1;
-  else warehouse.push({ ...spec, quantity: 1 });
-  saveWarehouse(warehouse);
+// 풀 아이템 하나를 이 캐릭터의 held 인스턴스로 전환하고, 그 인스턴스를 반환.
+async function equipFromWarehouse(poolItem) {
+  const raw = poolItem._raw;
+  if ((raw.quantity || 0) <= 1) {
+    const { data: updated, error } = await window.sbClient
+      .from("warehouse_items")
+      .update({ held_by: charId })
+      .eq("id", raw.id)
+      .select()
+      .single();
+    if (error) { reportError("장착", error); return null; }
+    return mapItemRow(updated);
+  }
+  const { error: decError } = await window.sbClient
+    .from("warehouse_items")
+    .update({ quantity: raw.quantity - 1 })
+    .eq("id", raw.id);
+  if (decError) { reportError("장착(재고 차감)", decError); return null; }
+  const { data: inserted, error: insError } = await window.sbClient
+    .from("warehouse_items")
+    .insert(buildHeldInsertPayload(raw))
+    .select()
+    .single();
+  if (insError) { reportError("장착(개체 생성)", insError); return null; }
+  return mapItemRow(inserted);
+}
+
+// held 인스턴스를 창고 풀로 되돌림. enhanceLevel/craftMaterial까지 같이 봐야 함 —
+// 강화된 장비(예: 대검+10)나 소재가 다른 개조품은 기본형과 스펙이 다른 별개
+// 아이템이라 절대 같이 뭉치면 안 됨.
+async function returnToWarehousePool(item) {
+  if (!item || !item.id) return;
+  let query = window.sbClient
+    .from("warehouse_items")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .is("held_by", null)
+    .eq("name", item.name)
+    .eq("category", item.category);
+  query = item.enhanceLevel == null ? query.is("enhance_level", null) : query.eq("enhance_level", item.enhanceLevel);
+  query = item.craftMaterial == null ? query.is("craft_material", null) : query.eq("craft_material", item.craftMaterial);
+  const { data: poolRow, error } = await query.limit(1).maybeSingle();
+  if (error) { reportError("해제(풀 조회)", error); return; }
+
+  if (poolRow) {
+    const { error: incError } = await window.sbClient
+      .from("warehouse_items")
+      .update({ quantity: (poolRow.quantity || 0) + 1 })
+      .eq("id", poolRow.id);
+    if (incError) { reportError("해제(재고 병합)", incError); return; }
+    const { error: delError } = await window.sbClient
+      .from("warehouse_items")
+      .delete()
+      .eq("id", item.id);
+    if (delError) { reportError("해제(개체 삭제)", delError); return; }
+  } else {
+    const { error: relError } = await window.sbClient
+      .from("warehouse_items")
+      .update({ held_by: null })
+      .eq("id", item.id);
+    if (relError) { reportError("해제", relError); return; }
+  }
+}
+
+// 창고 풀(장비 카테고리) 갱신 — 장착/해제 직후 목록을 다시 읽어옴.
+async function refreshEquipPool() {
+  const { data: rows, error } = await window.sbClient
+    .from("warehouse_items")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .is("held_by", null)
+    .eq("category", "equipment");
+  if (error) { reportError("창고 조회", error); return; }
+  equipPool = (rows || []).map(mapItemRow);
 }
 // ============================================================================
 // 양손무기(twoHanded) 예외 규칙 저장소 — 원칙은 "mainhand에 양손무기가 장착돼
@@ -1008,9 +1045,9 @@ function isTwoHandedExceptionAllowed(mainhandName, subhandName) {
 // 여기 항목이 아예 없는 직업은 제한 없음(모든 타입 착용 가능)으로 취급함 —
 // 안 그러면 아직 등록 안 된 다른 모든 직업이 장비를 하나도 못 끼는 상태가
 // 돼버림(직업 테이블은 필요할 때마다 하나씩 채워나가는 방식이라). 이제
-// dev-tools의 job-table-editor.html에서 관리하는 공용 소스에서 읽어옴.
+// game_content(key='jobTable')의 allowedEquipmentTypes에서 읽어옴.
 // ============================================================================
-const JOB_ALLOWED_EQUIPMENT_TYPES = getJobTable().allowedEquipmentTypes;
+let JOB_ALLOWED_EQUIPMENT_TYPES = {};
 
 function isItemEquippableBy(item, job, currentEquipment) {
   if (item.requiredJob && !isJobOrDescendantOf(job, item.requiredJob)) {
@@ -1327,7 +1364,7 @@ function renderStatSection() {
         }).join("")}
       </div>
       ${(() => {
-        const allPool = getWarehouse().filter((w) => w.category === "equipment" && !w.heldBy);
+        const allPool = equipPool;
         if (allPool.length === 0) return "";
         return `
         <h2 class="section-title" style="margin-top:18px;">창고에서 장착 가능한 장비 <span class="hint">용병단 공용 — 장착하면 그 개체가 이 캐릭터 전용이 됨, 해제하면 다시 공용으로</span></h2>
@@ -1427,60 +1464,50 @@ function renderStatSection() {
   // 그 슬롯에 이미 있던 장비는 다시 풀로 돌려보냄. 관전 모드(남의 캐릭터)면
   // 창고를 건드릴 수 없게 맨 위에서 막음 — 안 그러면 실제로 소유하지도 않을
   // 캐릭터에게 창고 아이템이 잘못 배정되는 구멍이 생김.
-  el.querySelectorAll(".equip-btn").forEach(btn => btn.addEventListener("click", (e) => {
+  el.querySelectorAll(".equip-btn").forEach(btn => btn.addEventListener("click", async (e) => {
     if (!isOwner) return;
     const idx = Number(e.target.closest(".inv-item").dataset.idx);
-    const poolItem = getWarehouse().filter((w) => w.category === "equipment" && !w.heldBy)[idx];
+    const poolItem = equipPool[idx];
     if (!poolItem) return;
     const eligibility = isItemEquippableBy(poolItem, data.job, data.equipment);
     if (!eligibility.ok) return; // 버튼이 disabled라 보통 여기 안 옴 — 방어적 처리
 
     const prev = data.equipment[poolItem.slot];
-    const heldInstance = equipFromWarehouse(data, poolItem);
+    const heldInstance = await equipFromWarehouse(poolItem);
     if (!heldInstance) return;
-    if (prev) returnToWarehousePool(prev);
+    if (prev) await returnToWarehousePool(prev);
     data.equipment[poolItem.slot] = heldInstance;
 
     // mainhand에 "새로" 양손무기를 장착하는 경우 — 예외 조합이 아니면 subhand를
-    // 강제로 해제함(요청하신 "장착 요청이 들어왔을 때 강제로 장착 해제됨" 규칙).
+    // 강제로 해제함("장착 요청이 들어왔을 때 강제로 장착 해제됨" 규칙).
     if (poolItem.slot === "mainhand" && poolItem.twoHanded) {
       const sub = data.equipment.subhand;
       if (sub && !isTwoHandedExceptionAllowed(poolItem.name, sub.name)) {
         data.equipment.subhand = null;
-        returnToWarehousePool(sub);
+        await returnToWarehousePool(sub);
       }
     }
 
-    // 창고 거래는 즉시 반영되는 공용 자원이라, 저장 버튼을 기다리지 않고 이
-    // 캐릭터의 equipment 필드도 곧바로 커밋함(안 그러면 "창고엔 이 캐릭터가
-    // 가져간 걸로 나오는데 정작 저장은 안 돼서 아무도 못 쓰는" 상태가 생김).
-    saveSection("equipment");
-    markDirty("equipment"); renderStatSection();
+    // 예전엔 여기서 saveSection("equipment")를 불러 character.equipment를 즉시
+    // 커밋했음(창고엔 반영됐는데 캐릭터엔 저장 안 되는 불일치 방지). 이제
+    // warehouse_items.held_by가 유일한 진실 공급원이라 위 DB 갱신 자체가 곧
+    // 확정이고, 애초에 동기화할 미러 필드가 없어서 호출이 불필요해짐.
+    await refreshEquipPool();
+    renderStatSection();
   }));
 
   // 해제: 슬롯을 비우고 창고 풀로 되돌림(해제하는 즉시 다른 캐릭터도 다시
   // 가져갈 수 있는 공용 재고가 됨 — 캐릭터가 아이템을 독점하지 않음).
-  el.querySelectorAll(".unequip-x").forEach(btn => btn.addEventListener("click", (e) => {
+  el.querySelectorAll(".unequip-x").forEach(btn => btn.addEventListener("click", async (e) => {
     if (!isOwner) return;
     const type = e.target.closest(".equip-slot").dataset.type;
     const item = data.equipment[type];
     if (!item) return;
     data.equipment[type] = null;
-    returnToWarehousePool(item);
-    saveSection("equipment");
-    markDirty("equipment"); renderStatSection();
+    await returnToWarehousePool(item);
+    await refreshEquipPool();
+    renderStatSection();
   }));
-
-  // 아래 개발자 도구 버튼들은 이제 창고 "풀"에 지급함(개인 인벤토리 직행이
-  // 아님) — 실제 장착 플로우(풀 → 장착)까지 그대로 타게 해서, 테스트가 진짜
-  // 유저 경로를 검증하게 함.
-  function grantToWarehousePool(item) {
-    const warehouse = getWarehouse();
-    const existing = warehouse.find((w) => w.name === item.name && w.category === "equipment" && !w.heldBy && (w.enhanceLevel||0) === (item.enhanceLevel||0));
-    if (existing) existing.quantity += 1;
-    else warehouse.push({ ...item, category: "equipment", quantity: 1 });
-    saveWarehouse(warehouse);
-  }
 
   // devGrantWeaponBtn / devGrantSetPieceBtn / devGrantJItemBtn / devGrantSkillSealBtn은
   // ITEM_TABLE(마스터 테이블) 제거에 맞춰 일시 비활성화함(버튼 자체는 disabled).
@@ -1794,17 +1821,7 @@ function updateSectionSaveIndicator(section) {
     flag.innerHTML = `<span class="dot"></span>${isDirty ? "저장 안 된 변경사항 있음" : "저장됨"}`;
   }
 }
-if (data) {
-  if (!isOwner) {
-    document.getElementById("spectateBanner").innerHTML = `
-      <div class="spectate-banner">👁 관전 모드 — 본인 캐릭터가 아니라서 모든 항목이 읽기 전용입니다. 어떤 값을 바꿔도 저장되지 않아요.</div>
-    `;
-  }
-  renderProfile();
-  renderStatSection();
-  renderPatternSection();
-  renderAdvancementSection();
-} else {
+function renderNotFound() {
   document.querySelector("main").innerHTML = `
     <div class="empty-wrap">
       <div class="e-icon">❓</div>
@@ -1814,6 +1831,92 @@ if (data) {
     </div>
   `;
 }
+
+// ============================================================================
+// 부트스트랩 — 로그인 확인 → 전역 콘텐츠(스킬/직업 테이블) + 캐릭터 + 장착 장비 +
+// 창고 풀을 전부 받아온 뒤에야 첫 렌더를 돌림. 예전엔 이 모든 게 localStorage
+// 동기 읽기라 파싱 시점에 그냥 끝났지만, 이제 값이 비동기로 도착하므로 렌더
+// 호출을 여기로 모았음(렌더 함수 자체는 그대로).
+// ============================================================================
+(async () => {
+  session = await window.AuthGuard.requireSession();
+
+  if (!charId) { renderNotFound(); return; }
+
+  let skillContent, jobContent, charRow, heldRows;
+  try {
+    const [skillRes, jobRes, charRes, adminFlag] = await Promise.all([
+      window.sbClient.from("game_content").select("data").eq("key", "skillTable").single(),
+      window.sbClient.from("game_content").select("data").eq("key", "jobTable").single(),
+      window.sbClient.from("characters").select("*").eq("id", charId).maybeSingle(),
+      window.AuthGuard.isAdmin(session),
+    ]);
+    if (skillRes.error) throw skillRes.error;
+    if (jobRes.error) throw jobRes.error;
+    if (charRes.error) throw charRes.error;
+    skillContent = skillRes.data?.data || {};
+    jobContent = jobRes.data?.data || {};
+    charRow = charRes.data;
+    isAdmin = adminFlag;
+  } catch (err) {
+    reportError("초기 데이터 로드", err);
+    renderNotFound();
+    return;
+  }
+
+  COMMON_SKILLS = skillContent.commonSkills || [];
+  SKILL_TABLE = skillContent.jobSkills || {};
+  JOB_ADVANCEMENT_TABLE = jobContent.advancement || {};
+  JOB_ALLOWED_EQUIPMENT_TYPES = jobContent.allowedEquipmentTypes || {};
+
+  // 캐릭터가 없거나(삭제/오타) 남의 것이면(RLS가 애초에 행을 안 내려줌) 똑같이
+  // "찾을 수 없음"으로 처리함 — 클라이언트 입장에서 둘은 구분 불가능하고,
+  // 구분해서 알려줄 이유도 없음.
+  if (!charRow) { renderNotFound(); return; }
+  isOwner = charRow.user_id === session.user.id;
+  if (!isOwner) { renderNotFound(); return; }
+
+  data = mapCharacterRow(charRow);
+
+  // 기본값 보정 — 예전 로스터 시절의 마이그레이션 코드 중 슬롯 4종→12종 변환은
+  // 사라졌음(장비 슬롯은 이제 warehouse_items.slot 컬럼이라 변환할 옛 모양이
+  // 존재하지 않음). 나머지 기본값 보정만 남김.
+  const defaults = {};
+  if (data.row !== "front" && data.row !== "back") { data.row = "front"; defaults.row_position = "front"; }
+  if (typeof data.guardAllies !== "boolean") { data.guardAllies = false; defaults.guard_allies = false; }
+  // "공격"이 COMMON_SKILLS로 전환되기 전에 만들어진 캐릭터도 계속 쓸 수 있도록 보정
+  if (!data.learnedSkillNames.includes("공격")) {
+    data.learnedSkillNames.unshift("공격");
+    defaults.learned_skill_names = data.learnedSkillNames;
+  }
+  // 이 보정은 "사용자 편집"이 아니라 데이터 정합성 문제라 섹션별 저장 버튼을
+  // 기다리지 않고 즉시 반영해둠(다음에 열었을 때 또 보정할 필요 없도록).
+  if (Object.keys(defaults).length) {
+    const { error } = await window.sbClient
+      .from("characters").update(defaults).eq("id", charId).eq("user_id", session.user.id);
+    if (error) reportError("기본값 보정 저장", error);
+  }
+
+  // data.equipment는 저장된 필드가 아니라 held_by 조회 결과로 조립하는 파생값.
+  // 슬롯당 아이템 하나뿐이므로 slot 컬럼으로 그대로 꽂으면 예전 12슬롯 객체와
+  // 정확히 같은 모양이 됨.
+  data.equipment = {};
+  EQUIPMENT_SLOT_KEYS.forEach((k) => { data.equipment[k] = null; });
+  const { data: itemRows, error: itemError } = await window.sbClient
+    .from("warehouse_items").select("*").eq("held_by", charId);
+  if (itemError) { reportError("장착 장비 조회", itemError); }
+  (itemRows || []).forEach((row) => {
+    const item = mapItemRow(row);
+    if (item.slot && item.slot in data.equipment) data.equipment[item.slot] = item;
+  });
+
+  await refreshEquipPool();
+
+  renderProfile();
+  renderStatSection();
+  renderPatternSection();
+  renderAdvancementSection();
+})();
 </script>
 
 </body>
