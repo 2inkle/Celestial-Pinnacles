@@ -6,6 +6,57 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 현재 진행 상황 요약 (2026-08-15 기준 — 다음 세션은 여기부터 읽을 것)
+
+### 끝난 것
+
+- **로그인**: Discord OAuth 단독, Supabase Auth 위임. 실제 계정으로
+  로그인→세션→리다이렉트까지 end-to-end 검증 완료(상세: "로그인" 섹션).
+- **DB 스키마**: `supabase/migrations/0001~0006` 전부 실제 프로젝트에
+  적용 완료. RLS(본인 소유 행만 CRUD)를 anon 키·실제 세션 양쪽으로
+  실측 검증함(타 유저 사칭 쓰기 차단 확인). `profiles.is_admin`으로
+  관리자 판별 전환, 자기 자신을 관리자로 승격시킬 수 있던 구멍도 막음
+  (상세: "로그인/서버 DB 전환 시 API 설계 논의" 섹션).
+- **게임 페이지 전체(10개) Supabase 전환 + 실측 검증 완료**:
+  `roster-index.html`/`hire.html`/`village.html`/`character-sheet.html`/
+  `guild.html`/`shop.html`/`refinery.html`/`workshop.html`/
+  `battle-select.html`/`dispatch.html`/`battle-view.html`(+공유 스크립트
+  `battle-encounters.js`/`battle-adapter.js`). `localStorage`
+  (`battleSim_*`)는 이제 게임 어디에서도 안 쓰임 — DB가 유일한 진실
+  공급원. 각 페이지 전환 세부 내용과 실측 결과는 "게임 페이지의 Supabase
+  전환" 섹션에 페이지별로 기록돼 있음.
+- **전환 중 발견해서 고친 심각한 버그 2건**:
+  1) `battle-adapter.js`가 스킬 테이블을 여전히 `localStorage`에서
+     읽고 있었는데 그 키를 채워주는 곳이 하나도 안 남아서 **모든 전투가
+     스킬 없이 맨주먹으로만 돌고 있었음**(크래시가 없어서 티가 안 났음).
+  2) 전투 결과 배너가 항상 "플레이어"로 뜨던 기존 버그(`src/engine.js`의
+     `startBattle`이 `username`을 반환 객체에 안 담고 있었음, DB 전환과
+     무관한 첫 커밋부터의 버그) — 둘 다 수정 완료, 회귀 테스트 통과.
+
+### 남은 것 (우선순위 순)
+
+1. **밸런싱 — 버프/디버프 상한 축소** (다음 세션 1순위, 위치 이미 특정함):
+   `src/character.js`의 `calculateEffectiveStat()`에서 `realVal * 20`(2000%
+   상한)을 `realVal * 5`(500%)로. `src/registries.js`의
+   `LUK_GROWTH_MAX_RATIO = 20`도 같이 조정 필요(이 캡을 전제로 역산된
+   값이라 파급됨). 상세: "알려진 미구현 / 보류 항목" 섹션 맨 아래.
+2. **관리자 전용 페이지들은 아직 `localStorage`/`battleSim_username`
+   기반**: `skill-table-editor.html`/`job-table-editor.html`/
+   `shop-table-editor.html`/`monster-roster.html`/`monster-sheet.html`/
+   `dev-tools.html`/`feature-requests.html`. `nav.js`는 이미
+   `profiles.is_admin`으로 옮겼지만 이 페이지들 자체의 내부 로직(콘텐츠
+   편집 → `game_content` 반영)은 손 안 댐. 게임 플레이와 무관해서 우선순위
+   낮게 잡아둠 — 편집기에서 스킬/직업/상점/몬스터를 고쳐도 지금은
+   `game_content`에 반영 안 됨(SQL로 직접 갱신하거나, 이 페이지들도
+   전환해야 함).
+3. **서버 측 보상 검증 미착수**: `dispatch.html`/`battle-view.html`이
+   클라이언트가 계산한 exp/gold/loot를 그대로 커밋하는 구조(기존과 동일한
+   신뢰 모델 유지, 이번 전환에서 의도적으로 손 안 댐). 상세: "API 단계에서
+   검증/방어가 필요한 지점" 섹션.
+4. 그 외 소소하게 남은 것들은 "알려진 버그"/"알려진 기능 공백" 섹션들에
+   개별로 정리돼 있음(전직 로그 오귀속, `battle-log-view.html` 낡은 파서,
+   `teamResourceConsume` 이펙트 없음 등) — 전부 우선순위 낮음으로 보류 중.
+
 ## 절대 잊지 말 것 — 데이터가 두 군데 있다
 
 **`skill-table.json` / `job-table.json`은 게임이 안 읽는다.** 이 파일들은
