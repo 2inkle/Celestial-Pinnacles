@@ -596,11 +596,23 @@ DB에서 65분 전으로 임시 조정 → 페이지가 정확히 "2장 대기"�
 카탈로그 전용 필드는 확인 결과 안 새어 들어감)로 아이템 생성, `shop_purchased`
 기록까지 확인 → 정리.
 
-**다음 전환 후보**: 남은 페이지들(`refinery.html`/`workshop.html`/
-`battle-select.html`)은 이 다섯 페이지에서 확립한 패턴(auth-guard/DB row
-매핑/warehouse_items의 `held_by` 직접 조작)을 재사용하면 됨.
-`dispatch.html`/`battle-view.html`(보상 지급 — 서버 검증 이슈와 얽혀 있음)은
-연결점이 많아 가장 마지막으로 남겨둠.
+**`refinery.html` 전환 완료**(2026-08-14): 강화 가능 여부/기준가 조회는
+`game_content`(shopTable/monsterRoster)를 캐시해서 동기 조회, 창고 풀은
+`warehouse_items`(category='equipment', held_by IS NULL)을 캐시. 실행
+시점엔 DB에서 base 행을 다시 조회해 수량 확인 후 차감/삭제, 성공분은
+목표 등급 행에 병합하거나 새로 insert — fromLevel/targetLevel이 0이면
+`enhance_level IS NULL`로 조건 분기(0이 아니라 NULL로 저장됨에 유의).
+원본(+0) 정의 기준 재계산·재강화 시 완전 파괴 등 기존 밸런스 로직은 전혀
+안 건드림. **실측 검증**: 실제 UI로 "모자"(+0) → +1 강화 실행 → 골드
+3000→2970(30G), 창고 행이 `enhance_level:1`인 새 행으로 정확히 교체,
+카드가 "모자 +1"로 재렌더링되고 다음 목표 옵션이 2부터 시작하는 것까지
+확인(재강화 연쇄 시작점 정상) → 정리.
+
+**다음 전환 후보**: 남은 페이지들(`workshop.html`/`battle-select.html`)은
+이 여섯 페이지에서 확립한 패턴(auth-guard/DB row 매핑/warehouse_items의
+`held_by` 직접 조작)을 재사용하면 됨. `dispatch.html`/`battle-view.html`
+(보상 지급 — 서버 검증 이슈와 얽혀 있음)은 연결점이 많아 가장 마지막으로
+남겨둠.
 
 ## 로그인/서버 DB 전환 시 API 설계 논의 (2026-08-14, 스키마 실제 프로젝트에 적용됨)
 
