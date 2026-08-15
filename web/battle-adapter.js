@@ -499,6 +499,16 @@
         character.personalResources[key] = { current: pool.current ?? 0, max: pool.max ?? 100 };
       });
     }
+    // 패시브 배율(damageDealtTo_userPct 등) — buildAllyFromRoster는 장비/학습한
+    // 패시브 스킬에서 자동으로 채우지만, 몬스터는 그 경로가 없어서 이 필드가
+    // 항상 빈 객체({})로 남아있었다. monsterDef.passiveMods로 직접 지정하면
+    // 그대로 심어줌(2026-08-16 신설 — "???"처럼 유저 대비 압도적인 HP/스탯을
+    // 가진 보스가 스탯을 극단적으로 낮추지 않고도 대인 데미지를 일괄
+    // 축소시킬 수 있게 하기 위함. damageDealtTo_userPct는 이미 있던 등급별
+    // 데미지 배율 메커니즘 — src/combatFormulas.js 참고 — 을 그대로 재사용).
+    if (monsterDef.passiveMods) {
+      character.passiveMods = { ...character.passiveMods, ...monsterDef.passiveMods };
+    }
     return character;
   }
 
