@@ -341,6 +341,9 @@ class BattleEngine {
           this.beginOrResolveSkill(actor, SkillRegistry.get(slot.act));
         } else {
           const delayTick = ActionRegistry.execute(slot.act, actor, this);
+          // chains:true 액션(대사 등)은 게이지를 안 건드리고 바로 다음 슬롯
+          // 평가로 넘어감 — "이번 턴 소모" 없이 같은 호출 안에서 연계 실행.
+          if (ActionRegistry.chains(slot.act)) continue;
           actor.actionGauge -= BattleEngine.GAUGE_THRESHOLD + delayTick * actor.effectiveSpeed;
         }
 

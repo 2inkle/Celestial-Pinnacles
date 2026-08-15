@@ -132,14 +132,25 @@ ConditionRegistry.register("AND", (actor, ctx, value, slotIndex) => {
 
 class ActionRegistry {
   static actions = new Map();
+  // chains:true인 액션은 실행 후 이번 턴의 게이지를 전혀 소모하지 않고, 같은
+  // executeAction() 호출 안에서 곧바로 다음 패턴 슬롯을 평가함(engine.js
+  // executeAction 참고) — "대사 한 줄 찍고 후속딜레이 없이 바로 다음 행동으로
+  // 이어지는" 연출용(DIALOGUE_OPENING -> SUMMON_OPENING, DIALOGUE_DEFEAT ->
+  // REWARD_GRANT -> SELF_DETONATION 같은 한 묶음 연계).
+  static chainingActions = new Set();
 
-  static register(key, executeFn) {
+  static register(key, executeFn, { chains = false } = {}) {
     this.actions.set(key, executeFn);
+    if (chains) this.chainingActions.add(key);
   }
 
   static execute(key, actor, context) {
     const fn = this.actions.get(key);
     return fn ? fn(actor, context) : 0;
+  }
+
+  static chains(key) {
+    return this.chainingActions.has(key);
   }
 }
 
@@ -387,6 +398,63 @@ ActionRegistry.register("SUMMON", (actor, ctx) =>
 
 ActionRegistry.register("SUMMON_OPENING", (actor, ctx) =>
   performSummon(actor, ctx, Math.max(1, actor.openingSummonCount || 3)));
+
+// ============================================================================
+// 대사 전용 액션 — 전투 효과 없이 텍스트만 출력(고블린 마차의 "대화하는 듯한
+// 연출"용). chains:true라 게이지를 안 쓰고 바로 다음 패턴 슬롯으로 넘어감 —
+// 대사 자체가 "이번 턴"을 차지하지 않고, 뒤이은 진짜 행동(소환/자폭 등)과
+// 한 묶음으로 즉시 이어짐. actor.dialogueLines(문자열 배열)를 심어두면
+// 그 대사를, 없으면 기본 문구를 씀 — 몬스터마다 다른 대사를 쓰고 싶을 때
+// 재사용 가능하게 하기 위함.
+function speakLines(actor, ctx, lines) {
+  lines.forEach((line) => ctx.log(`   ${actor.name}: "${line}"`));
+}
+
+ActionRegistry.register("DIALOGUE_OPENING", (actor, ctx) => {
+  speakLines(actor, ctx, actor.dialogueOpeningLines || ["..."]);
+  return 0;
+}, { chains: true });
+
+ActionRegistry.register("DIALOGUE_DEFEAT", (actor, ctx) => {
+  speakLines(actor, ctx, actor.dialogueDefeatLines || ["..."]);
+  return 0;
+}, { chains: true });
+
+// 자폭 — 방어력/Guard 등 어떤 경감도 거치지 않고 즉시 HP를 0으로 만듦
+// ("자신의 체력이 50% 미만이 될 경우 최대체력의 100%만큼 자해"라는 설계
+// 의도 자체가 "무조건 죽는다"이므로, takeDamage()의 방어 파이프라인을
+// 거치면 오히려 의도가 흐려짐 — 직접 0으로 설정). HP/SP 변화 표기는
+// creatureTier가 "boss"면 이미 로그에서 빠지므로(statChangeLine 규칙)
+// 여기서는 그냥 서술형 한 줄만 남김.
+ActionRegistry.register("SELF_DETONATION", (actor, ctx) => {
+  actor.currentHp = 0;
+  ctx.log(`   ${actor.name}이(가) 스스로 자폭했다!`);
+  return 0;
+});
+
+// 보상 오브젝트 소환 — performSummon()의 SummonEff/LUK 배율 시스템을 안 씀
+// (그 시스템은 "소환자가 강할수록 소환물도 강해진다"는 몬스터 물량전용
+// 설계라, 고정된 보상 상자에는 안 맞음). actor.rewardObjectSpec으로
+// {name, maxHp, dropTable} 등을 심어두면 그 스펙 그대로, 없으면 기본값
+// (2000 HP짜리 이름 없는 상자)을 씀 — 몬스터마다 다른 보상 오브젝트를
+// 쓰고 싶을 때 재사용 가능하게 하기 위함. 패턴 슬롯을 아예 안 줘서
+// 스스로는 아무 행동도 안 함.
+ActionRegistry.register("REWARD_GRANT", (actor, ctx) => {
+  const spec = actor.rewardObjectSpec || { name: "보물상자", maxHp: 2000, dropTable: [] };
+  const Ctor = actor.constructor;
+  const chest = new Ctor(spec.name, actor.side, { str: 0, int: 0, dex: 0, spd: 0, luk: 0 });
+  chest.patternSlots = []; // 아무 행동도 하지 않음
+  chest.creatureTier = "normal"; // 마차와 달리 이쪽은 받는 피해를 그대로 표기
+  chest.maxHpOverride = spec.maxHp;
+  chest.currentHp = chest.maxHp;
+  chest.expReward = spec.expReward || 0;
+  chest.goldReward = spec.goldReward || 0;
+  chest.dropTable = spec.dropTable || [];
+  ctx.units.push(chest);
+  (actor.side === "ally" ? ctx.allies : ctx.enemies).push(chest);
+  ctx.log(`   ${actor.name}이(가) ${chest.name}을(를) 남겼다!`);
+  return 0;
+}, { chains: true });
 
 module.exports = { JobRegistry, ConditionRegistry, ActionRegistry, BaseJob };
 

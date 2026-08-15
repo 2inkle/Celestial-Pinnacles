@@ -437,6 +437,11 @@
     // 일어나는 그 순간에 함(LUK가 전투 중 실시간으로 변할 수 있어서).
     const summonPool = resolveSummonPool(monsterTable, monsterDef.summonAbility);
     if (summonPool) character.summonPool = summonPool;
+    // DIALOGUE_OPENING/DIALOGUE_DEFEAT/REWARD_GRANT 액션(src/registries.js)이
+    // 읽는 몬스터별 커스텀 데이터 — 없으면 각 액션의 기본값을 씀.
+    if (monsterDef.dialogueOpeningLines) character.dialogueOpeningLines = monsterDef.dialogueOpeningLines;
+    if (monsterDef.dialogueDefeatLines) character.dialogueDefeatLines = monsterDef.dialogueDefeatLines;
+    if (monsterDef.rewardObjectSpec) character.rewardObjectSpec = monsterDef.rewardObjectSpec;
     return character;
   }
 
