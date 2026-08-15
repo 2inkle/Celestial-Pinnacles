@@ -1192,11 +1192,22 @@ function computeCombinedRealStats() {
   STAT_META.forEach((m) => { combined[m.key] = data.realStats[m.key] + equipReal[m.key]; });
   return combined;
 }
+// 장비/세트효과의 maxHpBonus/maxSpBonus 합산 — 2026-08-16까지는 이 함수
+// 자체가 없어서 computeMaxHp/computeMaxSp가 "생명의 반지"류 아이템의 효과를
+// 아예 안 보여주고 있었다(마침 실전투 쪽에도 이 값이 resetForBattle()에
+// 지워지는 별개 버그가 있었음 — src/character.js의 maxHpRealBonus 참고).
+// 시트 표시값과 실제 전투값이 반드시 같아야 하므로 여기도 같이 채움.
+function computeEquipmentMaxHpSpBonus() {
+  let hp = 0, sp = 0;
+  equippedItems().forEach((it) => { hp += it.maxHpBonus || 0; sp += it.maxSpBonus || 0; });
+  getSetBonusesForEquipped().forEach((tier) => { hp += tier.maxHpBonus || 0; sp += tier.maxSpBonus || 0; });
+  return { hp, sp };
+}
 function computeMaxHp() {
-  return JOB_BASE_HP + Math.floor(computeCombinedRealStats().str * 20);
+  return JOB_BASE_HP + Math.floor(computeCombinedRealStats().str * 20) + computeEquipmentMaxHpSpBonus().hp;
 }
 function computeMaxSp() {
-  return JOB_BASE_SP + Math.floor(computeCombinedRealStats().int * 10);
+  return JOB_BASE_SP + Math.floor(computeCombinedRealStats().int * 10) + computeEquipmentMaxHpSpBonus().sp;
 }
 // 크리티컬 — src/character.js의 critRate/critMultiplier 게터와 반드시 같은
 // 공식이어야 함(시트 표시값과 실제 전투값이 어긋나면 안 되므로).

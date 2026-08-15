@@ -134,11 +134,21 @@ class BattleCharacter {
     // 대상. { name, kind:"hp"|"sp", amountPerTick, remainingTicks } 배열.
     this.activeTicks = [];
 
-    // 버프/디버프(maxHpUp/maxHpDown 등) 및 장비/패시브스킬의 고정치 보너스로
-    // 전투 세션 동안 누적되는 보정치. real/bonus 스탯 시스템과 별개로, "이번
-    // 전투에서 걸린 효과 + 장착/학습 중인 것들의 합"만 담는 자리.
+    // 버프/디버프(maxHpUp/maxHpDown 등)로 전투 중에만 걸리는 보정치 —
+    // resetForBattle()이 매 전투 시작마다 0으로 되돌림(다른 bonus류 스탯과
+    // 동일한 취급).
     this.maxHpBonus = 0;
     this.maxSpBonus = 0; // maxHpBonus와 짝(예전엔 SP쪽엔 이 필드 자체가 없었음)
+
+    // 장비/패시브스킬의 고정치 보너스(생명의 반지 등) — real류 스탯과 같은
+    // 성격이라 resetForBattle() 대상이 아님(2026-08-16 버그 수정: 예전엔
+    // 어댑터가 이 값도 maxHpBonus에 합산해서 넣었는데, resetForBattle이 매
+    // 전투 시작 시 maxHpBonus를 0으로 돌리는 로직과 맞물려 장비발 Max HP/SP
+    // 보너스가 전투 시작 직후 곧바로 사라지는 상태였다 — "생명의 반지"/
+    // "마나의 반지"류 아이템이 사실상 한 번도 작동한 적이 없었던 셈. real/
+    // bonus 2단 구조(realAtk vs bonusAtk 등)와 똑같은 원리로 분리해서 해결.
+    this.maxHpRealBonus = 0;
+    this.maxSpRealBonus = 0;
 
     // 몬스터 전용 — 스탯 공식(200+STR×20)을 무시하고 최대 HP/SP를 직접 지정.
     // null이면 기존 공식대로. 어댑터가 몬스터 정의의 maxHp/maxSp를 여기 넣어줌.
@@ -541,13 +551,13 @@ class BattleCharacter {
     const base = this.maxHpOverride != null
       ? this.maxHpOverride
       : this.job.baseHp + Math.floor(this.realStr * 20);
-    return base + this.maxHpBonus;
+    return base + this.maxHpBonus + this.maxHpRealBonus;
   }
   get maxSp() {
     const base = this.maxSpOverride != null
       ? this.maxSpOverride
       : (this.job.baseSp || 50) + Math.floor(this.realInt * 10);
-    return base + this.maxSpBonus;
+    return base + this.maxSpBonus + this.maxSpRealBonus;
   }
 
   // --- 정보창 전용 (realStat 기준 고정) ---

@@ -362,8 +362,12 @@
       character[`real${capKey}`] += statRealBonus[k];
       character[`bonus${capKey}`] += statBonus[k];
     });
-    character.maxHpBonus += maxHpBonus + passiveMaxHpBonus;
-    character.maxSpBonus += maxSpBonus + passiveMaxSpBonus;
+    // maxHpRealBonus/maxSpRealBonus에 적립 — resetForBattle()이 안 건드리는
+    // "real류" 필드(2026-08-16 버그 수정, character.js 참고: 예전엔 여기서
+    // maxHpBonus/maxSpBonus에 더했는데, 그 필드는 전투 시작마다 0으로
+    // 리셋되는 "전투 중 버프 전용" 필드라 장비발 보너스가 곧바로 사라졌음).
+    character.maxHpRealBonus += maxHpBonus + passiveMaxHpBonus;
+    character.maxSpRealBonus += maxSpBonus + passiveMaxSpBonus;
     character.currentHp = character.maxHp; // maxHp가 위 보너스들로 바뀌었을 수 있으니 다시 풀피로
     character.currentSp = character.maxSp;
 
