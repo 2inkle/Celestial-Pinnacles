@@ -83,7 +83,7 @@
   .stat-row .s-bonus { color:var(--cyan); font-size:11px; }
   .stat-row .s-real-gear { color:var(--gold); font-size:10px; margin-left:2px; }
   .stepper { display:flex; align-items:center; gap:5px; }
-  .stepper button { width:21px; height:21px; border-radius:5px; border:1px solid var(--line); background:var(--panel); color:var(--mist); font-family:'JetBrains Mono',monospace; cursor:pointer; line-height:1; }
+  .stepper button { min-width:30px; height:22px; padding:0 6px; border-radius:5px; border:1px solid var(--line); background:var(--panel); color:var(--mist); font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer; line-height:1; }
   .stepper button:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
   .stepper button:disabled { opacity:0.3; cursor:not-allowed; }
 
@@ -108,11 +108,14 @@
   .unequip-x { background:none; border:none; color:var(--mist-dim); cursor:pointer; font-size:13px; padding:2px 4px; }
   .unequip-x:hover { color:var(--danger); }
 
+  .equip-filter-input { width:100%; box-sizing:border-box; margin-top:10px; padding:7px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel-sunken); color:var(--mist); font-family:'Inter',sans-serif; font-size:12.5px; }
+  .equip-filter-input:focus { outline:none; border-color:var(--gold); }
+  .inv-empty { padding:14px 4px; color:var(--mist-dim); font-size:12px; text-align:center; }
   .inv-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .inv-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel-sunken); }
-  .inv-item .i-name { font-size:12px; color:var(--mist); }
-  .inv-item .i-slot-tag { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--mist-dim); margin-left:6px; }
-  .inv-item .i-bonus { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--cyan); margin-left:8px; }
+  .inv-item .i-name { font-size:13px; color:var(--mist); }
+  .inv-item .i-slot-tag { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); margin-left:6px; }
+  .inv-item .i-bonus { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--cyan); margin-left:8px; }
   .equip-btn { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.05em; background:transparent; border:1px solid var(--cyan-dim); color:var(--cyan); padding:5px 10px; border-radius:5px; cursor:pointer; white-space:nowrap; }
   .equip-btn:hover { border-color:var(--cyan); background:#5fd3c414; }
 
@@ -169,21 +172,21 @@
   .skill-list { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
   .skill-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); }
   .skill-item .sk-main { display:flex; flex-direction:column; gap:3px; }
-  .skill-item .sk-name { font-size:12px; color:#f2efe8; }
-  .skill-item .sk-meta { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); letter-spacing:0.02em; }
+  .skill-item .sk-name { font-size:13.5px; color:#f2efe8; }
+  .skill-item .sk-meta { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); letter-spacing:0.02em; }
   /* 스킬 카드(습득한/습득 가능 스킬) 전용 — 정보가 많아 세로로 쌓음. 전직/테스트
      도구 등 기존의 단순 이름+버튼 한 줄짜리 .skill-item에는 영향 없음. */
-  .skill-item.skill-card { flex-direction:column; align-items:stretch; gap:6px; padding:10px 12px; }
+  .skill-item.skill-card { flex-direction:column; align-items:stretch; gap:7px; padding:11px 13px; }
   .skill-item.skill-card .sk-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .skill-item.skill-card .sk-row { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); letter-spacing:0.02em; }
-  .sk-type-badge { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.05em; padding:2px 8px; border-radius:10px; border:1px solid; white-space:nowrap; }
+  .skill-item.skill-card .sk-row { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); letter-spacing:0.02em; line-height:1.5; }
+  .sk-type-badge { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.05em; padding:2px 8px; border-radius:10px; border:1px solid; white-space:nowrap; }
   .sk-type-badge.physical { color:var(--ember); border-color:var(--ember-dim); }
   .sk-type-badge.magic    { color:var(--cyan);  border-color:var(--cyan-dim); }
   .sk-type-badge.support  { color:var(--gold);  border-color:var(--gold-dim); }
   .sk-type-badge.invalid  { color:var(--danger); border-color:var(--danger-dim); }
   .sk-badges { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
-  .sk-effects { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
-  .sk-effect { font-family:'JetBrains Mono',monospace; font-size:9px; padding:2px 7px; border-radius:4px; background:var(--panel-raised); border:1px solid var(--line); }
+  .sk-effects { display:flex; flex-wrap:wrap; gap:5px; margin-top:2px; }
+  .sk-effect { font-family:'JetBrains Mono',monospace; font-size:10px; padding:3px 8px; border-radius:4px; background:var(--panel-raised); border:1px solid var(--line); }
   .sk-effect.buff { color:var(--cyan); border-color:var(--cyan-dim); }
   .sk-effect.debuff { color:var(--danger); border-color:var(--danger-dim); }
   .sk-effect.neutral { color:var(--mist); }
@@ -504,6 +507,7 @@ let isOwner = false;   // characters 행의 user_id가 내 세션과 같은지(R
 let isAdmin = false;   // profiles.is_admin — 개발자 도구 노출 조건
 let data = null;       // 편집용 작업 사본(camelCase). data.equipment는 held_by로 조립한 파생값
 let equipPool = [];    // 창고 풀(held_by IS NULL)의 장비 목록. 각 원소에 원본 DB 행이 _raw로 붙어있음
+let equipFilterQuery = ""; // 창고 장비 목록 이름 검색어 — 렌더마다 초기화되면 안 되므로 모듈 상태로 유지
 
 // ============================================================================
 // DB 행(snake_case) → 기존 렌더 코드가 기대하는 camelCase 모양으로 변환.
@@ -844,13 +848,14 @@ function computeSkillPoints(d) {
 // ============================================================================
 // 스탯 real/bonus/effective 클램프 공식 — BattleCharacter(src/character.js)의
 // calculateEffectiveStat와 동일한 공식. 장비의 공격력/방어력/마법공격력도 이제
-// 이 공식을 그대로 씀: effective = clamp(real+bonus, real×0.5, real×20).
+// 이 공식을 그대로 씀: effective = clamp(real+bonus, real×0.5, real×5).
 // "낮은 Real + 버프 의존형" vs "높은 Real + 버프 덜 필요형"은 별도 공식이 아니라,
 // 아이템마다 real 수치를 다르게 설계하는 것만으로 이 공식 위에서 자연히 갈림
-// (real이 낮으면 20배를 해도 절대값이 작아서 "버프 없인 약함"이 성립).
+// (real이 낮으면 5배를 해도 절대값이 작아서 "버프 없인 약함"이 성립).
+// 2026-08-15: 상한을 2000%(×20)에서 500%(×5)로 축소 — src/character.js와 동일.
 // ============================================================================
 function calcEffective(real, bonus) {
-  const maxCap = real * 20;   // 버프로도 real의 2000%를 못 넘음
+  const maxCap = real * 5;   // 버프로도 real의 500%를 못 넘음
   const minFloor = real * 0.5;
   return Math.max(minFloor, Math.min(maxCap, real + bonus));
 }
@@ -1313,7 +1318,7 @@ function renderStatSection() {
             <span class="s-bonus">+${bonusStats[m.key]}</span>
           </div>
           <div class="stepper">
-            <button class="stat-plus" ${unassignedPoints <= 0 ? "disabled" : ""}>+</button>
+            ${[1, 5, 10].map(amount => `<button class="stat-plus" data-amount="${amount}" ${unassignedPoints <= 0 ? "disabled" : ""}>+${amount}</button>`).join("")}
           </div>
         </div>
       `).join("")}
@@ -1321,7 +1326,7 @@ function renderStatSection() {
     </div>
 
     <div class="block">
-      <h2 class="section-title">전투 스탯 <span class="hint">전적으로 장비 의존 — real/effective(2000% 캡) 존재</span></h2>
+      <h2 class="section-title">전투 스탯 <span class="hint">전적으로 장비 의존 — real/effective(500% 캡) 존재</span></h2>
       <div class="stat-row"><div class="s-name">⚔️ 공격력(ATK)</div><div class="s-bars"><span class="s-real">${combatStats.real.atk}</span><span class="s-bonus">eff ${combatStats.effective.atk}</span></div></div>
       <div class="stat-row"><div class="s-name">🔮 마법 공격력(MATK)</div><div class="s-bars"><span class="s-real">${combatStats.real.matk}</span><span class="s-bonus">eff ${combatStats.effective.matk}</span></div></div>
       <div class="stat-row"><div class="s-name">🛡️ 방어력(DEF)</div><div class="s-bars"><span class="s-real">${combatStats.real.def}</span><span class="s-bonus">eff ${combatStats.effective.def}</span></div></div>
@@ -1366,10 +1371,17 @@ function renderStatSection() {
       ${(() => {
         const allPool = equipPool;
         if (allPool.length === 0) return "";
+        // 검색어는 idx(=equipPool 원본 인덱스)까지 같이 들고 다녀야 필터링 후에도
+        // 장착 버튼이 올바른 원본 항목을 가리킴 — filter 뒤에 인덱스를 다시 매기면 안 됨.
+        const query = equipFilterQuery.trim().toLowerCase();
+        const visible = allPool
+          .map((it, idx) => ({ it, idx }))
+          .filter(({ it }) => !query || it.name.toLowerCase().includes(query));
         return `
         <h2 class="section-title" style="margin-top:18px;">창고에서 장착 가능한 장비 <span class="hint">용병단 공용 — 장착하면 그 개체가 이 캐릭터 전용이 됨, 해제하면 다시 공용으로</span></h2>
+        <input type="text" id="equipFilterInput" class="equip-filter-input" placeholder="이름으로 검색... (${allPool.length}개)" value="${equipFilterQuery.replace(/"/g, "&quot;")}">
         <div class="inv-list">
-          ${allPool.map((it, idx) => {
+          ${visible.length === 0 ? `<div class="inv-empty">"${equipFilterQuery}"와(과) 일치하는 장비가 없습니다.</div>` : visible.map(({ it, idx }) => {
             const eligibility = isItemEquippableBy(it, data.job, data.equipment);
             return `
             <div class="inv-item" data-idx="${idx}">
@@ -1456,9 +1468,24 @@ function renderStatSection() {
 
   el.querySelectorAll(".stat-plus").forEach(btn => btn.addEventListener("click", (e) => {
     const key = e.target.closest(".stat-row").dataset.stat;
-    if (computeUnassignedPoints(data) <= 0) return;
-    data.realStats[key]++; markDirty("stat"); renderStatSection();
+    const amount = Number(e.target.dataset.amount) || 1;
+    const applied = Math.min(amount, computeUnassignedPoints(data));
+    if (applied <= 0) return;
+    data.realStats[key] += applied; markDirty("stat"); renderStatSection();
   }));
+
+  // 검색창 입력 — 매 입력마다 renderStatSection() 전체를 다시 그리므로(이
+  // 페이지의 기존 렌더 방식 그대로) innerHTML 교체 직후 포커스/커서 위치가
+  // 풀려버림. 새로 그려진 input을 즉시 다시 찾아 focus+커서 위치를
+  // 복원해서, 타이핑 중간에 포커스가 빠지는 것처럼 보이지 않게 함.
+  const filterInput = el.querySelector("#equipFilterInput");
+  if (filterInput) filterInput.addEventListener("input", (e) => {
+    equipFilterQuery = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    renderStatSection();
+    const newInput = document.getElementById("equipFilterInput");
+    if (newInput) { newInput.focus(); newInput.setSelectionRange(cursorPos, cursorPos); }
+  });
 
   // 장착: 창고 풀에서 개체를 하나 꺼내 이 캐릭터 전용(heldBy)으로 전환하고,
   // 그 슬롯에 이미 있던 장비는 다시 풀로 돌려보냄. 관전 모드(남의 캐릭터)면
@@ -1582,6 +1609,20 @@ function formatTarget(s) {
   const count = s.targetCount && TARGET_COUNT_TYPES[s.targetCount] ? TARGET_COUNT_TYPES[s.targetCount].label : "?";
   return `${faction} · ${count}`;
 }
+// 스킬명 뒤에 붙은 "(직업명)" 접미사(예: "MagicCircle (Druid)")는 데이터상
+// 이름 충돌 회피용일 뿐이라 플레이어에게 보일 필요가 없음 — 화면 표시에서만
+// 잘라냄(실제 skill.name/learnedSkillNames/pattern.action 등 내부 값은
+// 그대로 둬서 저장·조회 로직에 영향 없음). 화이트리스트 방식으로만 지움 —
+// "Eagle Eye (Passive)"/"(Active)"나 "Elemental Shield(Red)"처럼 괄호가
+// 실제로 서로 다른 스킬을 구분하는 의미일 때는 절대 지우면 안 되므로,
+// "무조건 끝 괄호 제거" 대신 알려진 직업 소속 표시 접미사만 정확히 매칭.
+const JOB_DISAMBIGUATION_SUFFIXES = [" (Priest)", " (Druid)", " (WH)"];
+function displaySkillName(name) {
+  if (!name) return name;
+  if (name.startsWith("Job Master:")) return name;
+  const suffix = JOB_DISAMBIGUATION_SUFFIXES.find((sfx) => name.endsWith(sfx));
+  return suffix ? name.slice(0, -suffix.length) : name;
+}
 // 습득한 스킬 / 습득 가능 스킬 카드 렌더링(공용). learnBtnState가 있으면 "배우기"
 // 버튼을 붙임(습득 가능 목록용), 없으면 순수 조회용(습득한 스킬 목록용).
 function renderSkillCard(s, { learnBtnState } = {}) {
@@ -1615,7 +1656,7 @@ function renderSkillCard(s, { learnBtnState } = {}) {
   return `
     <div class="skill-item skill-card" ${learnBtnState ? `data-skill="${s.name}"` : ""}>
       <div class="sk-head">
-        <span class="sk-name">${s.name}${learnBtnState ? ` <span class="sk-meta">Lv.${s.requiredLevel}</span>` : ""}</span>
+        <span class="sk-name">${displaySkillName(s.name)}${learnBtnState ? ` <span class="sk-meta">Lv.${s.requiredLevel}</span>` : ""}</span>
         <span class="sk-badges">${typeBadge}${invalidBadge}</span>
       </div>
       ${target ? `<div class="sk-row">대상: ${target}</div>` : ""}
@@ -1710,7 +1751,7 @@ function buildRowHTML(row, idx, active) {
       <div class="builder-line" style="${row.andNext ? "display:none;" : ""}">
         <span class="cb-tag">THEN</span>
         <select class="cb-action">
-          ${actionOptionsFor().map(a => `<option ${row.action===a?"selected":""}>${a}</option>`).join("")}
+          ${actionOptionsFor().map(a => `<option value="${a}" ${row.action===a?"selected":""}>${displaySkillName(a)}</option>`).join("")}
         </select>
       </div>
       <div class="builder-line max-uses-line" style="${row.andNext ? "display:none;" : ""}">
