@@ -106,6 +106,12 @@
     if (row.metric === "battleTurn" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "BATTLE_TURN_AT_LEAST", val: row.value };
     }
+    // 자기 자신의 effective 스탯 비교 — subject가 "self"일 때만 번역함(상대방
+    // 스탯은 이 경로로 절대 참조 못 하게 하는 설계 의도, row.statKey로 어떤
+    // 스탯인지 지정: str/int/dex/spd/luk/atk/matk/def/mdef).
+    if (row.metric === "effectiveStat" && row.subject === "self" && row.statKey) {
+      return { cond: "MY_EFFECTIVE_STAT_COMPARE", val: { stat: row.statKey, comparator: row.comparator, threshold: row.value } };
+    }
     console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
     return { cond: "ALWAYS", val: 0 };
   }

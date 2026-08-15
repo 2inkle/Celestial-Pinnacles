@@ -110,6 +110,28 @@ ConditionRegistry.register("BATTLE_TURN_AT_LEAST", (actor, ctx, value) => {
   return ctx.currentTurn >= value;
 });
 
+// value: { stat: "str"|"int"|"dex"|"spd"|"luk"|"atk"|"matk"|"def"|"mdef",
+//   comparator: "gte"|"gt"|"lte"|"lt"|"eq", threshold: 숫자 }
+// 자기 자신의 effective{Stat}(버프/디버프 실시간 반영값)을 threshold와 비교.
+// 항상 actor(자기 자신) 기준으로만 고정 — 상대방 스탯은 절대 참조 못 하게
+// 설계함(2026-08-16, 사용자 요청: "적의 스탯은 판정하지 못하도록"). 예:
+// "자신의 MATK가 디버프로 일정 선 아래로 떨어지면 스스로 재정비 버프를
+// 건다" 같은 패턴에 씀 — { subject:"self", metric:"effectiveStat",
+// statKey:"matk", comparator:"lte", value:150, action:"..." }.
+ConditionRegistry.register("MY_EFFECTIVE_STAT_COMPARE", (actor, ctx, value) => {
+  const capKey = value.stat.charAt(0).toUpperCase() + value.stat.slice(1);
+  const effective = actor[`effective${capKey}`];
+  if (effective === undefined) return false;
+  switch (value.comparator) {
+    case "gte": return effective >= value.threshold;
+    case "gt": return effective > value.threshold;
+    case "lte": return effective <= value.threshold;
+    case "lt": return effective < value.threshold;
+    case "eq": return effective === value.threshold;
+    default: return false;
+  }
+});
+
 // value: 숫자 N — 이 패턴 슬롯이 지금까지 발동한 횟수가 N보다 작을 때만 true.
 // "○회까지는 반드시" 규칙의 핵심. slotIndex는 BattleEngine.executeAction이
 // 자동으로 넘겨주는 "이 조건이 몇 번째 패턴 슬롯에서 평가되는지"이고, 그 슬롯이
