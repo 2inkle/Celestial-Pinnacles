@@ -155,6 +155,21 @@
   .add-row-btn { width:100%; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em; background:transparent; border:1px dashed var(--line); color:var(--mist-dim); padding:9px; border-radius:8px; cursor:pointer; }
   .add-row-btn:hover { border-color:var(--gold); color:var(--gold); }
 
+  .preset-tab.io { color:var(--mist-dim); border-style:dashed; margin-left:auto; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(10,9,14,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .modal-box { background:var(--panel); border:1px solid var(--line); border-radius:14px; max-width:560px; width:100%; }
+  .modal-head { padding:20px 22px 14px; border-bottom:1px solid var(--line); }
+  .modal-head h2 { font-family:'Cinzel',serif; font-size:17px; color:#f2efe8; margin:0; }
+  .modal-body { padding:16px 22px; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7; }
+  .modal-body textarea { width:100%; min-height:220px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; color:#f2efe8; font-family:'JetBrains Mono',monospace; font-size:11px; padding:10px; resize:vertical; box-sizing:border-box; }
+  .modal-body .io-error { color:var(--danger); font-size:11px; margin-top:8px; white-space:pre-wrap; }
+  .modal-body .io-hint { color:var(--mist-dim); font-size:10.5px; margin-bottom:8px; }
+  .modal-foot { padding:16px 22px 20px; border-top:1px solid var(--line); display:flex; gap:10px; }
+  .modal-btn { font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:11px 18px; border-radius:8px; cursor:pointer; flex:1; border:none; }
+  .modal-btn.cancel { background:transparent; border:1px solid var(--line); color:var(--mist-dim); }
+  .modal-btn.confirm { background:var(--ember); color:#1a1108; font-weight:600; }
+
   .save-row { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
   .unsaved-flag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ember); display:flex; align-items:center; gap:6px; }
   .unsaved-flag.clean { color:var(--mist-dim); }
@@ -1802,6 +1817,8 @@ function renderPatternSection() {
       <div class="preset-tabs" id="presetTabs">
         ${data.presets.map((p, i) => `<button class="preset-tab ${i===activePresetIdx?"active":""}" data-i="${i}">${p.name}</button>`).join("")}
         <button class="preset-tab add" id="addPresetBtn">+ 새 프리셋</button>
+        <button class="preset-tab io" id="exportPresetBtn">↓ 내보내기</button>
+        <button class="preset-tab io" id="importPresetBtn">↑ 가져오기</button>
       </div>
       <div class="pattern-list" id="patternList">
         ${preset.rows.map((row, i) => buildRowHTML(row, i, i < maxPatternSlots)).join("")}
@@ -1809,9 +1826,115 @@ function renderPatternSection() {
       <button class="add-row-btn" id="addRowBtn">+ 패턴 줄 추가</button>
       ${renderSectionSaveButton("pattern")}
     </div>
+    <div id="patternIoModalSlot"></div>
   `;
 
   bindPatternEvents();
+}
+
+// 패턴 프리셋을 JSON으로 내보내기/가져오기 — 스크래치 스크립트나 다른 캐릭터에서
+// 짠 패턴을 사람이 직접 텍스트로 복사해 옮길 수 있게 함(수동 패턴 편집기는
+// 이미 있었지만, 한 줄씩 다시 클릭해서 재구성하는 것 말고는 옮길 방법이 없었음).
+function closePatternIoModal() {
+  document.getElementById("patternIoModalSlot").innerHTML = "";
+}
+
+function openPatternExportModal() {
+  const preset = data.presets[activePresetIdx];
+  const json = JSON.stringify({ name: preset.name, rows: preset.rows }, null, 2);
+  document.getElementById("patternIoModalSlot").innerHTML = `
+    <div class="modal-overlay" id="patternIoOverlay">
+      <div class="modal-box">
+        <div class="modal-head"><h2>패턴 내보내기</h2></div>
+        <div class="modal-body">
+          <div class="io-hint">"${preset.name}" 프리셋의 JSON입니다. 아래 텍스트를 복사해 보관하거나 다른 캐릭터에 붙여넣으세요.</div>
+          <textarea id="exportText" readonly>${json.replace(/</g, "&lt;")}</textarea>
+        </div>
+        <div class="modal-foot">
+          <button class="modal-btn cancel" id="exportCloseBtn">닫기</button>
+          <button class="modal-btn confirm" id="exportCopyBtn">클립보드에 복사</button>
+        </div>
+      </div>
+    </div>
+  `;
+  const textarea = document.getElementById("exportText");
+  document.getElementById("exportCloseBtn").addEventListener("click", closePatternIoModal);
+  document.getElementById("patternIoOverlay").addEventListener("click", (e) => { if (e.target.id === "patternIoOverlay") closePatternIoModal(); });
+  document.getElementById("exportCopyBtn").addEventListener("click", async (e) => {
+    try {
+      await navigator.clipboard.writeText(json);
+      e.target.textContent = "복사됨!";
+    } catch (err) {
+      textarea.select();
+      document.execCommand("copy");
+      e.target.textContent = "복사됨!";
+    }
+    setTimeout(() => { e.target.textContent = "클립보드에 복사"; }, 1500);
+  });
+}
+
+function openPatternImportModal() {
+  document.getElementById("patternIoModalSlot").innerHTML = `
+    <div class="modal-overlay" id="patternIoOverlay">
+      <div class="modal-box">
+        <div class="modal-head"><h2>패턴 가져오기</h2></div>
+        <div class="modal-body">
+          <div class="io-hint">내보내기에서 복사한 JSON(또는 조건-행동 줄 배열)을 붙여넣으세요. 기존 프리셋은 건드리지 않고 새 프리셋으로 추가됩니다.</div>
+          <textarea id="importText" placeholder='{"name": "???전 공략", "rows": [...]}'></textarea>
+          <div class="io-error" id="importError" style="display:none;"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="modal-btn cancel" id="importCancelBtn">취소</button>
+          <button class="modal-btn confirm" id="importConfirmBtn">가져오기</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById("importCancelBtn").addEventListener("click", closePatternIoModal);
+  document.getElementById("patternIoOverlay").addEventListener("click", (e) => { if (e.target.id === "patternIoOverlay") closePatternIoModal(); });
+  document.getElementById("importConfirmBtn").addEventListener("click", () => {
+    const raw = document.getElementById("importText").value.trim();
+    const errEl = document.getElementById("importError");
+    errEl.style.display = "none";
+    if (!raw) { errEl.textContent = "붙여넣은 내용이 없습니다."; errEl.style.display = "block"; return; }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      errEl.textContent = `JSON 형식이 아닙니다: ${err.message}`;
+      errEl.style.display = "block";
+      return;
+    }
+
+    const rows = Array.isArray(parsed) ? parsed : parsed?.rows;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      errEl.textContent = `"rows" 배열을 찾을 수 없습니다. { "rows": [...] } 형태이거나, 줄 배열 자체를 붙여넣어야 합니다.`;
+      errEl.style.display = "block";
+      return;
+    }
+    const invalidIdx = rows.findIndex((r) => !r || typeof r !== "object" || typeof r.subject !== "string" || typeof r.metric !== "string");
+    if (invalidIdx !== -1) {
+      errEl.textContent = `${invalidIdx + 1}번째 줄에 subject/metric 필드가 없습니다 — 패턴 내보내기로 만든 JSON인지 확인해주세요.`;
+      errEl.style.display = "block";
+      return;
+    }
+
+    let name = (!Array.isArray(parsed) && typeof parsed.name === "string" && parsed.name.trim()) || "";
+    if (!name || data.presets.some((p) => p.name === name)) {
+      const suggested = name || "가져온 패턴";
+      let candidate = suggested;
+      let n = 2;
+      while (data.presets.some((p) => p.name === candidate)) { candidate = `${suggested} (${n++})`; }
+      name = candidate;
+    }
+
+    data.presets.push({ name, rows });
+    activePresetIdx = data.presets.length - 1;
+    markDirty("pattern");
+    closePatternIoModal();
+    renderPatternSection();
+  });
 }
 
 function bindSkillEvents() {
@@ -1847,6 +1970,8 @@ function bindPatternEvents() {
     preset.rows.push({ subject:"self", metric:"always", action:"공격" });
     markDirty("pattern"); renderPatternSection();
   });
+  document.getElementById("exportPresetBtn").addEventListener("click", openPatternExportModal);
+  document.getElementById("importPresetBtn").addEventListener("click", openPatternImportModal);
 
   document.querySelectorAll(".pattern-row").forEach(rowEl => {
     const idx = Number(rowEl.dataset.idx);
