@@ -109,6 +109,10 @@
     if (row.metric === "battleTurn" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "BATTLE_TURN_AT_LEAST", val: row.value };
     }
+    // "N턴마다" 주기적 발동 — row.value가 배수 기준(N).
+    if (row.metric === "battleTurnMultiple") {
+      return { cond: "BATTLE_TURN_MULTIPLE_OF", val: row.value };
+    }
     // 자기 자신의 effective 스탯 비교 — subject가 "self"일 때만 번역함(상대방
     // 스탯은 이 경로로 절대 참조 못 하게 하는 설계 의도, row.statKey로 어떤
     // 스탯인지 지정: str/int/dex/spd/luk/atk/matk/def/mdef).

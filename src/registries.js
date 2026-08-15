@@ -130,6 +130,14 @@ ConditionRegistry.register("BATTLE_TURN_AT_LEAST", (actor, ctx, value) => {
   return ctx.currentTurn >= value;
 });
 
+// value: 숫자 N — 현재 턴이 N의 배수일 때만 true("항상 참"인 BATTLE_TURN_AT_LEAST와
+// 달리 정확히 그 순간만 참이라 "N턴마다 한 번씩 반드시" 패턴을 표현할 수 있음).
+// "???"의 "10턴마다 가벼운 공격과 함께 마법진을 만든다" 같은, 우연에 기대지
+// 않는 주기적 발동을 위해 신설(2026-08-16).
+ConditionRegistry.register("BATTLE_TURN_MULTIPLE_OF", (actor, ctx, value) => {
+  return !!value && ctx.currentTurn > 0 && ctx.currentTurn % value === 0;
+});
+
 // value: { stat: "str"|"int"|"dex"|"spd"|"luk"|"atk"|"matk"|"def"|"mdef",
 //   comparator: "gte"|"gt"|"lte"|"lt"|"eq", threshold: 숫자 }
 // 자기 자신의 effective{Stat}(버프/디버프 실시간 반영값)을 threshold와 비교.
