@@ -1994,11 +1994,18 @@
         "preDelay": 40,
         "preDelayType": "action",
         "postDelay": 0,
-        "effects": [],
+        "effects": [
+          {
+            "type": "stealTeamResource",
+            "resource": "magicCircle",
+            "eraseAmount": 1,
+            "gainAmount": 0
+          }
+        ],
         "requiredSkills": [
           "EnergyCollect"
         ],
-        "note": "'상대 마법진-1'은 teamResourceConsume류 이펙트가 아직 엔진에 없어서 미구현(CLAUDE.md '알려진 기능 공백' 섹션 참조) - 스킬 틀만 만들어둠."
+        "note": "'상대 마법진-1' 구현 완료(2026-08-16) — 오랫동안 stealTeamResource류 이펙트가 없어서 미구현이었는데(예전 note: 'teamResourceConsume류 이펙트가 아직 엔진에 없음'), '???' 궁극기 파훼법을 설계하며 만든 stealTeamResource를 gainAmount:0으로 써서 순수 삭제만 하도록 채움 — 자기 진영엔 아무것도 적립되지 않는 정확히 원래 의도한 '상대 마법진 -1'."
       }
     ],
     "인퀴지터": [
@@ -2267,27 +2274,6 @@
         "postDelay": 70,
         "effects": [],
         "note": "'자신의 HP%에 비례해 추가 데미지, 대상의 SP%에 반비례해 추가 데미지'는 계산식이 아직 안 정해져서 미구현 - 스킬 틀만 만듦."
-      },
-      {
-        "name": "Circle Erase",
-        "requiredLevel": 30,
-        "skillPointCost": 6,
-        "costs": [],
-        "skillType": "magic",
-        "targetFaction": "self",
-        "targetCount": "single",
-        "preDelay": 20,
-        "preDelayType": "action",
-        "postDelay": 20,
-        "effects": [
-          {
-            "type": "stealTeamResource",
-            "resource": "magicCircle",
-            "eraseAmount": 1,
-            "gainAmount": 1
-          }
-        ],
-        "note": "원래 '???' 전용으로 만들었다가 인퀴지터 스킬로 이전함(2026-08-16) — stealTeamResource가 시전자 진영 기준으로 방향이 자동 결정되므로, 같은 스킬을 그녀도 그대로 쓴다('???'의 패턴은 이름으로 직접 참조하므로 job 소속과 무관하게 계속 동작함). 상대 마법진 1개를 지우고 성공 시 자기 진영에 1개 적립. 그녀의 궁극기 OMEN이 costs로 마법진 5개를 요구하는데, PrepState.resolve()가 발동 시점(readyAtTick)에 코스트를 다시 확인하므로 — 그녀가 OMEN 시전(200틱, casting형이라 Magic Jammer로 연장 가능)에 들어간 뒤 이 스킬로 그녀의 마법진을 5개 미만으로 깎으면 OMEN이 코스트 부족으로 '발동 실패'하며 불발됨(2026-08-16, 사용자가 지적한 '이론상 파훼법'의 실제 메커니즘)."
       }
     ],
     "데몬헌터": [
@@ -5368,6 +5354,27 @@
     ],
     "???": [
       {
+        "name": "Circle Drain",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "costs": [],
+        "skillType": "magic",
+        "targetFaction": "self",
+        "targetCount": "single",
+        "preDelay": 20,
+        "preDelayType": "action",
+        "postDelay": 20,
+        "effects": [
+          {
+            "type": "stealTeamResource",
+            "resource": "magicCircle",
+            "eraseAmount": 1,
+            "gainAmount": 1
+          }
+        ],
+        "note": "'???' 전용(2026-08-16, 위치헌터의 'CircleErase'와 이름을 분리함 — 그쪽은 gainAmount:0인 순수 삭제기고, 이건 그녀만의 '훔쳐서 자기 것으로 만드는' 능력이라 의미가 다름. 한때 같은 이름 'Circle Erase'로 인퀴지터 스킬로도 옮겼었는데, 실은 인퀴지터가 위치헌터를 거쳐 이미 갖고 있던 진짜 'CircleErase'(순수 삭제)가 따로 있었다는 걸 뒤늦게 확인해서 되돌림 — 인퀴지터 쪽 중복 항목은 삭제). 상대 마법진 1개를 지우고, 성공했을 때만 자기 진영에 1개 적립."
+      },
+      {
         "name": "Arcane Pulse",
         "requiredLevel": 1,
         "skillPointCost": 0,
@@ -5497,7 +5504,7 @@
   // 기존 플레이어에게 반영되지 않았음(스킬을 182개로 늘려도 24개짜리 옛
   // 테이블이 그대로 남아 마법사 라인·스탠스·크리티컬 스킬이 전부 없었음).
   // 버전이 다르면 무조건 다시 심음. 시드를 고칠 때마다 버전만 올리면 됨.
-  const SKILL_SEED_VERSION = "2026-08-16p";
+  const SKILL_SEED_VERSION = "2026-08-16q";
   if (localStorage.getItem("battleSim_skillSeedVersion") !== SKILL_SEED_VERSION) {
     // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — 편집기에서 직접 손본
     // 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함. 필요하면
