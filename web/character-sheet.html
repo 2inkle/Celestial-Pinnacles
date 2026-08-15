@@ -157,6 +157,10 @@
 
   .preset-tab.io { color:var(--mist-dim); border-style:dashed; margin-left:auto; }
 
+  .skill-tree-text { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.75; color:var(--mist-dim); overflow-x:auto; max-height:360px; overflow-y:auto; }
+  .skill-tree-text .tree-line { white-space:pre; }
+  .skill-tree-text .tree-check { color:var(--gold); font-weight:600; }
+
   .modal-overlay { position:fixed; inset:0; background:rgba(10,9,14,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; }
   .modal-box { background:var(--panel); border:1px solid var(--line); border-radius:14px; max-width:560px; width:100%; }
   .modal-head { padding:20px 22px 14px; border-bottom:1px solid var(--line); }
@@ -1451,6 +1455,11 @@ function renderStatSection() {
       </div>
     </div>
 
+    <div class="block">
+      <h2 class="section-title">전체 스킬 트리 <span class="hint">✓ = 배운 스킬 · 선행 스킬 순서로 들여쓰기</span></h2>
+      <div class="skill-tree-text">${renderSkillTreeHtml()}</div>
+    </div>
+
     ${learnedSkillObjs().length ? `
     <div class="block">
       <h2 class="section-title">습득한 스킬 <span class="hint">패턴 행동으로 사용 가능</span></h2>
@@ -1732,6 +1741,58 @@ function violatesExclusion(skill) {
 }
 function learnableSkillObjs() {
   return jobSkillTable().filter(s => s.requiredLevel <= data.level && !data.learnedSkillNames.includes(s.name));
+}
+// 직업 전체 스킬(공용 + 지금 직업까지의 모든 하위 직업)을 requiredSkills 기준
+// 들여쓰기 트리 텍스트로 뽑음 — 스킬 카드 목록은 "습득한 것"/"습득 가능한 것"
+// (조건 미충족은 아예 숨김)으로 쪼개져 있어서 전체 구조를 한눈에 보기 어렵다는
+// 사용자 피드백으로 추가. 이번 세션에 skill-table.json 직업 등급을 재배치할 때
+// 사용자가 직접 불러준 들여쓰기 텍스트 형식(부모 스킬 아래에 자식 스킬을
+// 한 단 들여씀)을 그대로 재사용함. requiredSkills가 여러 개(mode:"all")면
+// 트리 표시는 첫 번째를 부모로 삼고 나머지는 "(+이름 필요)"로 옆에 붙임 —
+// DAG를 트리 하나로 접되, 정보 손실 없이 텍스트로 표현하기 위함.
+function buildSkillTreeLines() {
+  const skills = jobSkillTable();
+  const byName = new Map(skills.map(s => [s.name, s]));
+  const childrenByParent = new Map();
+  const roots = [];
+  skills.forEach((s) => {
+    const reqs = (s.requiredSkills || []).filter((n) => byName.has(n));
+    if (reqs.length === 0) {
+      roots.push(s);
+    } else {
+      const parentName = reqs[0];
+      if (!childrenByParent.has(parentName)) childrenByParent.set(parentName, []);
+      childrenByParent.get(parentName).push(s);
+    }
+  });
+
+  const lines = [];
+  const visited = new Set();
+  function renderNode(skill, depth) {
+    if (visited.has(skill.name)) return;
+    visited.add(skill.name);
+    const extraReqs = (skill.requiredSkills || []).slice(1).filter((n) => byName.has(n));
+    const extraLabel = extraReqs.length ? ` (+${extraReqs.map(displaySkillName).join(", ")} 필요)` : "";
+    lines.push({ depth, label: `${displaySkillName(skill.name)}${extraLabel}`, learned: data.learnedSkillNames.includes(skill.name) });
+    (childrenByParent.get(skill.name) || [])
+      .slice()
+      .sort((a, b) => a.requiredLevel - b.requiredLevel)
+      .forEach((child) => renderNode(child, depth + 1));
+  }
+  roots
+    .slice()
+    .sort((a, b) => a.requiredLevel - b.requiredLevel)
+    .forEach((r) => renderNode(r, 0));
+  // 안전망 — requiredSkills가 순환하거나 첫 항목이 아직 안 그려진 경우 등으로
+  // 루트에서 못 닿은 스킬이 남으면 트리 맨 끝에 그대로 나열(누락 방지).
+  skills.forEach((s) => { if (!visited.has(s.name)) renderNode(s, 0); });
+  return lines;
+}
+function renderSkillTreeHtml() {
+  return buildSkillTreeLines().map((l) => {
+    const escapedLabel = l.label.replace(/</g, "&lt;");
+    return `<div class="tree-line" style="padding-left:${l.depth * 16}px">${escapedLabel}${l.learned ? ` <span class="tree-check">✓</span>` : ""}</div>`;
+  }).join("");
 }
 // SkillSeal 장비가 부여하는 스킬 — SKILL_TABLE 습득 여부와 무관하게 장착 중엔 씀.
 // 자기 직업 스킬이 아닐 수도 있어서 jobSkillTable()이 아니라 전체에서 찾음.
