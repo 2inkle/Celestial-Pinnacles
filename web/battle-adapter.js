@@ -103,6 +103,10 @@
     if (row.metric === "hp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
       return { cond: "MY_HP_LESS_THAN_PCT", val: row.value };
     }
+    // "자기 진영 중 누군가라도 HP가 낮으면" — subject가 "anyAlly"일 때.
+    if (row.metric === "hp" && row.subject === "anyAlly" && (row.comparator === "lte" || row.comparator === "lt")) {
+      return { cond: "ANY_ALLY_HP_LESS_THAN_PCT", val: row.value };
+    }
     if (row.metric === "sp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
       return { cond: "MY_SP_LESS_THAN_PCT", val: row.value };
     }

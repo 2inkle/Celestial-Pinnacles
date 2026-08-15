@@ -72,6 +72,15 @@ ConditionRegistry.register("MY_SP_LESS_THAN_PCT", (actor, ctx, value) => {
   return (actor.currentSp / actor.maxSp) * 100 <= value;
 });
 
+// MY_HP_LESS_THAN_PCT의 "파티 전체" 버전 — 자기 자신이 아니라 자기 진영
+// 아군 중 한 명이라도 HP%가 이 값 이하면 true. "누군가 위험하면 반응한다"는
+// 힐러 패턴(예: 평시엔 다른 행동, 위급 시에만 강한 회복기 사용)에 씀
+// (2026-08-16, "???" 벤치마크 튜닝 중 사용자 요청으로 신설).
+ConditionRegistry.register("ANY_ALLY_HP_LESS_THAN_PCT", (actor, ctx, value) => {
+  const allies = actor.side === "ally" ? ctx.allies : ctx.enemies;
+  return allies.some((u) => u.isAlive && (u.currentHp / u.maxHp) * 100 <= value);
+});
+
 // 자신이 현재 Guard 상태(패링 등으로 걸린 1회성 데미지 무효화)가 아닐 때 true.
 // "패링" 같은 self-guard 스킬을 "이미 Guard 중이면 또 걸지 않는다"는 패턴에 씀.
 ConditionRegistry.register("NOT_GUARDING", (actor) => {
