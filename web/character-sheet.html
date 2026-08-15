@@ -178,18 +178,18 @@
      도구 등 기존의 단순 이름+버튼 한 줄짜리 .skill-item에는 영향 없음. */
   .skill-item.skill-card { flex-direction:column; align-items:stretch; gap:7px; padding:11px 13px; }
   .skill-item.skill-card .sk-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .skill-item.skill-card .sk-row { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); letter-spacing:0.02em; line-height:1.5; }
-  .sk-type-badge { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.05em; padding:2px 8px; border-radius:10px; border:1px solid; white-space:nowrap; }
-  .sk-type-badge.physical { color:var(--ember); border-color:var(--ember-dim); }
-  .sk-type-badge.magic    { color:var(--cyan);  border-color:var(--cyan-dim); }
-  .sk-type-badge.support  { color:var(--gold);  border-color:var(--gold-dim); }
-  .sk-type-badge.invalid  { color:var(--danger); border-color:var(--danger-dim); }
-  .sk-badges { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
-  .sk-effects { display:flex; flex-wrap:wrap; gap:5px; margin-top:2px; }
-  .sk-effect { font-family:'JetBrains Mono',monospace; font-size:10px; padding:3px 8px; border-radius:4px; background:var(--panel-raised); border:1px solid var(--line); }
-  .sk-effect.buff { color:var(--cyan); border-color:var(--cyan-dim); }
-  .sk-effect.debuff { color:var(--danger); border-color:var(--danger-dim); }
-  .sk-effect.neutral { color:var(--mist); }
+  /* 스펙 한 줄(칩 나열) — "Break Down / 5pt / enemy · individual / 35sp /
+     570%×1 / Physical / Atk-30% / (0:10)" 식으로, 예전에 대상/코스트/딜레이가
+     각각 세로로 쌓이던 걸 flex-wrap 한 줄로 압축(사용자 피드백 반영). */
+  .sk-spec-line { display:flex; flex-wrap:wrap; align-items:center; gap:5px; }
+  .sk-chip { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.02em; padding:3px 8px; border-radius:5px; background:var(--panel-raised); border:1px solid var(--line); color:var(--mist-dim); white-space:nowrap; }
+  .sk-chip.physical { color:var(--ember); border-color:var(--ember-dim); }
+  .sk-chip.magic    { color:var(--cyan);  border-color:var(--cyan-dim); }
+  .sk-chip.support  { color:var(--gold);  border-color:var(--gold-dim); }
+  .sk-chip.invalid  { color:var(--danger); border-color:var(--danger-dim); }
+  .sk-chip.sk-effect.buff { color:var(--cyan); border-color:var(--cyan-dim); }
+  .sk-chip.sk-effect.debuff { color:var(--danger); border-color:var(--danger-dim); }
+  .sk-chip.sk-effect.neutral { color:var(--mist); }
   .skill-item.skill-card .sk-footer { display:flex; justify-content:flex-end; margin-top:2px; }
   .assign-btn { font-family:'JetBrains Mono',monospace; font-size:10px; background:transparent; border:1px solid var(--gold-dim); color:var(--gold); padding:4px 9px; border-radius:5px; cursor:pointer; white-space:nowrap; }
   .assign-btn:hover { border-color:var(--gold); background:#d9b45c14; }
@@ -1598,10 +1598,12 @@ function formatCosts(costs) {
 }
 function formatDelay(s) {
   if (s.preDelay === undefined && s.postDelay === undefined) return "";
-  const preTypeLabel = s.preDelayType && PRE_DELAY_TYPES[s.preDelayType] ? `(${PRE_DELAY_TYPES[s.preDelayType].label})` : "";
-  const pre = s.preDelay !== undefined ? `${s.preDelay}${preTypeLabel}` : "?";
+  // 예전엔 "선제:후속 0(행위) : 10"처럼 풀어 썼는데, 한 줄 스펙 표기(칩 나열)로
+  // 바꾸면서 "(0:10)" 압축형으로 통일 — preDelayType은 툴팁으로만 남김.
+  const preTypeLabel = s.preDelayType && PRE_DELAY_TYPES[s.preDelayType] ? PRE_DELAY_TYPES[s.preDelayType].label : "";
+  const pre = s.preDelay !== undefined ? `${s.preDelay}` : "?";
   const post = s.postDelay !== undefined ? `${s.postDelay}` : "?";
-  return `선제:후속 ${pre} : ${post}`;
+  return `<span title="선딜레이 유형: ${preTypeLabel || "?"}">(${pre}:${post})</span>`;
 }
 function formatTarget(s) {
   if (!s.targetFaction && !s.targetCount) return "";
@@ -1625,20 +1627,24 @@ function displaySkillName(name) {
 }
 // 습득한 스킬 / 습득 가능 스킬 카드 렌더링(공용). learnBtnState가 있으면 "배우기"
 // 버튼을 붙임(습득 가능 목록용), 없으면 순수 조회용(습득한 스킬 목록용).
+// 스킬 한 장의 스펙을 "Break Down / 5pt / enemy - individual / 35sp /
+// 570%x1 / Physical / Atk-30% / Def-30% / (0:10)" 식 한 줄(요소별로 칩
+// 하나씩, flex-wrap으로 감싸는) 표기로 압축 — 예전엔 대상/스탯·계수/코스트가
+// 각각 별도 줄로 세로로 쌓여서 좁은 칼럼에서 낭비가 컸음(사용자 피드백).
+// 요소 순서: pt · 대상 · 코스트 · 계수×히트 · 유형 · 이펙트들 · 선딜:후딜.
 function renderSkillCard(s, { learnBtnState } = {}) {
-  const typeBadge = s.skillType && SKILL_TYPES[s.skillType]
-    ? `<span class="sk-type-badge ${SKILL_TYPES[s.skillType].cls}">${SKILL_TYPES[s.skillType].label}</span>` : "";
-  const invalidBadge = s.invalid ? `<span class="sk-type-badge invalid" title="상대의 아군 보호(전열) 규칙을 무시함">차단 불가</span>` : "";
+  const invalidBadge = s.invalid ? `<span class="sk-chip invalid" title="상대의 아군 보호(전열) 규칙을 무시함">차단 불가</span>` : "";
   const target = formatTarget(s);
   const delay = formatDelay(s);
+  const costLabel = s.costs && s.costs.length ? formatCosts(s.costs) : "코스트 없음";
   // 힐/버프 등 스탯×계수 공식이 아예 적용 안 되는 스킬은 stat/coefficient
   // 필드 자체가 없음(예: Healing의 scaledHeal 효과) — 전체 스킬의 약 26%가
-  // 이 경우라 "" ×undefined" 같은 깨진 표시를 막으려면 줄 자체를 생략해야 함.
-  const statLine = s.stat !== undefined
-    ? `${s.stat.toUpperCase()} ×${s.coefficient}${delay ? " · " + delay : ""}`
-    : delay;
-  const costLabel = s.costs && s.costs.length ? formatCosts(s.costs) : "코스트 없음";
-  const effects = (s.effects || []).map(e => {
+  // 이 경우라 "undefined%x1" 같은 깨진 표시를 막으려면 칩 자체를 생략해야 함.
+  const powerChip = s.stat !== undefined
+    ? `<span class="sk-chip">${Math.round(s.coefficient * 100)}%×${s.hits || 1}</span>` : "";
+  const typeChip = s.skillType && SKILL_TYPES[s.skillType]
+    ? `<span class="sk-chip ${SKILL_TYPES[s.skillType].cls}">${SKILL_TYPES[s.skillType].label}</span>` : "";
+  const effectChips = (s.effects || []).map(e => {
     const meta = EFFECT_TYPES[e.type];
     if (!meta) return "";
     const unit = meta.valueUnit || "";
@@ -1650,19 +1656,26 @@ function renderSkillCard(s, { learnBtnState } = {}) {
     const guardTypeLabel = e.type === "guard"
       ? `(${e.guardType === "physical" ? "물리" : e.guardType === "magic" ? "마법" : "전체"})`
       : "";
-    return `<span class="sk-effect ${meta.polarity || "neutral"}">${meta.label}${resourceLabel}${guardTypeLabel}${valueLabel}</span>`;
+    return `<span class="sk-chip sk-effect ${meta.polarity || "neutral"}">${meta.label}${resourceLabel}${guardTypeLabel}${valueLabel}</span>`;
   }).join("");
+
+  const chips = [
+    `<span class="sk-chip">${s.skillPointCost}pt</span>`,
+    target ? `<span class="sk-chip">${target}</span>` : "",
+    `<span class="sk-chip">${costLabel}</span>`,
+    powerChip,
+    typeChip,
+    invalidBadge,
+    effectChips,
+    delay ? `<span class="sk-chip">${delay}</span>` : "",
+  ].filter(Boolean).join("");
 
   return `
     <div class="skill-item skill-card" ${learnBtnState ? `data-skill="${s.name}"` : ""}>
       <div class="sk-head">
         <span class="sk-name">${displaySkillName(s.name)}${learnBtnState ? ` <span class="sk-meta">Lv.${s.requiredLevel}</span>` : ""}</span>
-        <span class="sk-badges">${typeBadge}${invalidBadge}</span>
       </div>
-      ${target ? `<div class="sk-row">대상: ${target}</div>` : ""}
-      ${statLine ? `<div class="sk-row">${statLine}</div>` : ""}
-      <div class="sk-row">코스트: ${costLabel}</div>
-      ${effects ? `<div class="sk-effects">${effects}</div>` : ""}
+      <div class="sk-spec-line">${chips}</div>
       ${learnBtnState ? `<div class="sk-footer"><button class="assign-btn learn-btn" ${learnBtnState.disabled ? "disabled" : ""}>포인트 ${s.skillPointCost} · 배우기</button></div>` : ""}
     </div>
   `;
