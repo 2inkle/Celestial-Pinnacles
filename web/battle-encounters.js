@@ -92,6 +92,16 @@
         { monsterId: "goblin_noble", row: "front", weight: 40, maxAppearances: 1 },
       ],
     },
+    // 미스터리 전투 — maxCount:1 + guaranteed:true인 후보 딱 하나뿐이라
+    // 항상 "unknown_entity" 한 체만 등장함(weight는 guaranteed면 안 쓰이므로
+    // 0). 몬스터 자체는 web/monster-roster.html에 골격만 잡혀있음 — 실제
+    // 스탯/패턴 설계는 다음 단계.
+    "unknown-battle": {
+      maxCount: 1,
+      pool: [
+        { monsterId: "unknown_entity", row: "front", weight: 0, maxAppearances: 1, guaranteed: true },
+      ],
+    },
     // 새 전투 예시: "forest-1": { maxCount:2, pool:[{monsterId:"forest_wolf", row:"front", weight:100, maxAppearances:2}] }
   };
 

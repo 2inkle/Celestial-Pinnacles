@@ -53,6 +53,25 @@
         ] },
       ],
     },
+    // 미스터리 전투(2026-08-16) — 테마명/전투명/등장 몬스터 전부 "???"로 남겨
+    // 아무것도 미리 알려주지 않음. roster-select.html의 몬스터 미리보기가
+    // 몬스터 데이터의 name/portrait를 그대로 보여주는 구조라, 이 필드
+    // 자체를 "???"/"❓"로 두는 것만으로 별도 은폐 코드 없이 안 새어나감
+    // (조사 완료 — 확정). "불길한 마력 파편"(고블린 수송대 보물상자의
+    // 30% 드랍) 소지가 입장 조건. 몬스터 쪽(BATTLE_MONSTER_POOLS의
+    // "unknown-battle", web/monster-roster.html의 "unknown_entity")은
+    // 골격만 잡아둔 상태 — 실제 스탯/패턴은 다음에 채울 것.
+    {
+      id: "unknownEncounter",
+      name: "???",
+      icon: "❓",
+      section: "aftermath",
+      battles: [
+        { id: "unknown-battle", name: "???", requirements: [
+          { type: "consumesItem", value: "불길한 마력 파편" },
+        ] },
+      ],
+    },
     // 새 테마 예시: { id:"forest", name:"저주받은 숲", icon:"🌲", battles:[{id:"forest-1", name:"길 잃은 늑대", requirements:[]}] }
   ];
 
