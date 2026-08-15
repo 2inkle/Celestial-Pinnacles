@@ -362,21 +362,25 @@
     //      폴백. 예전엔 여기가 ATTACK(물리)이었는데, "마법사인데 물리공격을
     //      반복하는 게 이상하다"는 사용자 지적으로 교체함(2026-08-16).
     //
-    // passiveMods.damageDealtTo_userPct: -90 — 유저(플레이어) 캐릭터에게
-    // 가하는 모든 데미지를 일괄 10분의 1로 낮춤(2026-08-16, 사용자 설계
-    // 결정). 이유: 유저 캐릭터는 아무리 키워도 HP가 1000~2000대인데, 이
-    // 보스는 HP가 수십만이라 "비슷한 스펙"이어도 몇 턴 안에 유저를 죽여버림
-    // — 그렇다고 INT/MATK를 1까지 깎으면 그 낮은 값 자체가 감쇠 곡선의
-    // 바닥에 붙어서 퍼센트 디버프(Arcane Surge의 MATK+150%, 파티의
-    // 방어력/공격력 디버프 등)가 사실상 무의미해짐. 대신 스탯은 정상적인
-    // 범위로 두고 최종 데미지에만 -90%를 걸어서, 스탯 기반 미세조정
-    // 여지를 그대로 살림(damageDealtTo_{tier}Pct는 이미 있던 등급별
-    // 데미지 배율 메커니즘 재사용 — src/combatFormulas.js 참고, ATTACK/
-    // 모든 스킬 데미지에 공통 적용됨). 적용 후 INT/MATK를 30/25(최초
-    // 추정치)로 되돌려 재검증할 것.
+    // passiveMods.damageDealtTo_userPct: -115 — 유저(플레이어) 캐릭터에게
+    // 가하는 모든 데미지를 일괄 축소(2026-08-16, 사용자 설계 결정). 이유:
+    // 유저 캐릭터는 아무리 키워도 HP가 1000~2000대인데, 이 보스는 HP가
+    // 수십만이라 "비슷한 스펙"이어도 몇 턴 안에 유저를 죽여버림 — 그렇다고
+    // INT/MATK를 1까지 깎으면 그 낮은 값 자체가 감쇠 곡선의 바닥에 붙어서
+    // 퍼센트 디버프(Arcane Surge의 MATK+150%, 파티의 방어력/공격력 디버프
+    // 등)가 사실상 무의미해짐. 대신 스탯은 정상적인 범위로 두고 최종
+    // 데미지에만 배율을 걸어서, 스탯 기반 미세조정 여지를 그대로 살림
+    // (damageDealtTo_{tier}Pct는 이미 있던 등급별 데미지 배율 메커니즘
+    // 재사용 — src/combatFormulas.js 참고, ATTACK/모든 스킬 데미지에 공통
+    // 적용됨). 값을 -90이 아니라 -115로 잡은 이유: applyDealtPassiveMods의
+    // pct는 여러 출처가 그냥 더해지는 구조라(곱연산 아님), 개전에 거는
+    // Mana Guard 스탠스 자체가 magicDamageDealtPct:+25를 주는 걸 감안하지
+    // 않으면 순 감소분이 -90+25=-65%에 그침(실측으로 발견 — INT30/MATK25
+    // 기준 첫 Lightning Ball 히트가 예상보다 훨씬 큰 250~350대로 나옴).
+    // -115로 잡아야 Mana Guard 활성 중(사실상 전투 내내) 순수 -90%가 유지됨.
     { id:"unknown_entity", name:"???", portrait:"❓", realStats:{str:10,int:30,dex:10,spd:10,luk:10},
       combatReal:{atk:10,matk:25,def:10,mdef:10}, tier:"boss",
-      passiveMods:{damageDealtTo_userPct:-90},
+      passiveMods:{damageDealtTo_userPct:-115},
       personalResources:{focusMana:{current:0,max:1000}},
       patterns:[
         {subject:"self",metric:"resource",comparator:"gte",value:5,action:"OMEN"},
@@ -395,7 +399,7 @@
       ],
       expReward:0, goldReward:0, dropTable:[] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16n";
+  const MONSTER_SEED_VERSION = "2026-08-16o";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
