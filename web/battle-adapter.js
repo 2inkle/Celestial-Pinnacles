@@ -112,6 +112,12 @@
     if (row.metric === "effectiveStat" && row.subject === "self" && row.statKey) {
       return { cond: "MY_EFFECTIVE_STAT_COMPARE", val: { stat: row.statKey, comparator: row.comparator, threshold: row.value } };
     }
+    // 상대 진영의 팀 자원 보유량 — subject가 "opponent"일 때만 번역함(자기 진영
+    // 자원 판정은 기존 관례상 별도 metric으로 추가하면 됨, 아직 그 경로는 없음).
+    // row.resource가 없으면 magicCircle 기본값.
+    if (row.metric === "opponentResource" && row.subject === "opponent" && (row.comparator === "gte" || row.comparator === "gt")) {
+      return { cond: "OPPONENT_RESOURCE_GREATER_THAN", val: { resource: row.resource || "magicCircle", amount: row.value } };
+    }
     console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
     return { cond: "ALWAYS", val: 0 };
   }

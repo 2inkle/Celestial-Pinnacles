@@ -93,6 +93,20 @@ ConditionRegistry.register("FACTION_RESOURCE_GREATER_THAN", (actor, ctx, value) 
   return ctx.resourceManager.getResource(actor.side, registeredKey) >= amount;
 });
 
+// 상대 진영의 자원 보유량 판정 — FACTION_RESOURCE_GREATER_THAN이 "자기 진영"만
+// 보는 것과 정확히 대칭. value 형태도 동일(숫자 단독 = magicCircle 기본값,
+// 객체 {resource, amount} = 자원 종류 지정). "???"의 Circle Erase처럼 "상대가
+// 마법진을 갖고 있을 때만 지운다" — 상대에게 지울 게 없는데 매턴 헛스윙하는
+// 낭비를 막는 패턴 조건으로 씀(2026-08-16).
+ConditionRegistry.register("OPPONENT_RESOURCE_GREATER_THAN", (actor, ctx, value) => {
+  const isObjectForm = value && typeof value === "object";
+  const resourceKey = isObjectForm ? value.resource : "magicCircle";
+  const amount = isObjectForm ? value.amount : value;
+  const registeredKey = TEAM_RESOURCE_TYPES[resourceKey]?.key || "MAGIC_CIRCLE";
+  const opponentSide = actor.side === "ally" ? "enemy" : "ally";
+  return ctx.resourceManager.getResource(opponentSide, registeredKey) >= amount;
+});
+
 // value: "action" | "casting" — 상대 진영 중 그 선딜레이 유형으로 "준비 중"인
 // 대상이 하나라도 있으면 true. 목 노리기처럼 "영창 중인 상대가 있으면 반드시
 // 사용" 같은 패턴을 만들 때 씀. ctx.prepState는 BattleEngine이 들고 있음.
