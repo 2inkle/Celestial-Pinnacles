@@ -6,6 +6,165 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 2026-08-16 — 스킬 테이블 직업 등급 재배치 작업 (진행 중)
+
+`skill-table.json`/`skill-table-editor.html`의 `LEGACY_SKILL_SEED`에서, 여러
+직업 라인이 "상위 전직(2차/3차) 스킬이 실제로는 1차 잡의 레벨1 목록에 통째로
+섞여 들어가 있는" 같은 패턴의 버그를 갖고 있었다(사용자가 과거 설계
+참고자료 스크린샷을 스킬별로 짚어가며 대조 요청 → 재배치). 확립된 작업
+방식: **이미지는 "어느 스킬이 몇 차 전직인가"(색상) 판별에만 쓰고, 선행
+스킬 트리(들여쓰기)는 사용자가 텍스트로 직접 불러주는 방식이 훨씬 정확함**
+— 색상 인식을 이번 세션에서 여러 번 오독했음(전사 계열의 "로열가드/
+소셜나이트"는 과거 잔재 명칭이라 무시, 사제 계열의 Regeneration/Rabbit
+소속을 두 번 틀림). 텍스트 들여쓰기로 받은 뒤부터는 정확도가 확 올라감.
+
+**완료**:
+- 워록(2차)→둠로드(3차): Explosion/Hell Fire/Meteor Storm/Ice Prison/
+  Tidal Wave/Blizzard/Flash/Paralysis/Thunder Storm/Earthquake/Subsidence/
+  SandStorm 12개 이동(requiredLevel 15→30). 나머지 화염/빙결/전격/무속성
+  postDelay 수치는 처음엔 이미지와 달라 보였지만, 실제로는 `note` 필드에
+  "'딜레이 감소 N%'는 postDelay(X→Y)에 미리 반영"이라고 이미 정확히
+  계산해서 기록해둔 값이었음(버그 아님) — 지금은 "딜레이감소"가
+  `actionDelay` 이펙트와 동일한 개념이라는 것도 확인됨.
+- 전사(1차)/가드(2차) 13개 스킬에 통째로 비어있던 `requiredSkills`를
+  들여쓰기 트리대로 삽입(Break Down은 Weapon Break+Armor Break 둘 다
+  필요/all, Hyper Recovery·Self Regeneration은 둘 다 Self Recovery
+  하나만 선행/형제 관계 등).
+- 사제(1차)→비숍(2차)/카디널(3차): SmartHeal/Party Heal/MagicCircle/
+  Force Shield/Regeneration→비숍, Healing Shower/Sanctuary/Grand
+  Cross→카디널로 이동. Rabbit은 처음에 비숍으로 잘못 옮겼다가 사제로
+  되돌림(Holy→Rabbit까지 1차, Advent Angel부터 2차). Holy 직계 자식
+  6개(Rabbit/Encourage/Charm/ProtectionField/Force Shield/Holy Burst)
+  전부 선행조건 삽입, Holy Burst→{Grand Cross, Divine Burst}(형제
+  관계, 둘 다 Holy Burst 하나로 동시 해금)도 반영. 카디널 Job Master
+  패시브에 `passiveMods:{healingDealtFlat:200, healingDealtPct:10}`
+  추가(사용자가 알려준 수치).
+- 드루이드(2차)→하이드루이드(3차): Nature Defence/MasterHeal/
+  FullAssist 이동 + HolyShield/Quick(Druid)/CastAsist/Nature
+  Defence/ProgressiveHeal/MasterHeal 선행조건 삽입.
+- **스킬명 충돌 회피 + 표시명 숨김 기능 신규 추가**: 비숍과 드루이드가
+  각각 독립적으로 "MagicCircle"을 갖고 있었음(스킬은 이름으로 전역
+  등록되는 구조라 이름이 겹치면 하나가 다른 하나를 덮어씀). 드루이드
+  쪽을 `"MagicCircle (Druid)"`로 개명해서 데이터상 충돌은 피하되,
+  `web/character-sheet.html`에 `displaySkillName(name)` 헬퍼를 새로
+  추가해서 **화면에는 "(직업명)" 접미사가 안 보이게** 함(스킬 카드
+  이름 표시, 패턴 편집기의 행동 선택 드롭다운 라벨 둘 다 적용 —
+  드롭다운의 실제 값/저장 데이터는 원래 이름 그대로라 회귀 없음).
+  단, `"Job Master: X"`는 예외로 그대로 노출(어떤 직업의 마스터 효과인지
+  자체가 정보이므로). 기존에 이미 있던 "Quick (Druid)"/"Attack (Priest)"
+  같은 스킬명도 이 헬퍼를 거치면 자동으로 괄호가 잘림(일관된 동작).
+- 전사(1차)→위치헌터(2차)→{인퀴지터, 데몬헌터}(3차): DeathStrike/
+  FullBreak→데몬헌터, Soul Storm/Mana Burn/Magic Jammer→인퀴지터로 이동.
+  선행조건 대량 삽입(Quick Slash (WH)→Double Quick Slash (WH)→DeathStrike,
+  Double Attack (WH)→{Weapon Break (WH)→FullBreak, Mana Break→Soul
+  Break→{Soul Storm, SoulShout}}, EnergyRob→{EnergyCollect→CircleErase,
+  ChargeDisturb, ChargeDisturb(all)}, ForceShield[self]→{MindBreak→Mana
+  Burn→Magic Jammer, ResistDown, ForceShield}, Pray→Purify,
+  DemonHunter→{HolyEnchant, ExorcismGospel, Avenger} 등). **전사 공용
+  스킬 "Raging Blow"에도 이번에 처음으로 `Double Attack` 선행조건이
+  확인돼서 추가함**(가드 라인 조사 때는 안 나왔던 정보 — 위치헌터 라인
+  이미지에서 같은 스킬이 다시 나오면서 발견됨, 공용 스킬이라 가드
+  라인에도 동일하게 적용됨).
+- **신규 스킬 4개 추가**(위치헌터/인퀴지터/데몬헌터 트리에 있었지만
+  기존 데이터에 아예 없던 것): `SoulShout`(데몬헌터, Soul Break 후행),
+  `CircleErase`(위치헌터, EnergyCollect 후행 — "상대 마법진-1"은
+  teamResourceConsume류 이펙트가 없어서 미구현, 스킬 틀만 존재),
+  `Purify`(데몬헌터, Pray 후행 — `damageSideCondition:"different"`로
+  "적에게만 피해" 부분은 구현함. 이 필드는 `src/skillResolution.js`에
+  예전부터 "Purify류 — 적에게는 피해, 아군에게는 회복"이라고 주석으로만
+  남아있던 걸 실제로 채운 첫 사례. "아군 회복" 쪽은 정확한 공식/수치가
+  아직 없어서 effects 비워둠), `Punishment`(인퀴지터, 독립 — "HP%비례
+  추가데미지/SP%반비례 추가데미지" 계산식 미정으로 기본 데미지만 반영).
+- 전체 회귀(`index.js`+`demo-*.js` 27/27) 매 단계마다 통과 확인,
+  `skill-table.json`/`LEGACY_SKILL_SEED` 항상 동시 갱신, `SEED_VERSION`
+  `2026-08-09a`→`2026-08-16g`까지 단계별로 올림.
+- **확립된 작업 흐름**: 이미지는 "어느 스킬이 몇 차 전직인가"(색상)
+  판별에만 쓰고, 선행 스킬 트리(들여쓰기)는 사용자가 텍스트로 직접
+  불러주는 방식으로 최종 정착함 — 색상 오독이 반복돼서 전환함(위 항목
+  참고). 앞으로도 이 형식으로 받을 것.
+
+- 헌터(1차)→스나이퍼(2차)→{화이트아크, 아케인아처}(3차) — **이걸로 전
+  직업 라인(마법사/전사/사제/헌터 4갈래 전부) 스킬 등급 재배치를 마침**.
+  Concentration/Eagle Eye(Passive+Active)/Hunting Sign/Vulcan Arrow/
+  Quick Shot을 스나이퍼→화이트아크로 이동. Power Shoot postDelay(0→15)/
+  Concentration postDelay(0→10)/Job Master: Arcane Archer의
+  `dexDamageDealtPct`(6→8) 수치 정정. 선행조건: Power Shoot→{Charge
+  Shot, Pierce Shot→{Aiming, Disarm}}, Palsy Shot→Poison Shot,
+  Concentration→{Eagle Eye 양쪽, Hunting Sign}, Hurricane Shot→Vulcan
+  Arrow→[Vulcan Arrow+Quick Shot+Concentration]→Star Bow Brake→Fury,
+  [Arcane Intuition or Arcane Curtain]→Arcane Bolt→Arcane Spear.
+  `Excorsism`(오타)→`Exorcism`으로 이름 수정도 이 세션에 반영함.
+- **`displaySkillName()` 헬퍼를 화이트리스트 방식으로 교체**: 처음엔
+  "끝에 오는 괄호는 전부 지운다"는 정규식이었는데, 이 라인에서
+  `Eagle Eye (Passive)`/`Eagle Eye (Active)`처럼 **괄호가 직업명이
+  아니라 서로 다른 두 스킬을 구분하는 실제 의미**인 경우를 발견함(같은
+  이유로 `Elemental Shield(Red/Blue/Green)`, `ChargeDisturb(all)`도
+  지우면 안 됨). `JOB_DISAMBIGUATION_SUFFIXES = [" (Priest)", " (Druid)",
+  " (WH)"]` 화이트리스트로 교체 — 이 셋만 정확히 매칭해서 지움, 그 외
+  괄호는 전부 그대로 노출.
+
+- **Eagle Eye (Passive)+Eagle Eye (Active) — 스킬 2개를 1개로 재통합**
+  (2026-08-16, 사용자 지적으로 발견): "패시브+액티브 겸용 스킬 하나였는데
+  스킬 스키마가 패시브/액티브 동시 보유를 지원 안 해서 둘로 쪼갰다"는
+  예전 note를 다시 보니, 이미 `grantPassiveMod` 이펙트(액티브 스킬
+  발동 시 `target.passiveMods[key]`에 영구 가산 — "매의 눈" 상태의
+  방어무시 부여에 이미 쓰이고 있었음)로 "발동 시 패시브 수치를 영구
+  부여"가 가능했다는 걸 확인 — 즉 애초에 스킬을 쪼갤 필요 자체가
+  없었음(스키마 제약이 아니라 이 이펙트를 놓쳤던 것). 명중률+10%도
+  `grantPassiveMod`로 옮겨서 하나의 액티브 스킬 `Eagle Eye`로 합침
+  (pt6, `Concentration` 선행). 총 잡스킬 수 187→186(2개→1개).
+- **고블린 주술사 MATK 16→4로 하향** — "고블린 주술사가 실제로 Fire
+  Ball을 한 번이라도 완성시키면 얼마나 위협적인가" 조사(위 "레벨 10
+  4인 파티" 섹션)에서 나온 후속 조치. `goblin_shaman`이 플레이어
+  마법사와 완전히 같은 "Fire Ball"(targetCount:"all", hits:4)을
+  그대로 씀 — 스킬 자체를 고치면 유저 마법사까지 같이 약해지므로,
+  몬스터 쪽 MATK만 낮춤. 히트당 위력이 MATK×dampedINT×계수라 MATK
+  16이면 4히트 합계 ≈816(400 HP 캐릭터 한 캐스트로 즉사 가능) —
+  4로 낮추면 합계 ≈200 안팎(위협적이지만 즉사는 아님, 실측
+  `shaman-alpha-strike.js` 스크래치 스크립트로 강제 선공시켜 확인:
+  헌터 400→196/마법사 400→240/사제 400→265, 전원 생존). `web/monster-roster.html`의
+  `LEGACY_MONSTER_SEED`만 수정(몬스터는 skill-table과 달리 별도 JSON
+  미러 파일이 없음), `MONSTER_SEED_VERSION` `2026-08-14a`→`2026-08-16a`.
+- **고블린의 왕 승률을 의도적으로 60%로 튜닝** — 사용자 요청: "레벨15,
+  최대효율 스탯, 상점 무기만(방어구 몇 가지는 아직 못 갖춘 수준)"인
+  파티가 고블린의 왕 전투(`goblin-king`, 고블린의 왕은 weight10로 낮은
+  확률로만 등장 — 나머지는 섭정/수문장/주술사)를 승률 60% 정도로 이길
+  수 있게 조정. **레벨10 4인 파티 실측 때 의심했던 섭정의 Fire Ball이
+  아니라, 진짜 원인은 왕 자신의 "Break Down"이었음** — 원래 STR26/ATK22
+  조합에서 raw 데미지가 ≈2200까지 나와서, 방어구 없는 400 HP 캐릭터를
+  Break Down 한 방(개전 직후 3연타 패턴)이 그냥 죽였음(왕이 낀 조우는
+  실측 승률 0%에 가까움 — 강제 선공 디버그로 확인: 4명 중 2명이 3턴 안에
+  전투불능, 6턴째 전멸). Bash/Break Down 둘 다 전사의 공용 스킬이라
+  스킬 자체는 못 건드림 — 몬스터 쪽 스탯만 조정.
+  - **ATK만 낮춰본 1차 시도**(STR26 고정): ATK2~4는 승률 100%(트리비얼),
+    ATK6은 82%, ATK8부터 60%대로 급격히 꺾임 — "낮췄지만 여전히
+    위협적인" 중간 지점을 못 찾음(스텝이 너무 거칢).
+  - **STR도 같이 낮추는 2차 시도**: `dampDamageStat`이 완만한 곡선이라
+    ATK 하나만 움직이는 것보다 STR·ATK 두 축을 같이 움직이면 조정
+    폭이 넓어짐 — STR22/ATK9~13, STR18/ATK11~13 구간에서 승률이
+    58~61%로 여러 인접값에 걸쳐 안정적으로 재현되는 평탄구간을 찾음
+    (우연한 노이즈 아님). **STR22/ATK11**로 확정(원래 STR26/ATK22).
+    실제 파일 반영 후 재검증: 승률 61.5%(200회).
+  - 사용자 의도: "장비가 갖춰지고 레벨이 오르고 스킬을 더 배우면 자연히
+    100%로 수렴하게" — 지금 60%는 이 파티 스펙 기준에서의 의도된
+    난이도점이지 최종 밸런스가 아님. STR도 같이 낮춘 부수 효과로,
+    왕의 기준 스탯 자체가 낮아져서 플레이어 디버프(Weapon Break류
+    Atk%감소 등)가 상대적으로 더 크게 체감돼 디버프 전략을 유도하는
+    효과도 노림(사용자가 명시적으로 의도한 부분).
+  - `web/monster-roster.html`만 수정, `MONSTER_SEED_VERSION`
+    `2026-08-16a`→`2026-08-16b`.
+
+**남은 것**: 사제 계열 나머지 스킬들(Party Heal/Refresh/Job Master 등
+선행조건 없이 독립으로 둔 것들)이 정말 독립인지 재확인 필요할 수 있음.
+새로 추가한 4개 스킬(SoulShout/CircleErase/Purify/Punishment)의 정확한
+수치·공식이 아직 미정 — 다음에 확정되면 채워야 함. 전 직업 라인의
+등급/선행조건 재배치 자체는 이걸로 일단 끝났지만, 실제 UI(패턴 편집기
+드롭다운·습득 화면)에서 눈으로 재검증하는 건 아직 안 함 — 다음 세션에서
+브라우저로 한 번 훑어볼 가치가 있음. 다른 패시브+액티브 겸용 스킬도
+비슷하게 잘못 쪼개져 있을 가능성 있음 — Eagle Eye 사례를 계기로 전체
+스킬 목록에서 note에 "패시브+Use 겸용"/"둘로 분리" 같은 문구가 있는
+다른 항목이 더 있는지 훑어볼 가치가 있음(아직 안 함).
+
 ## 현재 진행 상황 요약 (2026-08-15 기준 — 다음 세션은 여기부터 읽을 것)
 
 ### 끝난 것
@@ -40,15 +199,18 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
   3) 전직하면 하위 직업 스킬을 영영 못 배우던 버그(`jobSkillTable()`이
      지금 직업 스킬만 봤음, 플레이 테스트로 발견) — 전부 수정 완료,
      회귀 테스트 통과·실제 UI로 재검증함.
+- **밸런싱 — 버프/디버프 상한 축소(2000%→500%) 완료**: `src/character.js`의
+  `calculateEffectiveStat()`(`realVal * 20` → `realVal * 5`), `src/registries.js`의
+  `LUK_GROWTH_MAX_RATIO`(20→5, 캡=5 지점에서 여전히 3배 도달하도록 자동
+  재계산됨), `src/skillResolution.js`의 `describeStatCap()`("더 이상
+  증가할 수 없다" 판정 임계값), `web/character-sheet.html`의 `calcEffective()`
+  (UI 표시용 사본)까지 전부 동기화. 전체 회귀(`index.js`+`demo-*.js` 27/27)
+  통과, `simulate.js`/성장곡선 프로브로 재확인함. 상세: "알려진 미구현 /
+  보류 항목" 섹션.
 
 ### 남은 것 (우선순위 순)
 
-1. **밸런싱 — 버프/디버프 상한 축소** (다음 세션 1순위, 위치 이미 특정함):
-   `src/character.js`의 `calculateEffectiveStat()`에서 `realVal * 20`(2000%
-   상한)을 `realVal * 5`(500%)로. `src/registries.js`의
-   `LUK_GROWTH_MAX_RATIO = 20`도 같이 조정 필요(이 캡을 전제로 역산된
-   값이라 파급됨). 상세: "알려진 미구현 / 보류 항목" 섹션 맨 아래.
-2. **관리자 전용 페이지들은 아직 `localStorage`/`battleSim_username`
+1. **관리자 전용 페이지들은 아직 `localStorage`/`battleSim_username`
    기반**: `skill-table-editor.html`/`job-table-editor.html`/
    `shop-table-editor.html`/`monster-roster.html`/`monster-sheet.html`/
    `dev-tools.html`/`feature-requests.html`. `nav.js`는 이미
@@ -57,10 +219,17 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
    낮게 잡아둠 — 편집기에서 스킬/직업/상점/몬스터를 고쳐도 지금은
    `game_content`에 반영 안 됨(SQL로 직접 갱신하거나, 이 페이지들도
    전환해야 함).
-3. **서버 측 보상 검증 미착수**: `dispatch.html`/`battle-view.html`이
+2. **서버 측 보상 검증 미착수**: `dispatch.html`/`battle-view.html`이
    클라이언트가 계산한 exp/gold/loot를 그대로 커밋하는 구조(기존과 동일한
    신뢰 모델 유지, 이번 전환에서 의도적으로 손 안 댐). 상세: "API 단계에서
    검증/방어가 필요한 지점" 섹션.
+3. **초반 무기 ATK가 초반 던전 난이도 대비 과도한 문제** (2026-08-15 성장곡선
+   조사로 발견, 상세는 아래 "레벨 1~30 성장곡선 조사" 항목): 레벨업(스탯
+   투자) 자체는 감쇠가 잘 작동하는데, 상점 시작 무기만 사도 레벨 1부터 이미
+   고블린 왕국 최초 전투를 100% 승률로 찍어눌러서 레벨 30까지 수치가 안
+   움직임. 던전별 실제 몬스터 구성 대비 레벨 진행 검증 필요, 마법 클래스의
+   "맨주먹이면 MATK 0이라 아예 딜이 안 나오는" 구조적 비대칭도 같이 있음
+   (물리 클래스만 맨주먹 ATK+5 안전장치가 있음).
 4. 그 외 소소하게 남은 것들은 "알려진 버그"/"알려진 기능 공백" 섹션들에
    개별로 정리돼 있음(전직 로그 오귀속, `battle-log-view.html` 낡은 파서,
    `teamResourceConsume` 이펙트 없음 등) — 전부 우선순위 낮음으로 보류 중.
@@ -70,6 +239,110 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 - **전직하면 하위 직업 스킬을 영영 못 배우던 버그(+ 이미 배운 스킬이
   화면에서 사라지는 부작용) — 수정 완료**. 상세: "알려진 버그 — 전직하면
   하위 직업 스킬을 영영 못 배우던 문제" 섹션.
+
+### 2026-08-15 — `simulate.js`가 이번 세션의 DB 전환 이후로 깨져 있었음 (수정 완료)
+
+레벨 1~30 성장곡선에서 "지나치게 강한 구간"을 찾으려고 `simulate.js`의
+`loadAdapterEnv()`로 스크래치 벤치마크를 돌렸는데, 모든 직업·모든 레벨이
+승률 0%로 나왔다. 원인: `loadAdapterEnv()`가 여전히
+`localStorage.setItem("battleSim_skillTable", ...)`로 스킬 테이블을
+넣고 있었는데, `battle-adapter.js`는 오늘 있었던 injectable-cache 리팩터
+(`dispatch.html`/`battle-view.html` 전환 중 발견한 "모든 전투가 스킬 없이
+맨주먹으로 돌던" 버그를 고치면서) 이후로 그 키를 아예 안 읽는다 — 오직
+`setSkillTable()` 주입만 받음. 즉 **`simulate.js`가 그날 이후로 스킬을 단
+하나도 등록 못 하는 채로 조용히 돌고 있었다**(에러 없이 승률만 이상하게
+나와서 티가 안 남 — CLAUDE.md의 "밸런스 조정 시 기본 도구"라고 적어둔
+바로 그 도구가 깨져 있었던 것). `simulate.js`의 `loadAdapterEnv()`에서
+`JSON.parse` 후 `BattleAdapter.setSkillTable(table)`을 직접 호출하도록
+수정 → `node simulate.js --runs 50`으로 정상 동작 확인(전체 `demo-*.js`
++ `index.js` 27/27 회귀 통과, 이 경로들은 `loadAdapterEnv`를 안 써서
+애초에 이 버그의 영향을 안 받았음).
+
+### 2026-08-15 — 레벨 1~30 성장곡선 조사: "지나치게 강한 구간"의 정체는 무기, 스탯이 아님
+
+`simulate.js` 수정 후 고블린 왕국 최초 전투(고블린 척후병 x2)를 벤치마크로
+전사/헌터/마법사/사제 각각 레벨 1~30 전 구간(60회씩)을 돌린 결과:
+
+- **상점 시작 무기(1000~1000원대)만 쥐어주면 전사/헌터/마법사는 레벨 1부터
+  이미 100% 승률·3~4턴 클리어로 시작해서 레벨 30까지 수치가 전혀 안
+  움직인다**(예: 전사 Lv1 100%/4.2턴 → Lv30 100%/4.2턴, 완전히 평평함).
+  레벨 성장(스탯 배분)이 이 벤치마크에 사실상 아무 영향도 못 준다는 뜻 —
+  스탯 투자를 안 해도 이미 이겨버리는 구간이라 성장이 "느껴질" 수가 없음.
+- **무기 없이(맨주먹) 돌리면 반대로 마법사/헌터는 레벨 30까지도 승률이
+  0~7%에 머무름** — `battle-adapter.js`가 ATK/MATK를 오직 장비의
+  `combatReal`에서만 주고(맨주먹이면 ATK만 +5, MATK는 절대 안 붙음),
+  화살 같은 개인 자원도 오직 장비(`grantsResource`)로만 채워서(로스터의
+  `personalResources` 필드 자체를 어댑터가 안 읽음) — 마법사는 MATK=0이라
+  Fire Ball 데미지가 항상 0, 헌터는 화살이 0이라 Shoot을 아예 못 씀. 즉
+  **INT/DEX에 아무리 투자해도 무기가 없으면 그 투자가 데미지에 전혀
+  반영되지 않는다**(스탯 자체는 투자한 대로 오르지만, 데미지 공식이
+  `MATK × dampedINT × coefficient`라 MATK가 0이면 전부 0). 이건 밸런스
+  수치 문제가 아니라 "물리 클래스는 맨주먹 안전장치가 있는데 마법 클래스는
+  그게 없다"는 구조적 비대칭 — 다음 밸런싱 세션에서 참고할 것(맨주먹 ATK+5
+  안전장치처럼 최소 MATK 안전장치를 줄지, 아니면 "마법 클래스는 반드시
+  초반에 완드를 사야 한다"는 설계를 의도된 것으로 그대로 둘지는 아직
+  미결정 — 사용자와 상의 필요).
+- **`simulate.js` 자체의 기본 샘플 매치업**(아군 전사+궁수 2인 vs 고블린
+  2, 이미 무기 낀 상태로 설계된 고정 픽스처)도 동일하게 승률 100%/평균
+  3.2턴로 나오고, **`printReport()`가 자체적으로 "판정: 너무 쉬움 — 난이도를
+  올릴 여지가 있음"이라고 이미 판정하고 있었다** — `simulate.js`가 깨져
+  있어서 이 판정 자체가 그동안 한 번도 정상적으로 안 보였던 것으로 보임
+  (전 항목의 버그와 연결됨).
+- **결론**: 사용자가 플레이 테스트로 느낀 "지나칠 정도로 강한 구간"은 레벨업에
+  따른 스탯 성장 자체보다는 **"장비만 갖추면 초반 던전이 레벨 1부터 이미
+  거의 즉시 트리비얼해진다"** 쪽에 더 가까울 가능성이 높다 — 스탯 감쇠
+  (`STAT_DAMPING_*`)가 의도대로 작동해서 레벨업으로 인한 극적인 변화는
+  이미 억제돼 있는데, 반대로 시작 무기 자체의 ATK 절댓값(장비는 감쇠 대상이
+  아님, CLAUDE.md의 기존 설계 결정 그대로)이 초반 콘텐츠 난이도 대비 너무
+  높게 잡혀 있어서 "성장을 느낄 새도 없이 이미 이겨버리는" 구간이 레벨 1
+  직후부터 시작되는 것으로 보임. 이번 조사는 고블린 왕국 최초 전투 하나만
+  고정 벤치마크로 썼으므로(버프/디버프 캡 축소는 같은 날 별도로 완료함,
+  "알려진 미구현 / 보류 항목" 섹션 참조), 다음 세션에서 **던전별 실제
+  몬스터 구성(battle-select.html/battle-themes.js의 BATTLE_THEMES) 대비
+  레벨 진행이 맞물리는지 점검할 가치가 있음** — 아직 미착수.
+
+### 2026-08-15 — 레벨 10 4인 파티로 전 전투(고블린의 왕 제외) 실측: "고블린 수송대"가 사실상 클리어 불가능
+
+버프/디버프 캡 축소 직후, 사용자 요청으로 레벨 10짜리 실전형 4인 파티(전사
+전열+아군보호 / 헌터·마법사·사제 후열, 스탯은 주력 70%+SPD 30%로 분배, 상점
+시작 무기+방어구 1세트 장착)를 만들어 고블린 왕국 왕 전투(`goblin-king`)를
+제외한 나머지 6개 전투를 실제 `spawnEnemies()` 확률 그대로 150회씩 돌림
+(`web/battle-adapter.js`의 `runBattle()`을 그대로 사용 — 실제 게임과 완전히
+같은 경로).
+
+- **고블린과 놀기/조금 강한 고블린/고블린 전사들/고귀한 고블린들/고블린
+  성채 — 전부 승률 100%, 3턴 클리어.** 레벨 10짜리 4인 정예 파티라 이
+  구간들은 이미 압도적으로 쉬움(예상된 결과 — 이 던전들은 훨씬 낮은 레벨대를
+  위한 콘텐츠).
+- **고블린 수송대(`goblin-cart-raid`, aftermath 전용) — 승률 0%, 150회 전부
+  100턴 타임아웃.** 원인은 명확함: `goblin_cart`(마차)의 `maxHp`가
+  **300,000**인데, 레벨 10 파티가 100턴 동안 낼 수 있는 누적 피해량은
+  약 130,000(전투 로그 실측 — 마차를 제외한 호위 고블린들은 파티의 광역기에
+  둘째 턴에 전멸해서 이후론 마차 하나만 남아 온전히 화력을 다 받는데도
+  이 정도). **300,000 / 100턴 ≈ 턴당 3,000 데미지가 필요한데, 레벨 10
+  파티의 실측 지속 화력은 턴당 1,300 안팍** — 산술적으로 이 레벨대에서는
+  절대 못 깨는 구조. 입장 조건은 `clearedBattle: noble-goblins`(왕국 3번째
+  던전 전, 비교적 초반에 열림)뿐이라, 열리는 시점과 실제로 깰 수 있는
+  전력 수준 사이에 큰 격차가 있어 보임 — 다음 밸런싱 세션에서 마차 HP를
+  낮추거나, 입장 조건에 권장 레벨/전력 기준을 추가하는 것을 검토할 가치가
+  있음(아직 미착수, 사용자 확인 필요).
+- **부수적으로 발견한 별개 버그(수정 안 함, 다음 세션용)**: `BATTLE_MONSTER_POOLS`의
+  각 몬스터 항목에 있는 `row`("front"/"back") 필드가 **실제 전투에는 전혀
+  반영되지 않는다.** `dispatch.html`/`battle-view.html` 둘 다 `spawnEnemies(battleId)`
+  결과에서 `monsterId`만 뽑아 `enemySpawnKeys`로 넘기고(`row`는 그 시점에
+  버려짐), `battle-adapter.js`의 `buildEnemyFromMonsterKey()`도 `character.row`를
+  전혀 설정하지 않는다 — `BattleCharacter` 생성자 기본값(`this.row = "front"`)이
+  그대로 남아서 **적은 항상 전원 "front"로 취급된다.** 예를 들어 고블린
+  수송대의 마차(`row:"back"`, 호위 뒤에 숨어야 정상)와 고블린 주술사
+  (`row:"back"`)도 실제 전투에선 다른 전열 몬스터와 똑같이 정면에 노출됨
+  — `targetPriority:"backRow"` 스킬(헌터의 Shoot 등)이 노리는 "후열 우선"
+  자체가 지금은 사실상 무의미함(적 쪽엔 후열이 존재한 적이 없으므로). 이번
+  조사에서 우연히 로그로 확인함(디버그 스크립트) — 아군 쪽 row는
+  `battle-adapter.js:279`에서 정상적으로 설정되므로 아군 진형 시스템 자체는
+  멀쩡함, 적 쪽만 빠짐. 고치려면 `buildEnemyFromMonsterKey(monsterTable,
+  monsterKey, instanceIndex, row)`에 `row` 매개변수를 추가하고, `runBattle()`의
+  `enemySpawnKeys`를 `{monsterId, row}` 객체 배열로 바꿔서 호출부(`dispatch.html`/
+  `battle-view.html`)까지 같이 고쳐야 함.
 
 ## 절대 잊지 말 것 — 데이터가 두 군데 있다
 
@@ -500,32 +773,28 @@ skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
 - 로그 접기/요약 UI는 아직 없음(우선순위 낮음으로 보류 중).
 - 티어(장비 등급) 개념은 데이터 필드로 존재하지 않음 — "같은 handle 대비
   성능"이라는 설계자 머릿속 개념일 뿐, 코드가 참조하는 값이 아님.
-- **(요청됨, 미착수 — 다음 세션 밸런싱 작업 1순위, 2026-08-15 위치 특정됨)**
-  전투 중 버프/디버프가 아무리 복리로 무한히 중첩돼도 최종 `effective` 값이
-  넘지 못하는 상/하한을 50~500%로 축소(현재 50~2000%)하고 싶다는 요청.
-  사용자가 말한 "50~2000%"는 스킬 `effect.value`(그건 -70~+100% 범위뿐임,
-  20만 스킬 순회 실측 완료)가 아니라 **`src/character.js`의
-  `calculateEffectiveStat(realVal, bonusVal)`**이었음 — STR/INT/DEX/SPD/LUK/
-  ATK/MATK/DEF/MDEF 전부 이 공식을 그대로 씀:
+- **(완료, 2026-08-15)** 전투 중 버프/디버프가 아무리 복리로 무한히
+  중첩돼도 최종 `effective` 값이 넘지 못하는 상/하한을 50~2000%에서
+  50~500%로 축소함. 사용자가 말한 "50~2000%"는 스킬 `effect.value`(그건
+  -70~+100% 범위뿐임, 20만 스킬 순회 실측 완료)가 아니라
+  `src/character.js`의 `calculateEffectiveStat(realVal, bonusVal)`이었음 —
+  STR/INT/DEX/SPD/LUK/ATK/MATK/DEF/MDEF 전부 이 공식을 그대로 씀:
   ```js
   calculateEffectiveStat(realVal, bonusVal) {
-    const maxCap = realVal * 20;    // 2000%
+    const maxCap = realVal * 5;     // 500% (2026-08-15에 2000%에서 축소)
     const minFloor = realVal * 0.5; // 50%
     return Math.max(minFloor, Math.min(maxCap, realVal + bonusVal));
   }
   ```
-  500%로 낮추려면 `realVal * 20` → `realVal * 5`.
-  **주의 — 이 캡을 전제로 역산된 다른 공식이 최소 하나 있음**:
-  `src/registries.js`의 `LUK_GROWTH_MAX_RATIO = 20`(LUK 크리티컬 성장 로그
-  곡선)이 "2000% 캡(ratio=20)에 도달했을 때 정확히 3배(`LUK_GROWTH_AT_MAX_RATIO`)"가
-  되도록 `LUK_LOG_SCALE`을 역산해 고정해둔 값 — 캡을 5배로 낮추면 이 상수도
-  같이 5로 맞춰야 함(그러면 `LUK_LOG_SCALE`은 기존 수식 그대로 자동 재계산됨,
-  "ratio=5 도달 시 3배"라는 의도가 유지되는 셈 — 다만 "2.5~3배 정도"라는 원래
-  설계 의도 자체를 그대로 유지할지는 사용자와 확인 필요, 캡 자체가 좁아지면
-  같은 배율 목표가 너무 쉽게/빨리 도달돼서 다르게 느껴질 수 있음).
-  다른 곳에서 20배/0.5배를 전제로 한 계산이 더 있는지는 아직 전수 조사
-  안 함 — 실제 작업 시작 시 `calculateEffectiveStat`/`realVal \* 20`/
-  `MAX_RATIO` 등을 다시 한번 grep해서 확인할 것.
+  이 캡을 전제로 역산돼 있던 의존 공식도 같이 맞춤: `src/registries.js`의
+  `LUK_GROWTH_MAX_RATIO`(20→5, LUK 크리티컬 성장 로그 곡선 — "캡 도달 시
+  정확히 3배"라는 설계 의도가 `LUK_LOG_SCALE` 재계산으로 그대로 유지됨),
+  `src/skillResolution.js`의 `describeStatCap()`("더 이상 증가/감소할 수
+  없다" 판정 임계값), `web/character-sheet.html`의 `calcEffective()`(같은
+  공식의 UI 표시용 사본, `real * 20` → `real * 5`)까지. `grep -rn "\* 20\b"
+  src/*.js web/*.js web/*.html`로 재확인한 결과 남은 `* 20`은 전부
+  `baseHp + str*20`(Max HP 공식, 캡과 무관한 별개 상수) 뿐이라 안 건드림.
+  전체 회귀(`index.js`+`demo-*.js` 27/27) 통과, `simulate.js`로 재확인함.
 
 ## 로그인 (2026-08-14, Discord OAuth 실제 동작 확인함)
 
