@@ -118,16 +118,33 @@ module.exports = { computeSkillPower, getEffectiveStatValue };
 // Arcane Archer의 "DEX 기반 스킬 위력 증가+6%"류 — 스탯 기준으로 위력이
 // 갈리는 패시브를 표현하기 위함(damageType은 물리/마법만 구분하지 어떤
 // 스탯을 썼는지는 모르므로 별도 인자로 받음).
+//
+// 세 "출처"(물리/마법 기본, 스탯별, 대상 등급별)는 서로 복리로 곱해짐
+// (2026-08-16, 사용자 지적으로 변경 — 예전엔 셋을 그냥 더한 뒤 한 번에
+// 곱해서, "???"의 damageDealtTo_userPct:-90%가 자기 자신의 Mana Guard
+// 스탠스(magicDamageDealtPct:+25%)와 그냥 상쇄되어 순 -65%로 줄어드는
+// 문제가 있었음 — 서로 무관한 두 효과가 우연히 같은 덧셈식에 들어있다는
+// 이유만으로 서로를 깎아먹는 건 직관과 어긋남). 각 출처 "안"에서는 여전히
+// 여러 소스가 합산됨(getPassiveModValue 자체가 이미 그렇게 함 — 예:
+// magicDamageDealtPct가 장비+패시브+스탠스에서 동시에 오면 그 안에서는
+// 더해짐), 다만 이 세 출처"사이"는 (1+a)×(1+b)×(1+c) 방식으로 곱해져서
+// 서로 독립적으로 작동함 — 어느 한쪽을 극단적으로 낮춰도 다른 한쪽의
+// 자기 버프에 거의 흔들리지 않게 되어 미세조정 여지가 넓어짐.
 function applyDealtPassiveMods(actor, rawDamage, damageType, statKey, targetTier) {
   const isMagic = damageType === "magic";
-  let pct = actor.getPassiveModValue(isMagic ? "magicDamageDealtPct" : "physicalDamageDealtPct");
-  if (statKey) pct += actor.getPassiveModValue(`${statKey}DamageDealtPct`);
+  // 각 출처의 배율을 0 미만으로는 안 내려가게 개별 클램프 — 안 그러면
+  // -150% 같은 극단값이 배율을 음수로 만들고, 음수끼리 곱해지면 부호가
+  // 다시 뒤집혀 데미지가 커지는 사고가 날 수 있음(복리 구조에서는 특히
+  // 위험 — 예전 덧셈식은 최종 pct 하나만 클램프하면 됐지만, 지금은 곱해지는
+  // 항이 여럿이라 각자 따로 막아야 함).
+  let multiplier = Math.max(0, 1 + actor.getPassiveModValue(isMagic ? "magicDamageDealtPct" : "physicalDamageDealtPct") / 100);
+  if (statKey) multiplier *= Math.max(0, 1 + actor.getPassiveModValue(`${statKey}DamageDealtPct`) / 100);
   // 대상 등급(creatureTier)별 추가 피해 — "damageDealtTo_{tier}Pct".
   // damageTakenFrom_{tier}Pct(받는 쪽)와 짝을 이루는 반대 방향.
   // 받는 피해 감소만으로는 상대 화력이 이미 방어력에 막혀 있으면 체감이
   // 안 나오는데, 가하는 피해는 방어 계산 전에 곱해지므로 확실히 체감됨.
-  if (targetTier) pct += actor.getPassiveModValue(`damageDealtTo_${targetTier}Pct`);
-  return Math.max(0, rawDamage * (1 + pct / 100));
+  if (targetTier) multiplier *= Math.max(0, 1 + actor.getPassiveModValue(`damageDealtTo_${targetTier}Pct`) / 100);
+  return Math.max(0, rawDamage * multiplier);
 }
 
 // 흡혈 — 데미지가 실제로 적용된(target.takeDamage()가 반환한 applied) 직후
