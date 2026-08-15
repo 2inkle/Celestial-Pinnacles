@@ -6,6 +6,135 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 2026-08-16 — "???"(레벨40 확장 마일스톤 보스) 궁극기/밸런싱 완성
+
+고블린 마차(`goblin_cart`) 이후 이어지는 AFTERMATH 미스터리 전투
+"unknown_entity"("???")의 실제 스킬셋·패턴·코어스탯을 이번 세션에서
+전부 확정함. 오늘 목표였던 "실제로 승리 가능한 전투"를 레벨30·+6강화
+(최소 기준) 파티 기준 **승률 66.7%**로 달성·검증 완료. 아래는 오늘 안에
+끝낸 것과 내일로 미룬 것.
+
+### 완성된 "???"의 전체 스킬/패턴
+- **OMEN**(궁극기): 마법진 5개 도달 시 최상위 우선순위로 무조건 발동.
+  Enemy-ALL·INT×200%×3·castDelay 55·전 스탯(ATK/MATK/DEF/MDEF) -30%·
+  SPD -20%. `preDelayType:"casting"`이라 인퀴지터의 Magic Jammer로
+  실제로 캐스팅을 늘릴 수 있고, costs로 마법진 5개를 요구하므로
+  `PrepState.resolve()`가 발동 시점에 코스트를 재확인 — 시전 중에
+  마법진을 5개 미만으로 깎으면 "발동 실패"로 불발됨(**이론상 파훼법이
+  실제로 성립함을 엔진 레벨에서 end-to-end 검증**, `demo-omen-counterplay.js`).
+- **Circle Drain**("???" 전용, erase+gain)/**CircleErase**(위치헌터→인퀴지터
+  계보 실제 스킬, 순수 삭제만 함— 처음에 이 둘을 헷갈려서 같은 이름으로
+  합쳤다가 사용자 지적으로 분리함. 파훼법의 핵심은 플레이어가 원래
+  갖고 있던 **순수 삭제형** CircleErase 쪽 — 판 전체 마법진 총량을 실제로
+  줄이므로 "무조건 지운다"만으로도 100턴 무승부까지 갈 수 있음이 확인됨).
+- **Arcane Pulse**(10턴마다 확정 발동, 가벼운 단일 공격+마법진 순증가 —
+  Circle Drain의 뺏고뺏기기 제로섬만으로는 궁극기 도달 속도가 우연에
+  너무 좌우돼서 추가).
+- **Arcane Surge**(자기 effectiveMatk가 realMatk의 60% 미만이면 MATK
+  +150% 자가보정 — 발동 즉시 조건이 꺼져서 무한루프 없음).
+- **Mana Tide**(SP 20% 이하 시 최대 3회, 발동 후 영구 SP 재생 tick —
+  "SP 낮추기 공략은 몇 번은 유효, 이후엔 자연재생으로 무효화").
+- **둠로드 스킬 이식**: 개전에 Mana Guard→Corrupted Focus(스탠스는
+  둠로드의 SpellFocus와 동일하지만 집속 마력 축적 배율만 1:10로 완화 —
+  원판 그대로 썼더니 궁극기 Vortex Overload까지 4~5턴 만에 도달해서
+  파티가 준비할 시간이 없었음) 순서로 진입 → 이후 기본 폴백이
+  Lightning Ball(마법사인데 물리공격 ATTACK을 반복하던 걸 사용자가
+  지적해서 교체) → 집속 마력 500 이상 Thunder Storm → 1000 이상
+  **Vortex Overload**("???" 전용, 둠로드의 Lightning Vortex와 스펙
+  동일하되 발동 후 집속 마력을 전부 소진시키는 사양만 다름 — 마법방어력을
+  미리 준비 못 하면 전멸 위기인 타임어택 궁극기).
+- HP 30% 이하 → 보물상자를 남기고 퇴각(goblin_cart와 동일하게 "직접
+  처치 불가"), HP 50% 이하 → 1회 완전회복(HP/SP) — 이 기믹 때문에
+  공략을 잘못하면 100턴을 다 쓰고도 못 끝낼 수 있음(의도된 설계).
+
+### 튜닝 과정에서 발견·수정한 엔진 버그 (전부 "???" 개발 중 실측으로 발견)
+1. **소환 배율 누수**: `performSummon()`의 SummonEff×LUK 배율이 원본
+   스탯뿐 아니라 combatReal(ATK/DEF/MATK/MDEF)·maxHp에도 그대로 곱해져서,
+   ATK/MATK처럼 감쇠 대상이 아닌 스탯은 배율이 그대로 새어나갔음(고블린
+   마차가 소환하는 주술사가 예전에 손봤던 MATK 너프를 우회해서 다시
+   위험해지던 문제) — 배율을 원본 스탯에만 적용하도록 수정.
+2. **장비발 Max HP/SP 보너스가 전투 시작과 동시에 사라짐**: "생명의
+   반지"/"마나의 반지" 등이 `resetForBattle()`에 매 전투 초기화되는
+   필드에 잘못 합산되고 있었음 — real/bonus 2단 구조로 분리해서 해결
+   (사실상 이 필드를 쓰는 아이템이 한 번도 작동한 적이 없었던 것으로 보임).
+3. **Arcane Pulse가 파티원 수만큼 마법진을 곱배로 줌**: `targetCount:"all"`
+   스킬의 `effects`가 대상 하나당 한 번씩 재적용되는 구조라, 5인 파티를
+   때리면 teamResourceGain도 5번 적용됨 — targetCount를 "single"로 수정.
+4. **마법사 계열 다수 스킬이 "multi"인데 "all"로 구현돼 있었음**(전역 시스템
+   버그, "???" 국한 아님): 사용자가 원본 설계 참고자료를 대조해서 발견 —
+   Fire Ball/Fire Storm/Lightning Ball/Thunder Storm/Lightning Vortex 등
+   16개가 "무작위 다수 타격(전열 보호캐 우선)"이어야 하는데 "전체 무조건
+   타격"으로 잘못 들어가 있었음. 엔진은 이미 이 구분을 정확히 지원하고
+   있어서(`targetCount:"single"`+`hits>1`이면 히트마다 재추첨하는 게
+   정확히 "multi" 거동) 데이터만 고치면 됐음. Voltex Sphere는 예외
+   (`bounceRows` 전용 메커니즘이 `targetCount:"all"`을 요구).
+5. **applyDealtPassiveMods가 덧셈이라 서로 무관한 효과끼리 상쇄됨**:
+   "???"의 damageDealtTo_userPct(대인 데미지 일괄 축소)와 그녀 자신의
+   Mana Guard 자기 버프가 같은 덧셈식에 있다는 이유만으로 상쇄되던 문제
+   — (1+a)×(1+b)×(1+c) 복리 구조로 변경(사용자 지시), 각 출처는 개별
+   0-클램프.
+6. **리젠류 tick 6곳이 `duration:1`이라 한 번 틱하고 소멸**(ManaRegen/Self
+   Regeneration/Regene Heal×2/Regeneration/Spirit of Mana) — "버프·디버프는
+   리젠·틱데미지 포함 전부 영구지속"이라는 확립된 규칙과 어긋나 있었음,
+   전수 조사해서 6곳 다 고침.
+
+### 새로 만든 범용 엔진 기능
+- `MY_EFFECTIVE_STAT_COMPARE`(자기 effective 스탯 비교, `thresholdPctOfReal`
+  옵션으로 절대값 대신 real 대비 %로도 판정 가능 — 상대 스탯은 절대 참조
+  불가하게 설계), `MY_PERSONAL_RESOURCE_COMPARE`(집속 마력 등 개인 자원
+  임계치), `ANY_ALLY_HP_LESS_THAN_PCT`(파티 중 누구라도 위험하면 반응),
+  `BATTLE_TURN_MULTIPLE_OF`(N턴마다 확정 발동), `OPPONENT_RESOURCE_GREATER_THAN`
+  / `FACTION_RESOURCE_GREATER_THAN`(상대/자기 진영 팀 자원 임계치).
+- `stealTeamResource`(상대 자원 삭제 성공 시 자기 진영 적립, gainAmount:0이면
+  순수 삭제)/`drainPersonalResource`(개인 자원 완전 소진) 이펙트.
+- `RETREAT`/`PANIC_FULL_RECOVERY` 액션(goblin_cart의 SELF_DETONATION류
+  패턴을 다른 몬스터에도 재사용 가능하게 일반화).
+- `buildEnemyFromMonsterKey`에 `monsterDef.personalResources`/`passiveMods`
+  지원 추가 — 몬스터는 "job" 개념이 없어서 플레이어 캐릭터가 자동으로
+  받는 이 두 필드를 못 받고 있었음, 직접 지정하는 통로를 뚫음.
+
+### 밸런싱 방법론과 최종 수치
+- 벤치마크 파티(인퀴지터/카디널/하이드루이드/화이트아크×2, 레벨30)로
+  goblin_king/goblin_cart 승률 100%/98.7%를 먼저 확인한 뒤, 그 파티로
+  "???"를 튜닝(goblin_king 때 확립한 방법론 그대로).
+- **몬스터 스탯을 극단적으로 낮추는 대신, `damageDealtTo_userPct`(대인
+  데미지 일괄 배율)로 최종 데미지만 축소하는 방식을 채택**(사용자 제안).
+  이유: 유저는 HP가 1000~2000대인데 보스는 수십만이라 "비슷한 스펙"으로
+  맞춰버리면 스탯을 1까지 깎아야 하고, 그러면 감쇠 곡선 바닥에 붙어서
+  퍼센트 디버프가 전부 무의미해짐. 스탯은 정상 범위(INT30/MATK25)로
+  두고 데미지에만 -95%(5%) 배율.
+- 최종 확정 스탯: **HP 60만**(1.2×HP=72만이 실제 처치에 필요한 누적딜
+  — 패닉힐로 50%에서 1회 리셋되므로 "50%까지+다시 100%에서 30%까지"
+  이중으로 깎아야 함), INT 30/MATK 25/MDEF 200/SPD 200/damageDealtTo_userPct -95.
+- 카디널 Inner Fire·하이드루이드 FullAssist를 500% 캡까지 반복 캐스팅
+  (사용자 지정), 화이트아크 2체는 **+6(최소 기준) 강화**로 **승률 66.7%,
+  사망으로 인한 패배 0%**(나머지는 100턴 무승부) 달성 — 처음 목표하신
+  "+6은 빠듯하지만 가능"과 정확히 일치. 인퀴지터가 MindBreak×2 후 공격
+  대신 ForceShield(파티 MDEF+20%)를 반복하면 사망률이 사실상 0%로
+  떨어짐(승률 자체는 안 바뀌고 패배가 전부 무승부로 바뀜)도 확인함.
+- 실측 로그(`omen-fight-win-log-fixed.txt`, 5/5 생존 승리, 39턴)를 사용자에게
+  전달해 직접 검토받음 — 검토 중 "???"가 데미지를 전혀 못 넣는 것처럼
+  보인 사례가 있었는데, 원인은 게임 코드가 아니라 스크래치 테스트
+  스크립트의 인자 파싱 버그(`--verbose`가 `Number()`로 들어가 NaN이 됨)
+  였음, 게임 코드는 `git diff` 결과 무관(수정 없음) 확인.
+
+### 남은 것 (내일 이어서)
+- **레벨 상한 30→40 확장**: 전투 승리/보상으로 트리거되는 메커니즘 자체는
+  아직 미착수. 하드코딩된 레벨 상한 위치를 찾아서 풀어야 함.
+- **보상 내역**: `rewardObjectSpec`이 아직 REWARD_GRANT의 기본값(이름
+  없는 상자, 2000 HP)에 폴백 중 — 실제 골드/드랍 아이템/아크메이지 3차
+  전직 요구 아이템 이름 등을 확정 안 함.
+- 개전 대사(DIALOGUE_OPENING) 여부 — 사용자가 "생각해보겠다"고 보류.
+- 이 전투는 "한 번 클리어하면 재입장 자체가 영구히 막혀야 한다"는 예외
+  규칙이 필요(다른 전투들과 달리) — `battle-select.html`의 해금 로직에
+  아직 미반영.
+- **`game_content` DB(Supabase)에는 이번 세션 내용이 전혀 반영 안 됨** —
+  "일단 로컬에서 진행"이라는 지침에 따라 SQL 마이그레이션을 만들지
+  않았음. GitHub에는 푸시했지만(`web/*.html`은 정적 코드라 푸시 즉시
+  반영), `game_content`가 DB 기반인 스킬/몬스터 데이터(OMEN 등 "???"의
+  전체 스킬셋, unknown_entity 몬스터 정의)는 실제 서비스에 반영하려면
+  다음에 반드시 SQL 마이그레이션을 새로 만들어서 실행해야 함.
+
 ## 2026-08-16 — 스킬 테이블 직업 등급 재배치 작업 (진행 중)
 
 `skill-table.json`/`skill-table-editor.html`의 `LEGACY_SKILL_SEED`에서, 여러
