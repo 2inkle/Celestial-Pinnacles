@@ -203,24 +203,36 @@
       // 소환 배율 2배 — 소환 계수 = SummonEff × LUK투자 × LUK성장인데 LUK만으로는
       // 1.25배에서 상한에 걸림. LUK 100(1.0배) × SummonEff 100(2.0배)로 맞춤.
       //
-      // 패턴 — 개전에 3체를 쏟고, 이후 체력이 75%/50%/25% 아래로 떨어질 때마다
-      // 각 1회씩 추가로 3체를 더 뱉음. 몬스터는 슬롯 제한이 없어서 이런 다단
-      // 패턴을 그대로 다 쓸 수 있음. 평상시엔 아무것도 안 함(화력 0이라
-      // 마차 자체는 위협이 아니고, 물량이 위협).
+      // 패턴(2026-08-16 개편) — 개전에 대사 한 줄 + 즉시 3체 소환(무딜레이
+      // 연계), 이후 체력 87%/75%/62%에서 각 1회씩 추가로 3체씩 뱉음. 50%
+      // 아래로 내려가면 "직접 죽일 수 없는" 연출 대신, 대사 -> 보물상자
+      // 소환 -> 자폭(자신 HP를 0으로)이 한 묶음으로 즉시 연계되어 마차
+      // 스스로 전투를 끝냄(플레이어가 굳이 300000 HP를 끝까지 깎을 필요
+      // 없음 — 50%까지만 깎으면 나머지는 마차가 알아서 처리). 원래
+      // 75/50/25% 3단계였던 소환 체크포인트를 "50% 이후는 죽음 연출"로
+      // 재배정하면서 87/75/62%로 촘촘하게 당김(100~50% 구간을 4등분한 것과
+      // 같은 간격 감각 유지). DIALOGUE_*/REWARD_GRANT/SELF_DETONATION은
+      // 전부 src/registries.js의 ActionRegistry에 구현됨(chains:true인
+      // 액션은 게이지 소모 없이 바로 다음 패턴으로 이어짐).
       //
-      // 타임어택 설계 — 승패가 아니라 "몇 턴에 잡느냐"로 파티 성능을 재는
-      // 허수아비 겸 보너스 전투. 전투 턴 상한(100)은 그대로 두고, 적정 스펙
-      // (Lv15 1차전직 + 최적 스탯) 파티가 약 37턴, 버프를 쓰면 약 33턴에
-      // 잡도록 HP를 맞춤. 파티가 강해질수록 소요 턴이 눈에 띄게 줄어들어
-      // 스스로 성장을 확인할 수 있음. HP를 여기서 더 올리면(43만 이상)
-      // 편차가 급격히 벌어져 100턴 초과가 섞이기 시작하므로 이 선이 상한.
+      // 타임어택 설계 — 승패가 아니라 "몇 턴에 절반을 깎느냐"로 파티 성능을
+      // 재는 허수아비 겸 보너스 전투(원래는 300000 전부를 깎는 기준이었는데,
+      // 이제 죽음 연출 트리거가 50%라 실질 목표치는 150000). 파티가 강해질수록
+      // 소요 턴이 눈에 띄게 줄어들어 스스로 성장을 확인할 수 있음.
+      dialogueOpeningLines:["당장 떨쳐내라!", "저 머저리들이 쫒아오지 못하게 막으란 말이다!"],
+      dialogueDefeatLines:["이이익... 이 한심한 놈들...!", "여봐라, 무거운 걸 던져줘라! 저기 저 쓰잘데기 없는 궤짝 말이다!"],
+      rewardObjectSpec:{ name:"보물상자", maxHp:2000, dropTable:[] }, // 드랍 내용 미정 — 추후 결정
       maxHp:300000, maxSp:200, openingAction:true,
       combatReal:{def:20,mdef:20,summonEff:100}, tier:"boss",
       patterns:[
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"DIALOGUE_OPENING",maxUses:1},
         {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:87,action:"SUMMON_OPENING",maxUses:1},
         {subject:"self",metric:"hp",comparator:"lte",value:75,action:"SUMMON_OPENING",maxUses:1},
-        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"SUMMON_OPENING",maxUses:1},
-        {subject:"self",metric:"hp",comparator:"lte",value:25,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:62,action:"SUMMON_OPENING",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"DIALOGUE_DEFEAT",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"REWARD_GRANT",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"SELF_DETONATION",maxUses:1},
       ],
       summonAbility:{ candidates:[{monsterId:"goblin_scout",weight:45},{monsterId:"goblin_warrior",weight:40},{monsterId:"goblin_shaman",weight:15}] },
       expReward:15, goldReward:8,
@@ -281,7 +293,7 @@
         {name:"왕의 대검",category:"equipment",enhanceable:true,chance:0.15,quantity:[1,1],slot:"mainhand",equipmentType:"greatsword",combatReal:{atk:97,def:8,mdef:4},combatBonus:{def:72,mdef:59},weight:2,twoHanded:true},
       ] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16c";
+  const MONSTER_SEED_VERSION = "2026-08-16d";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
