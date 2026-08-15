@@ -157,6 +157,14 @@
 
   .preset-tab.io { color:var(--mist-dim); border-style:dashed; margin-left:auto; }
 
+  .preset-control-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:14px; padding:9px 12px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; }
+  .preset-control-hint { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); }
+  .preset-control-actions { display:flex; gap:8px; }
+  .mini-btn-wide { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.02em; background:var(--panel); border:1px solid var(--line); color:var(--mist-dim); padding:6px 10px; border-radius:6px; cursor:pointer; }
+  .mini-btn-wide:not(:disabled):hover { border-color:var(--gold); color:var(--gold); }
+  .mini-btn-wide:disabled { opacity:0.5; cursor:default; }
+  .mini-btn-wide.danger:not(:disabled):hover { border-color:var(--danger-dim); color:var(--danger); }
+
   .skill-tree-text { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.75; color:var(--mist-dim); overflow-x:auto; max-height:360px; overflow-y:auto; }
   .skill-tree-text .tree-line { white-space:pre; }
   .skill-tree-text .tree-check { color:var(--gold); font-weight:600; }
@@ -548,6 +556,7 @@ function mapCharacterRow(row) {
     row: row.row_position,
     guardAllies: row.guard_allies,
     presets: row.presets || [],
+    battlePresetIdx: row.battle_preset_idx ?? 0,
     keyItems: row.key_items || [],
   };
 }
@@ -611,7 +620,7 @@ const SAVE_SECTIONS = {
   stat:      { fields: { realStats:"real_stats" } },
   equipment: { fields: { personalResources:"personal_resources" } },
   skill:     { fields: { learnedSkillNames:"learned_skill_names" } },
-  pattern:   { fields: { presets:"presets" } },
+  pattern:   { fields: { presets:"presets", battlePresetIdx:"battle_preset_idx" } },
 };
 const dirtyFlags = { profile:false, stat:false, equipment:false, skill:false, pattern:false };
 
@@ -1872,14 +1881,22 @@ function renderPatternSection() {
   const el = document.getElementById("patternSection");
   const preset = data.presets[activePresetIdx];
   const maxPatternSlots = computeMaxPatternSlots();
+  const isBattlePreset = activePresetIdx === data.battlePresetIdx;
   el.innerHTML = `
     <div class="block">
       <h2 class="section-title">패턴 프리셋 <span class="hint">조건 → 행동을 자유롭게 설계</span></h2>
       <div class="preset-tabs" id="presetTabs">
-        ${data.presets.map((p, i) => `<button class="preset-tab ${i===activePresetIdx?"active":""}" data-i="${i}">${p.name}</button>`).join("")}
+        ${data.presets.map((p, i) => `<button class="preset-tab ${i===activePresetIdx?"active":""}" data-i="${i}">${i===data.battlePresetIdx?"⚔ ":""}${p.name}</button>`).join("")}
         <button class="preset-tab add" id="addPresetBtn">+ 새 프리셋</button>
         <button class="preset-tab io" id="exportPresetBtn">↓ 내보내기</button>
         <button class="preset-tab io" id="importPresetBtn">↑ 가져오기</button>
+      </div>
+      <div class="preset-control-row">
+        <span class="preset-control-hint">${isBattlePreset ? "⚔ 지금 전투(직접 도전/파견)에 사용되는 패턴입니다" : "전투에는 다른 프리셋(⚔ 표시)이 설정되어 있습니다"}</span>
+        <div class="preset-control-actions">
+          <button class="mini-btn-wide" id="setBattlePresetBtn" ${isBattlePreset ? "disabled" : ""}>⚔ 이 패턴을 전투에 사용</button>
+          <button class="mini-btn-wide danger" id="deletePresetBtn" ${data.presets.length <= 1 ? "disabled title=\"최소 1개는 남아있어야 합니다\"" : ""}>✕ 이 프리셋 삭제</button>
+        </div>
       </div>
       <div class="pattern-list" id="patternList">
         ${preset.rows.map((row, i) => buildRowHTML(row, i, i < maxPatternSlots)).join("")}
@@ -2033,6 +2050,22 @@ function bindPatternEvents() {
   });
   document.getElementById("exportPresetBtn").addEventListener("click", openPatternExportModal);
   document.getElementById("importPresetBtn").addEventListener("click", openPatternImportModal);
+  document.getElementById("setBattlePresetBtn").addEventListener("click", () => {
+    data.battlePresetIdx = activePresetIdx;
+    markDirty("pattern"); renderPatternSection();
+  });
+  document.getElementById("deletePresetBtn").addEventListener("click", () => {
+    if (data.presets.length <= 1) return; // 버튼도 비활성화돼있지만 이중 안전장치
+    if (!confirm(`"${preset.name}" 프리셋을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    const deletedIdx = activePresetIdx;
+    data.presets.splice(deletedIdx, 1);
+    if (activePresetIdx >= data.presets.length) activePresetIdx = data.presets.length - 1;
+    // 전투에 쓰던 프리셋이 삭제됐으면 첫 프리셋으로 되돌리고, 그보다 앞쪽이
+    // 삭제됐으면 밀린 만큼 인덱스를 당겨서 계속 같은 프리셋을 가리키게 함.
+    if (data.battlePresetIdx === deletedIdx) data.battlePresetIdx = 0;
+    else if (data.battlePresetIdx > deletedIdx) data.battlePresetIdx -= 1;
+    markDirty("pattern"); renderPatternSection();
+  });
 
   document.querySelectorAll(".pattern-row").forEach(rowEl => {
     const idx = Number(rowEl.dataset.idx);
