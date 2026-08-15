@@ -367,11 +367,13 @@ function performSummon(actor, ctx, count) {
     ctx.units.push(summoned);
     (actor.side === "ally" ? ctx.allies : ctx.enemies).push(summoned);
     summonedNames.push(summoned.name);
-    if (i === 0) ctx._lastSummonMultiplier = multiplier;
   }
 
-  const mul = ctx._lastSummonMultiplier ?? 1;
-  ctx.log(`   ${actor.name}이(가) ${summonedNames.join(", ")}을(를) 소환했다! (${count}체, 소환 계수 ${mul.toFixed(2)})`);
+  // 소환 계수/마릿수는 로그에 안 남김(2026-08-16) — "정확한 효과·수치를
+  // 알려줄 생각은 없다"는 버프/디버프 로그 원칙(CLAUDE.md 참고)과 같은
+  // 이유로, 소환됐다는 사실만 알림. 모든 소환 스킬(SUMMON_OPENING 포함)에
+  // 공통 적용.
+  ctx.log(`   ${actor.name}이(가) ${summonedNames.join(", ")}을(를) 소환했다!`);
   return 0;
 }
 
