@@ -117,6 +117,10 @@
     if (row.metric === "battleTurnMultiple") {
       return { cond: "BATTLE_TURN_MULTIPLE_OF", val: row.value };
     }
+    // 자기 자신의 개인 자원(집속 마력 등) 임계치 비교 — subject가 "self"일 때만.
+    if (row.metric === "personalResource" && row.subject === "self" && row.resource) {
+      return { cond: "MY_PERSONAL_RESOURCE_COMPARE", val: { resource: row.resource, comparator: row.comparator, threshold: row.value } };
+    }
     // 자기 자신의 effective 스탯 비교 — subject가 "self"일 때만 번역함(상대방
     // 스탯은 이 경로로 절대 참조 못 하게 하는 설계 의도, row.statKey로 어떤
     // 스탯인지 지정: str/int/dex/spd/luk/atk/matk/def/mdef).
@@ -485,6 +489,16 @@
     if (monsterDef.dialogueOpeningLines) character.dialogueOpeningLines = monsterDef.dialogueOpeningLines;
     if (monsterDef.dialogueDefeatLines) character.dialogueDefeatLines = monsterDef.dialogueDefeatLines;
     if (monsterDef.rewardObjectSpec) character.rewardObjectSpec = monsterDef.rewardObjectSpec;
+    // 개인 자원(집속 마력 등) — buildAllyFromRoster는 PERSONAL_RESOURCE_TYPES의
+    // jobGrant(rosterChar.job 기준)로 자동 부여하지만, 몬스터는 "job"이라는
+    // 개념이 없어서 이 경로를 안 탄다. monsterDef.personalResources로 직접
+    // 지정하면 그대로 심어줌 — {key: {current, max}} 형태(2026-08-16, "???"의
+    // 집속 마력처럼 개인 자원이 필요한 몬스터를 위해 신설).
+    if (monsterDef.personalResources) {
+      Object.entries(monsterDef.personalResources).forEach(([key, pool]) => {
+        character.personalResources[key] = { current: pool.current ?? 0, max: pool.max ?? 100 };
+      });
+    }
     return character;
   }
 

@@ -5354,6 +5354,55 @@
     ],
     "???": [
       {
+        "name": "Vortex Overload",
+        "requiredLevel": 1,
+        "skillPointCost": 0,
+        "stat": "int",
+        "coefficient": 7.5,
+        "hits": 7,
+        "costs": [
+          {
+            "type": "sp",
+            "amount": 700
+          },
+          {
+            "type": "personalResource",
+            "resource": "focusMana",
+            "amount": 25
+          }
+        ],
+        "skillType": "magic",
+        "targetFaction": "enemy",
+        "targetCount": "all",
+        "invalid": true,
+        "element": "thunder",
+        "preDelay": 50,
+        "preDelayType": "action",
+        "postDelay": 120,
+        "effects": [
+          {
+            "type": "statUpPercent",
+            "stat": "str",
+            "value": -5
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "int",
+            "value": -5
+          },
+          {
+            "type": "statUpPercent",
+            "stat": "dex",
+            "value": -5
+          },
+          {
+            "type": "drainPersonalResource",
+            "resource": "focusMana"
+          }
+        ],
+        "note": "'???' 전용. 둠로드의 Lightning Vortex(stat/coefficient/hits/costs/preDelay/postDelay/자기 디버프까지 전부 동일)를 그대로 따르되, 사용자 지시로 drainPersonalResource 효과 하나만 추가 — 발동 시 costs로 집속 마력 25를 정상 소모한 뒤, 남은 집속 마력을 전부 0으로 비움(둠로드 버전은 25만 소모하고 나머지는 남김). 집속 마력이 1000에 도달하면 반드시 발동하는 패턴이라, 발동 전까지 파티가 마법방어력을 최대한 준비해야 하는 타임어택 궁극기(2026-08-16)."
+      },
+      {
         "name": "Circle Drain",
         "requiredLevel": 1,
         "skillPointCost": 0,
@@ -5504,7 +5553,7 @@
   // 기존 플레이어에게 반영되지 않았음(스킬을 182개로 늘려도 24개짜리 옛
   // 테이블이 그대로 남아 마법사 라인·스탠스·크리티컬 스킬이 전부 없었음).
   // 버전이 다르면 무조건 다시 심음. 시드를 고칠 때마다 버전만 올리면 됨.
-  const SKILL_SEED_VERSION = "2026-08-16q";
+  const SKILL_SEED_VERSION = "2026-08-16r";
   if (localStorage.getItem("battleSim_skillSeedVersion") !== SKILL_SEED_VERSION) {
     // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — 편집기에서 직접 손본
     // 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함. 필요하면

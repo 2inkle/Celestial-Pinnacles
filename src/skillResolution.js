@@ -623,6 +623,16 @@ function applyEffect(caster, target, effect, ctx) {
       return `${target.name}의 ${effect.resource} 재충전. (${pool.current}/${pool.max})`;
     }
 
+    // refillPersonalResource의 반대 — 개인 자원을 완전히 소진시킴(0으로).
+    // "???"의 Vortex Overload처럼 "한 번 크게 쓰고 나면 그 자원을 전부
+    // 소모한다"는 하이리스크 궁극기용(2026-08-16).
+    case "drainPersonalResource": {
+      const pool = target.personalResources?.[effect.resource];
+      if (!pool) return null;
+      pool.current = 0;
+      return `${target.name}의 ${effect.resource}이(가) 완전히 소진됨.`;
+    }
+
     // 진영 공유 자원(마법진 등) 증가 — FactionResourceManager는 이미
     // addResource/consumeResource를 다 갖고 있었고, 소모(costs의 teamResource)만
     // 연결돼 있었을 뿐이라 "증가시키는" 통로만 여기서 새로 뚫음.

@@ -182,6 +182,25 @@ ConditionRegistry.register("MY_EFFECTIVE_STAT_COMPARE", (actor, ctx, value) => {
   }
 });
 
+// value: { resource, comparator, threshold } — 자기 자신의 개인 자원
+// (personalResources — 화살/집속 마력 등) 현재치를 threshold와 비교.
+// MY_EFFECTIVE_STAT_COMPARE와 같은 원칙으로 항상 actor(자기 자신) 기준.
+// "???"의 집속 마력 500/1000 단계별 발동 조건 같은 데 씀(2026-08-16).
+// 자원 자체가 없으면(장비 미착용 등) false.
+ConditionRegistry.register("MY_PERSONAL_RESOURCE_COMPARE", (actor, ctx, value) => {
+  const pool = actor.personalResources?.[value.resource];
+  if (!pool) return false;
+  const cur = pool.current;
+  switch (value.comparator) {
+    case "gte": return cur >= value.threshold;
+    case "gt": return cur > value.threshold;
+    case "lte": return cur <= value.threshold;
+    case "lt": return cur < value.threshold;
+    case "eq": return cur === value.threshold;
+    default: return false;
+  }
+});
+
 // value: 숫자 N — 이 패턴 슬롯이 지금까지 발동한 횟수가 N보다 작을 때만 true.
 // "○회까지는 반드시" 규칙의 핵심. slotIndex는 BattleEngine.executeAction이
 // 자동으로 넘겨주는 "이 조건이 몇 번째 패턴 슬롯에서 평가되는지"이고, 그 슬롯이
