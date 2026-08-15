@@ -33,8 +33,13 @@ function josa(word, withBatchim, withoutBatchim) {
 // ({전} > {후})". web/battle-view.html이 " ▷ " 포함 여부로 이 줄을 감지해
 // 강조 스타일을 입힌다(그 파일의 classifyLine 참조) — 이 함수가 만드는
 // 문자열 모양을 바꾸면 그쪽도 같이 맞춰야 함.
-function statChangeLine(name, amount, label, before, after) {
-  return `${amount} ${label} ▷ ${name} (${before} > ${after})`;
+// target(문자열 아님, 유닛 객체) — creatureTier가 "boss"면 HP/SP 변화량을
+// 아예 표기하지 않음(2026-08-16, 사용자 요청). "더 이상 증가/감소할 수
+// 없다"(describeStatCap) 같은 상한 알림은 이 함수를 안 거치는 별도
+// 문구라 영향 안 받음 — 그건 그대로 노출.
+function statChangeLine(target, amount, label, before, after) {
+  if (target?.creatureTier === "boss") return "";
+  return `${amount} ${label} ▷ ${target.name} (${before} > ${after})`;
 }
 
 // ============================================================================
@@ -291,7 +296,7 @@ function applyEffect(caster, target, effect, ctx) {
       const healAmount = Math.max(0, Math.round((effect.value + healFlat) * (1 + healPct / 100)));
       const before = target.currentHp;
       target.currentHp = Math.min(target.maxHp, target.currentHp + healAmount);
-      return statChangeLine(target.name, healAmount, "회복", before, target.currentHp);
+      return statChangeLine(target, healAmount, "회복", before, target.currentHp);
     }
 
     // heal(고정치)과 달리, 회복량 자체가 caster의 스탯에서 매번 계산되는 버전.
@@ -313,7 +318,7 @@ function applyEffect(caster, target, effect, ctx) {
       const healAmount = Math.max(0, Math.floor((base + healFlat) * (1 + healPct / 100)));
       const before = target.currentHp;
       target.currentHp = Math.min(target.maxHp, target.currentHp + healAmount);
-      return statChangeLine(target.name, healAmount, "회복", before, target.currentHp);
+      return statChangeLine(target, healAmount, "회복", before, target.currentHp);
     }
 
     // 결손분(잃은 HP, maxHp-currentHp) 기준 회복 — percentOfMax(applyTick)나
@@ -331,7 +336,11 @@ function applyEffect(caster, target, effect, ctx) {
       const healAmount = Math.max(0, Math.floor((base + healFlat) * (1 + healPct / 100) + 1e-9));
       const before = target.currentHp;
       target.currentHp = Math.min(target.maxHp, target.currentHp + healAmount);
-      return `${statChangeLine(target.name, healAmount, "회복", before, target.currentHp)} (결손분의 ${effect.value}%)`;
+      // 보스면 statChangeLine이 ""를 반환 — "(결손분의 N%)" 같은 수치 부연도
+      // 그 위에 덧붙이면 안 되므로(뭘 결손분으로 삼았는지는 결국 수치 정보라),
+      // 빈 문자열이면 접미사도 같이 생략.
+      const line = statChangeLine(target, healAmount, "회복", before, target.currentHp);
+      return line ? `${line} (결손분의 ${effect.value}%)` : "";
     }
 
     // SP를 직접 깎는 데미지 — HP 데미지와는 완전히 별개 파이프라인(방어력/
@@ -356,7 +365,10 @@ function applyEffect(caster, target, effect, ctx) {
         caster.currentSp = Math.min(caster.maxSp, caster.currentSp + restore);
         restoreNote = ` (${caster.name} SP +${restore} 흡수)`;
       }
-      return `${statChangeLine(target.name, actualDrained, "SP피해", before, target.currentSp)}${restoreNote}`;
+      // 대상이 보스면 대상 쪽 SP피해 줄은 빈 문자열 — restoreNote(시전자 쪽
+      // SP 회복)는 대상의 보스 여부와 무관한 별개 유닛 정보라 그대로 유지.
+      const line = statChangeLine(target, actualDrained, "SP피해", before, target.currentSp);
+      return `${line}${restoreNote}`.trim();
     }
 
     case "spUp":
@@ -820,7 +832,11 @@ function applyDamageAndEffects(actor, skill, ctx) {
         const totalIgnorePct = (skill.ignoreBonusDefPct || 0) + passiveIgnorePct;
         const applied = t.takeDamage(finalPower, damageType, { ignoreBonusDefPct: totalIgnorePct, minimumDamageBasis: minimumBasis, attackerTier: actor.creatureTier });
         ctx.recordDamageDealt?.(actor.side, applied);
-        damageLine = `${isCrit ? "치명타! " : ""}${statChangeLine(t.name, applied, "데미지", before, t.currentHp)}`;
+        // 대상이 보스면 statChangeLine이 ""를 반환 — 그럼 "치명타!" 접두사도
+        // 덩그러니 혼자 남기지 않게 같이 생략(치명타 여부도 결국 데미지 결과에
+        // 딸린 정보라 함께 숨김).
+        const hitLine = statChangeLine(t, applied, "데미지", before, t.currentHp);
+        damageLine = hitLine ? `${isCrit ? "치명타! " : ""}${hitLine}` : "";
         applyLifesteal(actor, applied, ctx);
       }
       hitTracker.set(t, true);

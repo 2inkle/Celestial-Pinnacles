@@ -24,9 +24,12 @@ const { applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
 // skillResolution.js에도 같은 이름·같은 모양으로 있음(중복 — josa 헬퍼가
 // 이 코드베이스에서 이미 그렇게 관리되는 것과 동일한 방식). "{증감량} {유형}
 // ▷ {대상} ({전} > {후})" — web/battle-view.html이 " ▷ " 포함 여부로 감지해
-// 강조 스타일을 입힘.
-function statChangeLine(name, amount, label, before, after) {
-  return `${amount} ${label} ▷ ${name} (${before} > ${after})`;
+// 강조 스타일을 입힘. target(유닛 객체)의 creatureTier가 "boss"면 빈 문자열
+// 반환 — HP/SP 변화량을 아예 안 보여줌(2026-08-16, skillResolution.js와
+// 동일 규칙).
+function statChangeLine(target, amount, label, before, after) {
+  if (target?.creatureTier === "boss") return "";
+  return `${amount} ${label} ▷ ${target.name} (${before} > ${after})`;
 }
 
 class BaseJob {
@@ -161,7 +164,8 @@ ActionRegistry.register("ATTACK", (actor, ctx) => {
   const before = target.currentHp;
   const applied = target.takeDamage(finalDamage, "physical", { attackerTier: actor.creatureTier });
   ctx.recordDamageDealt?.(actor.side, applied);
-  ctx.log(`   ${isCrit ? "치명타! " : ""}${statChangeLine(target.name, applied, "데미지", before, target.currentHp)}`);
+  const hitLine = statChangeLine(target, applied, "데미지", before, target.currentHp);
+  if (hitLine) ctx.log(`   ${isCrit ? "치명타! " : ""}${hitLine}`);
   applyLifesteal(actor, applied, ctx);
   return 0;
 });
@@ -192,7 +196,8 @@ ActionRegistry.register("DETONATE_MAGIC_CIRCLE", (actor, ctx) => {
       const before = e.currentHp;
       const applied = e.takeDamage(dmg, "magic", { attackerTier: actor.creatureTier });
       ctx.recordDamageDealt?.(actor.side, applied);
-      ctx.log(`   ${statChangeLine(e.name, applied, "데미지", before, e.currentHp)}`);
+      const hitLine = statChangeLine(e, applied, "데미지", before, e.currentHp);
+      if (hitLine) ctx.log(`   ${hitLine}`);
       applyLifesteal(actor, applied, ctx);
     });
   }
