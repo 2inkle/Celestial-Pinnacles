@@ -416,22 +416,34 @@ function performSummon(actor, ctx, count) {
     const multiplier = summonEffMultiplier * investment * growth;
 
     const Ctor = actor.constructor;
+    // SummonEff/LUK 배율은 "원본 스탯"(STR/INT/DEX/SPD/LUK)에만 적용함
+    // (2026-08-16, 사용자 지적으로 발견한 버그 수정). combatReal(ATK/DEF/
+    // MATK/MDEF)과 maxHp는 소환 원본 스펙 그대로 물려주고 배율을 안 곱함 —
+    // ATK/MATK는 애초에 스탯 감쇠(dampDamageStat) 대상에서 제외돼 있어서,
+    // 여기에 배율을 직접 곱하면 감쇠 없이 그대로 데미지에 반영돼버려 위력이
+    // 배율만큼 고스란히 새어나갔다(예: 고블린 마차 LUK100/summonEff100=
+    // 정확히 2.0배 → 소환된 고블린 주술사의 realMatk가 4→8로 그대로 2배,
+    // 감쇠되는 INT 증가분까지 곱해져 실제 히트당 데미지는 약 3배가 됨 —
+    // 이미 한 번 손봤던 "주술사 MATK 16→4" 안전장치가 이 경로로 무력화되고
+    // 있었음). 원본 스탯만 배율을 받으면, 그 스탯이 실제 위력에 반영될 때도
+    // 다른 모든 스탯 성장과 똑같이 dampDamageStat을 그대로 통과하게 되어
+    // 일관된 감쇠가 적용됨.
     const summoned = new Ctor(picked.name, actor.side, scaleStatsByMultiplier(picked.stats, multiplier));
     summoned.patternSlots = picked.patternSlots || [];
     summoned.creatureTier = "creature"; // 몬스터도 유저 캐릭터도 아닌 소환된 존재
     summoned.expReward = Math.max(0, Math.round((picked.expReward || 0) * multiplier));
     summoned.goldReward = Math.max(0, Math.round((picked.goldReward || 0) * multiplier));
     summoned.dropTable = picked.dropTable || [];
-    // 소환 원본이 combatReal/maxHp를 갖고 있으면 그대로 물려줌 — 안 그러면
-    // 소환된 전사가 공격력 0이라 아무것도 못 하는 허수아비가 됨.
+    // 소환 원본이 combatReal/maxHp를 갖고 있으면 배율 없이 그대로 물려줌 —
+    // 안 물려주면 소환된 전사가 공격력 0이라 아무것도 못 하는 허수아비가 됨.
     if (picked.combatReal) {
-      summoned.realAtk = Math.round((picked.combatReal.atk || 0) * multiplier);
-      summoned.realDef = Math.round((picked.combatReal.def || 0) * multiplier);
-      summoned.realMatk = Math.round((picked.combatReal.matk || 0) * multiplier);
-      summoned.realMdef = Math.round((picked.combatReal.mdef || 0) * multiplier);
+      summoned.realAtk = picked.combatReal.atk || 0;
+      summoned.realDef = picked.combatReal.def || 0;
+      summoned.realMatk = picked.combatReal.matk || 0;
+      summoned.realMdef = picked.combatReal.mdef || 0;
     }
     if (picked.maxHp != null) {
-      summoned.maxHpOverride = Math.round(picked.maxHp * multiplier);
+      summoned.maxHpOverride = picked.maxHp;
       summoned.currentHp = summoned.maxHp;
     }
 

@@ -132,6 +132,11 @@
     if (row.metric === "resource" && row.subject === "self" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "FACTION_RESOURCE_GREATER_THAN", val: { resource: row.resource || "magicCircle", amount: row.value } };
     }
+    // 상대 진영 중 그 선딜레이 유형("action"/"casting")으로 준비 중인 대상이
+    // 있는지 — Magic Jammer처럼 "영창 중인 적이 있으면 방해"류 패턴에 씀.
+    if (row.metric === "preparingType") {
+      return { cond: "ENEMY_PREPARING_TYPE", val: row.value };
+    }
     console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
     return { cond: "ALWAYS", val: 0 };
   }
