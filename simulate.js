@@ -188,8 +188,13 @@ function loadAdapterEnv({ skillTablePath, baseDir = __dirname, quiet = true } = 
   });
 
   if (skillTablePath) {
-    const table = fs.readFileSync(path.resolve(baseDir, skillTablePath), "utf8");
-    sandbox.localStorage.setItem("battleSim_skillTable", table);
+    // 2026-08-15: battle-adapter.js가 localStorage(battleSim_skillTable) 읽기를
+    // 없애고 setSkillTable() 주입 캐시 방식으로 바뀌면서, 여기서 예전처럼
+    // localStorage에만 써두면 조용히 무시되고 스킬이 하나도 등록되지 않았다
+    // (모든 시뮬레이션이 맨주먹 ATTACK만으로 도는 상태 — 성장곡선 검증 도중
+    // 발견함). setSkillTable()을 직접 호출하도록 수정.
+    const table = JSON.parse(fs.readFileSync(path.resolve(baseDir, skillTablePath), "utf8"));
+    vm.runInContext("window.BattleAdapter", sandbox).setSkillTable(table);
     vm.runInContext("window.BattleAdapter.registerKnownSkills();", sandbox);
   }
 
