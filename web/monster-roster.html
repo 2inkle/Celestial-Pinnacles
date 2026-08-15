@@ -328,10 +328,14 @@
     //   4) 자신의 SP가 20% 이하 → Mana Tide(SP 영구 재생 tick 부여, maxUses:3
     //      — 2026-08-16에 1→3으로 확대. "SP를 낮추는 공략은 몇 번은 유효하지만,
     //      이후엔 자연재생 때문에 무효해진다"는 설계 의도).
-    //   5) 개전(battleTurn>=1, maxUses:1 각각) → Mana Guard → SpellFocus 순으로
-    //      자가 버프(2026-08-16 신설, 둠로드 스킬 그대로 재사용). SpellFocus
-    //      스탠스가 SP 소모의 100%를 집속 마력으로 적립시키므로, 이후
-    //      Lightning Ball 연발이 곧 궁극기 타이머가 됨.
+    //   5) 개전(battleTurn>=1, maxUses:1 각각) → Mana Guard → Corrupted Focus
+    //      순으로 자가 버프(2026-08-16 신설, 둠로드 스킬 그대로 재사용하되
+    //      Corrupted Focus는 "???" 전용 — SpellFocus와 스탠스 자체는 동일
+    //      하지만 resourceOnCost.ratio를 1→0.1로 낮춤. 원판 그대로 썼더니
+    //      Lightning Ball 2회+Thunder Storm 1회(행동 4~5번)만에 집속 마력이
+    //      1000을 넘어버려서 파티가 마법방어력을 준비할 시간이 없었음 —
+    //      사용자 지적으로 1:10 배율로 늦춤). 스탠스 중엔 SP 소모의 10%가
+    //      집속 마력으로 적립되므로, Lightning Ball 연발이 궁극기 타이머가 됨.
     //   6) 자신의 집속 마력이 1000 이상 → Vortex Overload("???" 전용 —
     //      둠로드의 Lightning Vortex와 위력/코스트 전부 동일하되, 발동 후
     //      집속 마력을 전부 소진시키는 사양만 다름). 마법방어력을 미리
@@ -367,7 +371,7 @@
         {subject:"self",metric:"hp",comparator:"lte",value:50,action:"PANIC_FULL_RECOVERY",maxUses:1},
         {subject:"self",metric:"sp",comparator:"lte",value:20,action:"Mana Tide",maxUses:3},
         {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Mana Guard",maxUses:1},
-        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"SpellFocus",maxUses:1},
+        {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Corrupted Focus",maxUses:1},
         {subject:"self",metric:"personalResource",resource:"focusMana",comparator:"gte",value:1000,action:"Vortex Overload"},
         {subject:"self",metric:"personalResource",resource:"focusMana",comparator:"gte",value:500,action:"Thunder Storm"},
         {subject:"self",metric:"battleTurnMultiple",value:10,action:"Arcane Pulse"},
@@ -377,7 +381,7 @@
       ],
       expReward:0, goldReward:0, dropTable:[] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16l";
+  const MONSTER_SEED_VERSION = "2026-08-16m";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
