@@ -66,6 +66,12 @@ ConditionRegistry.register("MY_HP_LESS_THAN_PCT", (actor, ctx, value) => {
   return (actor.currentHp / actor.maxHp) * 100 <= value;
 });
 
+// MY_HP_LESS_THAN_PCT의 SP판. "???"의 SP 자가재생 기믹처럼 "SP가 바닥나면
+// 스스로 재생을 건다"는 패턴 조건용(2026-08-16).
+ConditionRegistry.register("MY_SP_LESS_THAN_PCT", (actor, ctx, value) => {
+  return (actor.currentSp / actor.maxSp) * 100 <= value;
+});
+
 // 자신이 현재 Guard 상태(패링 등으로 걸린 1회성 데미지 무효화)가 아닐 때 true.
 // "패링" 같은 self-guard 스킬을 "이미 Guard 중이면 또 걸지 않는다"는 패턴에 씀.
 ConditionRegistry.register("NOT_GUARDING", (actor) => {

@@ -322,12 +322,18 @@
     //      요구 아이템 등 실제 보상 내역은 다음 단계에서 확정할 것.
     //   3) HP 50% 이하 → PANIC_FULL_RECOVERY(HP/SP 완전 회복, maxUses:1).
     //      2)보다 아래에 둬서, 한 방에 30% 밑으로 훅 꺾이는 극단적 버스트가
-    //      들어와도 회복을 쓰지 않고 그냥 물러나게 함(2번이 먼저 걸림).
-    //   4) 상대 진영에 마법진이 1개 이상 있으면 → Circle Erase(1개 삭제,
+    //      들어와도 회복을 쓰지 않고 그냥 물러나게 함(2번이 먼저 걸림). "HP를
+    //      자체 회복하지는 않지만" 이 1회성 기믹 때문에 공략을 잘못하면 100턴
+    //      제한을 전부 소모하고도 못 끝낼 수 있음(2026-08-16, 의도된 설계).
+    //   4) 자신의 SP가 20% 이하 → Mana Tide(SP 영구 재생 tick 부여, maxUses:1
+    //      로 평생 한 번만). "SP를 낮추는 공략은 한두 번은 유효하지만, 이후엔
+    //      자연재생 때문에 무효해진다"는 설계 의도 — 3)보다 아래, 5)/6)보다는
+    //      위에 둬서 위급한 SP 고갈 상황을 일상적인 마법진 공방보다 먼저 처리함.
+    //   5) 상대 진영에 마법진이 1개 이상 있으면 → Circle Erase(1개 삭제,
     //      성공 시 자기 진영에 1개 적립 — 이게 쌓여서 1)의 궁극기로 이어짐).
-    //   5) 자신의 effectiveMatk가 realMatk의 60% 미만이면 → Arcane Surge
+    //   6) 자신의 effectiveMatk가 realMatk의 60% 미만이면 → Arcane Surge
     //      (MATK +150%, 발동 즉시 조건이 거짓이 되므로 자연히 멈춤).
-    //   6) 그 외엔 평범한 공격(ATTACK) — 조건 없는 마지막 폴백.
+    //   7) 그 외엔 평범한 공격(ATTACK) — 조건 없는 마지막 폴백.
     { id:"unknown_entity", name:"???", portrait:"❓", realStats:{str:10,int:10,dex:10,spd:10,luk:10},
       combatReal:{atk:10,matk:10,def:10,mdef:10}, tier:"boss",
       patterns:[
@@ -335,13 +341,14 @@
         {subject:"self",metric:"hp",comparator:"lte",value:30,action:"REWARD_GRANT",maxUses:1},
         {subject:"self",metric:"hp",comparator:"lte",value:30,action:"RETREAT",maxUses:1},
         {subject:"self",metric:"hp",comparator:"lte",value:50,action:"PANIC_FULL_RECOVERY",maxUses:1},
+        {subject:"self",metric:"sp",comparator:"lte",value:20,action:"Mana Tide",maxUses:1},
         {subject:"opponent",metric:"opponentResource",comparator:"gte",value:1,action:"Circle Erase"},
         {subject:"self",metric:"effectiveStat",statKey:"matk",comparator:"lt",value:60,thresholdMode:"pctOfReal",action:"Arcane Surge"},
         {subject:"self",metric:"always",action:"ATTACK"},
       ],
       expReward:0, goldReward:0, dropTable:[] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16g";
+  const MONSTER_SEED_VERSION = "2026-08-16h";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {

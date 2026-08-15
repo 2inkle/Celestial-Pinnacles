@@ -103,6 +103,9 @@
     if (row.metric === "hp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
       return { cond: "MY_HP_LESS_THAN_PCT", val: row.value };
     }
+    if (row.metric === "sp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
+      return { cond: "MY_SP_LESS_THAN_PCT", val: row.value };
+    }
     if (row.metric === "battleTurn" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "BATTLE_TURN_AT_LEAST", val: row.value };
     }
