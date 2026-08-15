@@ -132,16 +132,29 @@ ConditionRegistry.register("BATTLE_TURN_AT_LEAST", (actor, ctx, value) => {
 // "자신의 MATK가 디버프로 일정 선 아래로 떨어지면 스스로 재정비 버프를
 // 건다" 같은 패턴에 씀 — { subject:"self", metric:"effectiveStat",
 // statKey:"matk", comparator:"lte", value:150, action:"..." }.
+//
+// threshold 대신 thresholdPctOfReal(숫자, %)을 주면 "자신의 real{Stat} 대비
+// 그 %"를 임계값으로 매번 다시 계산함(2026-08-16 확장, "???" 설계용 — "MATK가
+// 100이라면 60 아래로 떨어졌을 때"처럼 절대값이 아니라 자기 자신의 원 스탯
+// 대비 비율로 판정하고 싶은 경우. 절대 threshold를 미리 못 박지 않아도 되므로
+// 스탯이 나중에 재조정돼도 조건 데이터를 안 고쳐도 됨). 둘 다 없으면 false.
 ConditionRegistry.register("MY_EFFECTIVE_STAT_COMPARE", (actor, ctx, value) => {
   const capKey = value.stat.charAt(0).toUpperCase() + value.stat.slice(1);
   const effective = actor[`effective${capKey}`];
   if (effective === undefined) return false;
+  let threshold = value.threshold;
+  if (threshold === undefined && value.thresholdPctOfReal !== undefined) {
+    const real = actor[`real${capKey}`];
+    if (real === undefined) return false;
+    threshold = real * (value.thresholdPctOfReal / 100);
+  }
+  if (threshold === undefined) return false;
   switch (value.comparator) {
-    case "gte": return effective >= value.threshold;
-    case "gt": return effective > value.threshold;
-    case "lte": return effective <= value.threshold;
-    case "lt": return effective < value.threshold;
-    case "eq": return effective === value.threshold;
+    case "gte": return effective >= threshold;
+    case "gt": return effective > threshold;
+    case "lte": return effective <= threshold;
+    case "lt": return effective < threshold;
+    case "eq": return effective === threshold;
     default: return false;
   }
 });
@@ -465,6 +478,28 @@ ActionRegistry.register("DIALOGUE_DEFEAT", (actor, ctx) => {
 ActionRegistry.register("SELF_DETONATION", (actor, ctx) => {
   actor.currentHp = 0;
   ctx.log(`   ${actor.name}이(가) 스스로 자폭했다!`);
+  return 0;
+});
+
+// 퇴각 — SELF_DETONATION과 메커니즘은 완전히 동일(방어 파이프라인을 거치지
+// 않고 즉시 HP를 0으로 만들어 전투에서 제거)하지만, "자폭"이 아니라 "물러남"
+// 이라는 서사가 다른 개체용으로 이름만 분리함("???"의 HP 30% 미만 퇴각처럼
+// 직접 죽일 수 없는 개체가 스스로 전장을 떠나는 연출).
+ActionRegistry.register("RETREAT", (actor, ctx) => {
+  actor.currentHp = 0;
+  ctx.log(`   ${actor.name}이(가) 전장에서 물러났다.`);
+  return 0;
+});
+
+// 패닉 회복 — HP/SP를 즉시 최대치로 완전 회복(방어 파이프라인 무관, 상태이상/
+// 스탠스는 안 건드림). USE_POTION(고정 100 회복)과 달리 "상태를 완전히
+// 회복"하는 대형 자기 구제기용 — 낮은 HP를 노린 파티 전략을 한 번 무효화하는
+// 위협적인 행동이라, 패턴 쪽에서 maxUses:1 등으로 반드시 횟수를 제한해서 써야
+// 함(이 액션 자체엔 횟수 제한이 없음).
+ActionRegistry.register("PANIC_FULL_RECOVERY", (actor, ctx) => {
+  actor.currentHp = actor.maxHp;
+  actor.currentSp = actor.maxSp;
+  ctx.log(`   🧪 [U.Item] ${actor.name}이(가) 비장의 아이템을 사용해 모든 상태를 완전히 회복했다!`);
   return 0;
 });
 

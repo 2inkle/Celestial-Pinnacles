@@ -110,13 +110,24 @@
     // 스탯은 이 경로로 절대 참조 못 하게 하는 설계 의도, row.statKey로 어떤
     // 스탯인지 지정: str/int/dex/spd/luk/atk/matk/def/mdef).
     if (row.metric === "effectiveStat" && row.subject === "self" && row.statKey) {
-      return { cond: "MY_EFFECTIVE_STAT_COMPARE", val: { stat: row.statKey, comparator: row.comparator, threshold: row.value } };
+      // row.thresholdMode === "pctOfReal"이면 row.value를 절대 임계값이 아니라
+      // "자기 real 스탯 대비 %"로 해석함(MY_EFFECTIVE_STAT_COMPARE의
+      // thresholdPctOfReal 확장, 2026-08-16 — "???"의 MATK 자가보정처럼
+      // 절대 수치를 스탯 확정 전에 미리 박아둘 필요가 없게 함).
+      const val = row.thresholdMode === "pctOfReal"
+        ? { stat: row.statKey, comparator: row.comparator, thresholdPctOfReal: row.value }
+        : { stat: row.statKey, comparator: row.comparator, threshold: row.value };
+      return { cond: "MY_EFFECTIVE_STAT_COMPARE", val };
     }
     // 상대 진영의 팀 자원 보유량 — subject가 "opponent"일 때만 번역함(자기 진영
-    // 자원 판정은 기존 관례상 별도 metric으로 추가하면 됨, 아직 그 경로는 없음).
-    // row.resource가 없으면 magicCircle 기본값.
+    // 자원 판정은 아래 별도 분기). row.resource가 없으면 magicCircle 기본값.
     if (row.metric === "opponentResource" && row.subject === "opponent" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "OPPONENT_RESOURCE_GREATER_THAN", val: { resource: row.resource || "magicCircle", amount: row.value } };
+    }
+    // 자기 진영의 팀 자원 보유량 — subject가 "self"일 때. "마법진이 5개면
+    // 반드시 궁극기" 같은 최상위 게이팅 조건에 씀(2026-08-16).
+    if (row.metric === "resource" && row.subject === "self" && (row.comparator === "gte" || row.comparator === "gt")) {
+      return { cond: "FACTION_RESOURCE_GREATER_THAN", val: { resource: row.resource || "magicCircle", amount: row.value } };
     }
     console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
     return { cond: "ALWAYS", val: 0 };

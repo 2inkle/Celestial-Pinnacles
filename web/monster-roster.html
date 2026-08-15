@@ -303,17 +303,45 @@
       ] },
 
     // 미스터리 전투("unknown-battle", web/battle-themes.js의 "unknownEncounter"
-    // 테마) 전용 — 골격만 잡아둔 상태. name/portrait를 "???"/"❓"로 둔 것
-    // 자체가 은폐 수단임(roster-select.html 미리보기가 이 필드를 그대로
-    // 보여주는 구조라, 다른 이름을 넣으면 그대로 새어나감 — 절대 힌트가
-    // 될 만한 실제 이름/포트레이트로 바꾸지 말 것). 스탯/패턴/보상은
-    // 전부 임시값 — 다음 세션에서 실제로 설계할 것.
+    // 테마) 전용. name/portrait를 "???"/"❓"로 둔 것 자체가 은폐 수단임
+    // (roster-select.html 미리보기가 이 필드를 그대로 보여주는 구조라, 다른
+    // 이름을 넣으면 그대로 새어나감 — 절대 힌트가 될 만한 실제 이름/포트레이트로
+    // 바꾸지 말 것). realStats/combatReal은 여전히 전부 임시값(goblin_king처럼
+    // 나중에 실제 파티(인퀴지터/카디널/하이드루이드/딜러 2)로 시뮬 튜닝할 것) —
+    // 패턴/스킷은 2026-08-16 설계로 확정됨.
+    //
+    // 패턴 우선순위(위에서부터 순서대로 평가, 먼저 참인 조건이 그 턴을 가져감):
+    //   1) 마법진 5개 이상 → OMEN(궁극기). 최상위, 무조건 발동. OMEN 자체가
+    //      costs로 마법진 5개를 소모하므로 발동 직후 이 조건은 다시 거짓이 됨
+    //      (안 그러면 매턴 재발동하는 무한루프가 됨).
+    //   2) HP 30% 이하 → REWARD_GRANT(보물상자를 남김) → RETREAT(전장 이탈)
+    //      순서로 체인 발동(둘 다 maxUses:1). goblin_cart와 마찬가지로 "직접
+    //      쓰러뜨릴 수 없는 개체" — HP 바닥은 없고 그냥 패턴 순서상 30%에서
+    //      물러남. rewardObjectSpec을 아직 안 정했으므로 REWARD_GRANT의
+    //      기본값(이름 없는 상자, 2000 HP)으로 폴백함 — 아크메이지 3차 전직
+    //      요구 아이템 등 실제 보상 내역은 다음 단계에서 확정할 것.
+    //   3) HP 50% 이하 → PANIC_FULL_RECOVERY(HP/SP 완전 회복, maxUses:1).
+    //      2)보다 아래에 둬서, 한 방에 30% 밑으로 훅 꺾이는 극단적 버스트가
+    //      들어와도 회복을 쓰지 않고 그냥 물러나게 함(2번이 먼저 걸림).
+    //   4) 상대 진영에 마법진이 1개 이상 있으면 → Circle Erase(1개 삭제,
+    //      성공 시 자기 진영에 1개 적립 — 이게 쌓여서 1)의 궁극기로 이어짐).
+    //   5) 자신의 effectiveMatk가 realMatk의 60% 미만이면 → Arcane Surge
+    //      (MATK +150%, 발동 즉시 조건이 거짓이 되므로 자연히 멈춤).
+    //   6) 그 외엔 평범한 공격(ATTACK) — 조건 없는 마지막 폴백.
     { id:"unknown_entity", name:"???", portrait:"❓", realStats:{str:10,int:10,dex:10,spd:10,luk:10},
-      combatReal:{atk:10,def:10,mdef:10}, tier:"boss",
-      patterns:[{subject:"self",metric:"always",action:"ATTACK"}],
+      combatReal:{atk:10,matk:10,def:10,mdef:10}, tier:"boss",
+      patterns:[
+        {subject:"self",metric:"resource",comparator:"gte",value:5,action:"OMEN"},
+        {subject:"self",metric:"hp",comparator:"lte",value:30,action:"REWARD_GRANT",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:30,action:"RETREAT",maxUses:1},
+        {subject:"self",metric:"hp",comparator:"lte",value:50,action:"PANIC_FULL_RECOVERY",maxUses:1},
+        {subject:"opponent",metric:"opponentResource",comparator:"gte",value:1,action:"Circle Erase"},
+        {subject:"self",metric:"effectiveStat",statKey:"matk",comparator:"lt",value:60,thresholdMode:"pctOfReal",action:"Arcane Surge"},
+        {subject:"self",metric:"always",action:"ATTACK"},
+      ],
       expReward:0, goldReward:0, dropTable:[] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16f";
+  const MONSTER_SEED_VERSION = "2026-08-16g";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
