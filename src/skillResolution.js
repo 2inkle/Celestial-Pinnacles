@@ -210,9 +210,10 @@ function subjectParticle(label) {
   return "가";
 }
 
-// 능력치 증감 효과가 상한(real의 2000%) 또는 하한(real의 50%)에 걸렸는지
-// 확인해서, 걸렸으면 일반 설명 대신 "더 이상 증가/감소할 수 없다"로 교체함.
-// capKey는 "Atk"/"Str"처럼 real{capKey}/effective{capKey} 필드 접미사,
+// 능력치 증감 효과가 상한(real의 500%, 2026-08-15에 2000%에서 축소 —
+// src/character.js의 calculateEffectiveStat() 참조) 또는 하한(real의 50%)에
+// 걸렸는지 확인해서, 걸렸으면 일반 설명 대신 "더 이상 증가/감소할 수 없다"로
+// 교체함. capKey는 "Atk"/"Str"처럼 real{capKey}/effective{capKey} 필드 접미사,
 // statLabel은 로그용 한글 이름, isIncrease는 이번 효과가 증가 방향인지(감소면
 // false) — 방향에 따라 어느 쪽 캡에 걸렸는지만 확인함(반대쪽엔 안 걸림).
 // realVal이 0이면 상/하한이 둘 다 0이라(맨몸 캐릭터 등) 항상 캡 상태로 취급됨
@@ -221,7 +222,7 @@ function describeStatCap(target, capKey, statLabel, isIncrease, normalDesc) {
   const effectiveVal = target[`effective${capKey}`];
   const realVal = target[`real${capKey}`];
   const particle = subjectParticle(statLabel);
-  if (isIncrease && effectiveVal >= realVal * 20) return `${target.name}의 ${statLabel}${particle} 더 이상 증가할 수 없다.`;
+  if (isIncrease && effectiveVal >= realVal * 5) return `${target.name}의 ${statLabel}${particle} 더 이상 증가할 수 없다.`;
   if (!isIncrease && effectiveVal <= realVal * 0.5) return `${target.name}의 ${statLabel}${particle} 더 이상 감소할 수 없다.`;
   return normalDesc;
 }

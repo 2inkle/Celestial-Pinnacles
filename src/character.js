@@ -394,7 +394,7 @@ class BattleCharacter {
    *      결정). 20이면 데미지의 80%만 통과, 30이면 70%만 통과.
    *   2) bonus(DEF|MDEF) — 절대값 감소, 버프/디버프로 오르내림. 1번을 통과하고
    *      남은 데미지에서 그 값만큼 그대로 뺌. 상/하한 규칙(다른 스탯과 동일한
-   *      real의 50%~2000% 클램프)이 적용된 뒤의 "순수 버프분"만 사용함
+   *      real의 50%~500% 클램프)이 적용된 뒤의 "순수 버프분"만 사용함
    *      (= effective(Def|Mdef) - real(Def|Mdef), calculateEffectiveStat이 이미 클램프한 값).
    * damageType이 "magic"이면 MDEF를, 그 외(기본값 "physical")엔 DEF를 씀 —
    * 어느 쪽을 쓸지는 호출부가 skill.skillType 등을 보고 결정해서 넘겨줘야 함.
@@ -482,7 +482,12 @@ class BattleCharacter {
   }
 
   calculateEffectiveStat(realVal, bonusVal) {
-    const maxCap = realVal * 20;
+    // 2026-08-15: 상한을 2000%(realVal*20)에서 500%(realVal*5)로 축소 —
+    // 버프/디버프가 복리로 무한히 중첩되더라도 실전투 체감상 과도하게
+    // 벌어지지 않도록 하한(50%)은 그대로 두고 상한만 좁힘. 의존 상수:
+    // src/registries.js의 LUK_GROWTH_MAX_RATIO, src/skillResolution.js의
+    // describeStatCap() — 이 값을 또 바꾸면 그 두 곳도 같이 맞춰야 함.
+    const maxCap = realVal * 5;
     const minFloor = realVal * 0.5;
     return Math.max(minFloor, Math.min(maxCap, realVal + bonusVal));
   }

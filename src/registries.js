@@ -250,14 +250,18 @@ function scaleStatsByMultiplier(stats, multiplier) {
 // LUK 성장 배율 — 선형이 아니라 로그 곡선. 게임 내 다른 스탯 변동이 대부분
 // 곱셈(복리)로 일어나기 때문에, 여기만 "비율을 그대로 캡"하는 선형 방식으로
 // 두면 상대적으로 밋밋하게 느껴진다는 판단 — 초반엔 가파르게 오르고, LUK이
-// 2000% 캡(=effectiveLuk이 realLuk의 20배)에 가까워질수록 완만하게 수렴함.
-//   ratio = effectiveLuk / realLuk — 기존 스탯 클램프 덕에 자연히 0.5~20 사이
+// 500% 캡(=effectiveLuk이 realLuk의 5배)에 가까워질수록 완만하게 수렴함.
+//   ratio = effectiveLuk / realLuk — 기존 스탯 클램프 덕에 자연히 0.5~5 사이
 //   growth = 1 + LOG_SCALE × ln(ratio)
-// ratio=1(버프 전혀 없음)일 때 정확히 1배(보너스 없음), ratio=20(LUK이 2000%
-// 캡에 도달)일 때 정확히 3배가 되도록 LOG_SCALE을 역산해서 고정해둠 — "2000%까지
-// 갔을 때 2.5~3배 정도"라는 의도를 정확히 그 상한(20배 지점=3배)에 맞춘 것.
-const LUK_GROWTH_AT_MAX_RATIO = 3; // ratio가 이론상 최대(20)일 때 도달하는 배율
-const LUK_GROWTH_MAX_RATIO = 20; // effectiveLuk/realLuk의 이론상 최대치(2000% 캡과 동일한 수치)
+// ratio=1(버프 전혀 없음)일 때 정확히 1배(보너스 없음), ratio=5(LUK이 500%
+// 캡에 도달)일 때 정확히 3배가 되도록 LOG_SCALE을 역산해서 고정해둠 — "캡까지
+// 갔을 때 2.5~3배 정도"라는 원래 설계 의도를 그대로 유지하되, 상한 자체가
+// 좁아졌으니 같은 배율 목표(3배)에 더 빨리 도달함(2026-08-15, calculateEffectiveStat
+// 캡 축소에 맞춰 20→5로 조정 — CLAUDE.md "알려진 미구현 항목"에서 예고했던
+// 그 변경. "2.5~3배 정도"라는 의도 자체는 유지하고, 도달 지점만 좁아진 캡에
+// 맞춰 당겨진 것이 이번 결정).
+const LUK_GROWTH_AT_MAX_RATIO = 3; // ratio가 이론상 최대(5)일 때 도달하는 배율
+const LUK_GROWTH_MAX_RATIO = 5; // effectiveLuk/realLuk의 이론상 최대치(500% 캡과 동일한 수치)
 const LUK_LOG_SCALE = (LUK_GROWTH_AT_MAX_RATIO - 1) / Math.log(LUK_GROWTH_MAX_RATIO);
 
 function lukGrowthMultiplier(actor) {
