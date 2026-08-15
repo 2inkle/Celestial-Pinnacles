@@ -154,7 +154,8 @@
   // 제련 공식 — 확정된 값 그대로.
   //   성공확률: +1~6 확정, +7부터 50%×0.8^(N-7)
   //   스탯배율: 1+0.004×N² (천장 없음, +10에서 정확히 1.4배)
-  //   +8 이상 추가효과: 3단계마다 증가폭 자체가 커지는 누적 statBonus
+  //   +8 이상 추가효과: 3단계마다 증가폭 자체가 커지는 누적 statRealBonus(잠재치
+  //     자체에 가산 — 500% 캡의 영향을 받는 statBonus가 아님, 원래 설계대로)
   //     (+8~10: 매단계+1, +11~13: 매단계+2, +14~16: 매단계+3, ...)
   //   비용: 상점 판매가의 1/10 × 실제 시행 횟수(계획한 목표치가 아니라 진짜
   //     소모된 시도 수 기준 — 중간에 파괴돼서 멈추면 그만큼만 냄)
@@ -204,8 +205,10 @@
     if (enhanced.combatReal) Object.keys(enhanced.combatReal).forEach(k => { enhanced.combatReal[k] = Math.round((enhanced.combatReal[k]||0) * mult); });
     if (enhanced.combatBonus) Object.keys(enhanced.combatBonus).forEach(k => { enhanced.combatBonus[k] = Math.round((enhanced.combatBonus[k]||0) * mult); });
     if (bonus > 0) {
-      enhanced.statBonus = enhanced.statBonus || {};
-      ["str","int","dex","spd","luk"].forEach(k => { enhanced.statBonus[k] = (enhanced.statBonus[k]||0) + bonus; });
+      // +8 이상 추가효과는 realX(잠재치 자체)에 붙어야 하는 설계 — bonusX(전투 중
+      // 버프성 수치, 500% 캡의 영향을 받음)에 잘못 붙어있던 걸 수정(2026-08-16).
+      enhanced.statRealBonus = enhanced.statRealBonus || {};
+      ["str","int","dex","spd","luk"].forEach(k => { enhanced.statRealBonus[k] = (enhanced.statRealBonus[k]||0) + bonus; });
     }
     return enhanced;
   }
