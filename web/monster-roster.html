@@ -151,7 +151,12 @@
       ] },
 
     { id:"goblin_shaman", name:"고블린 주술사", portrait:"🧙", realStats:{str:6,int:15,dex:8,spd:8,luk:6},
-      combatReal:{matk:16,mdef:4}, tier:"normal",
+      // MATK 16->4 (2026-08-16): Fire Ball이 targetCount:"all"+hits:4라 대상
+      // 각자가 4연타를 통째로 맞는 구조라(스킬 자체는 유저 마법사와 공유,
+      // 못 건드림), MATK 16이면 한 캐스트로 400 HP 캐릭터가 거의 즉사했음
+      // (히트당 MATK×dampedINT×계수 ≈ 204, 4히트 합 ≈ 816). 4로 낮추면
+      // 합계 ≈ 200 안팎 — 위협적이지만 즉사는 아닌 수준.
+      combatReal:{matk:4,mdef:4}, tier:"normal",
       patterns:[
         {subject:"self",metric:"hp",comparator:"lte",value:70,action:"Healing"},
         {subject:"self",metric:"always",action:"Fire Ball"},
@@ -240,16 +245,27 @@
         {name:"섭정의 인장",category:"equipment",enhanceable:true,chance:0.12,quantity:[1,1],slot:"jItem",combatReal:{mdef:11},combatBonus:{mdef:17},weight:0},
       ] },
 
-    { id:"goblin_king", name:"고블린의 왕", portrait:"👑", realStats:{str:26,int:16,dex:14,spd:10,luk:14},
-      // 보스 — 평타 화력은 STR 26 수준으로 두고(탱커가 버틸 만한 수준),
-      // 내구도만 따로 크게 잡아서 장기전을 만듦. 이 구간에서 버프/디버프를
+    { id:"goblin_king", name:"고블린의 왕", portrait:"👑", realStats:{str:22,int:16,dex:14,spd:10,luk:14},
+      // 보스 — 내구도를 크게 잡아 장기전을 만듦. 이 구간에서 버프/디버프를
       // 쌓는 쪽이 눈에 띄게 유리해지는 게 설계 의도.
       maxHp:45000, maxSp:400,
-      // 화력은 낮추고(ATK 34→22) 내구도를 크게 올림 — 짧고 굵게 죽이는 보스가
-      // 아니라 오래 버티는 보스로 만들어야 버프/디버프를 쌓을 시간이 생김.
-      // 화력이 높으면 파티가 먼저 전멸해서 전투가 짧아지고, 그러면 버프에 쓴
-      // 1턴이 손해가 되어 "버프가 강하다"는 체감이 아예 안 나옴.
-      combatReal:{atk:22,matk:10,def:12,mdef:8}, tier:"boss",
+      // 2026-08-16: STR 26→22 / ATK 22→11로 재조정(둘 다). 왕의 기본 공격
+      // Bash(계수3)·Break Down(계수5.7, 개전 직후 3연타)이 둘 다 전사와
+      // 공용 스킬이라 스킬 자체는 못 건드리는데, 원래 STR26/ATK22 조합은
+      // Break Down 한 방(raw ≈2200)이 방어구 없는 400 HP 캐릭터를 그냥
+      // 즉사시켜서 "레벨15, 최대효율 스탯, 상점 무기만(방어구 미착용)"
+      // 조건의 파티가 왕을 만나면 사실상 못 이겼음(왕 포함 조우 시 승률
+      // 실측 0%에 가까움). ATK만 낮추면 100%(트리비얼)나 급격히 꺾이는
+      // 구간(60→80%대)만 나오고 "낮췄지만 여전히 위협적" 지점을 못 찾았는데,
+      // STR도 같이 낮추니(damp(STR) 자체가 완만한 곡선이라 ATK 하나보다
+      // 두 축을 같이 움직이는 쪽이 조정 폭이 넓어짐) STR22/ATK11에서 승률이
+      // 58~61% 사이로 안정적으로(여러 인접 ATK값에서도 재현됨 — 우연 아님)
+      // 나오는 평탄구간을 찾음. 의도적으로 60%로 맞춘 것 — 장비/레벨/스킬이
+      // 갖춰지면 자연히 100%에 수렴하게 설계함(사용자 결정, 2026-08-16).
+      // STR을 같이 낮춘 두 번째 이유: 왕 자신의 STR/ATK이 이미 낮은
+      // 기준선이라, 플레이어의 디버프(Weapon Break류 Atk%감소 등)가 상대적으로
+      // 더 크게 체감되어 디버프 활용을 적극적으로 유도하는 효과도 있음.
+      combatReal:{atk:11,matk:10,def:12,mdef:8}, tier:"boss",
       patterns:[
         {subject:"self",metric:"battleTurn",comparator:"gte",value:1,action:"Break Down",maxUses:3},
         {subject:"self",metric:"hp",comparator:"lte",value:40,action:"Ultimate Strike"},
@@ -265,7 +281,7 @@
         {name:"왕의 대검",category:"equipment",enhanceable:true,chance:0.15,quantity:[1,1],slot:"mainhand",equipmentType:"greatsword",combatReal:{atk:97,def:8,mdef:4},combatBonus:{def:72,mdef:59},weight:2,twoHanded:true},
       ] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-14a";
+  const MONSTER_SEED_VERSION = "2026-08-16b";
   function ensureMigrated() {
     // 시드 버전이 다르면 무조건 다시 심음(내용 갱신이 기존 플레이어에게도 반영되도록).
     if (localStorage.getItem("battleSim_monsterSeedVersion") !== MONSTER_SEED_VERSION) {
