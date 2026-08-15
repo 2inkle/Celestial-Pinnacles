@@ -639,6 +639,31 @@ function applyEffect(caster, target, effect, ctx) {
       return `${caster.name}${josa(caster.name, "이", "가")} ${label}${josa(label, "을", "를")} ${gained}개 그렸다.`;
     }
 
+    // 상대 진영 자원 삭제 시도 → 그 삭제가 실제로 성공했을 때만(=상대의 그
+    // 자원 수에 실제 변동이 생겼을 때만) 대가로 시전자 진영에 같은 자원을
+    // 적립. "훔친다"는 하나의 원자적 이펙트가 아니라 consumeResource(상대)의
+    // 성공 여부에 addResource(자신)를 종속시키는 조합 — 상대에게 지울 자원이
+    // 이미 없으면(0) 삭제 자체가 불발하고 내 쪽 적립도 없음. 소모량/적립량은
+    // 각각 eraseAmount/gainAmount로 분리 지정 가능(둘 다 없으면 value, 그마저
+    // 없으면 1).
+    case "stealTeamResource": {
+      const rm = ctx?.resourceManager;
+      if (!rm) return null;
+      const meta = TEAM_RESOURCE_TYPES[effect.resource];
+      const key = meta ? meta.key : effect.resource;
+      const opponentSide = caster.side === "ally" ? "enemy" : "ally";
+      const eraseAmount = effect.eraseAmount ?? effect.value ?? 1;
+      const erased = rm.consumeResource(opponentSide, key, eraseAmount);
+      if (!erased) return null; // 상대에게 지울 게 없으면 완전히 불발
+      const gainAmount = effect.gainAmount ?? effect.value ?? 1;
+      const gained = rm.addResource(caster.side, key, gainAmount);
+      const label = meta?.label || effect.resource;
+      const gainSuffix = gained > 0
+        ? ` ${caster.name}${josa(caster.name, "이", "가")} 그 힘으로 ${label}${josa(label, "을", "를")} ${gained}개 그렸다.`
+        : "";
+      return `상대 진영의 ${label}${josa(label, "이", "가")} 지워졌다.${gainSuffix}`;
+    }
+
     // 자원 변환 — 한쪽(from)을 깎아서 다른쪽(to)을 채움. Life Convert
     // ("HP 10% 소모, SP 80% 회복")나 Energy Exchange("HP/SP 교환") 같은
     // "한쪽을 대가로 다른쪽을 얻는" 스킬용.
