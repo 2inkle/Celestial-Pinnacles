@@ -6,6 +6,69 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 알려진 버그 — 패턴 편집기에 "개인 자원(화살 등) 개수" 조건을 만들 방법이 아예 없었음 (2026-08-17, 수정됨)
+
+**증상(사용자 신고)**: 아래 패턴을 가진 화이트아크가 전투에서 공격을 전혀
+안 함(내보내기 JSON):
+```json
+{ "rows": [
+  { "value": 16, "action": "Hurricane Shot", "metric": "resource", "andNext": false, "subject": "self", "comparator": "gte" },
+  { "action": "Arrow Charge", "metric": "always", "subject": "self" }
+] }
+```
+의도는 "화살 16개 이상이면 Hurricane Shot, 아니면 Arrow Charge로 재장전"
+이었지만 실제로는 매 턴 Arrow Charge만 무한 반복하고 Hurricane Shot이
+한 번도 안 나감.
+
+**원인**: `web/battle-adapter.js`의 `translateCondition()`에는 `metric`이
+같은 "자원"이어도 완전히 다른 엔진 조건으로 갈라지는 두 갈래가 있었음 —
+`metric:"resource"`는 **팀(진영) 자원**(`FACTION_RESOURCE_GREATER_THAN`,
+마법진 등)으로, `metric:"personalResource"`는 **개인 자원**
+(`MY_PERSONAL_RESOURCE_COMPARE`, 화살 등)으로 번역됨. 그런데
+`character-sheet.html`의 패턴 빌더 `CONDITION_TYPES`에는 `"자원 개수"`라는
+이름의 조건이 **`metric:"resource"`(팀 자원) 하나뿐**이었고, `personalResource`
+metric은 UI에 아예 노출된 적이 없었음 — "화살 개수"를 조건으로 쓰고 싶어도
+고를 수 있는 선택지 자체가 없었던 것. 게다가 두 갈래 모두 "어떤 자원인지"를
+고르는 드롭다운이 없어서, 팀 자원 쪽은 `row.resource || "magicCircle"`로
+조용히 기본값 처리되고 있었음(TEAM_RESOURCE_TYPES에 마법진 하나뿐이라 지금까지
+안 드러났던 문제).
+
+그 결과 사용자가 "자원 개수" 조건(사실상 유일한 선택지)으로 만든 조건은
+`metric:"resource"`로 저장됐고, `row.resource`가 없으니 `"magicCircle"`로
+번역됨 — "화살 16개 이상"이 아니라 **"마법진 16개 이상"**으로 해석된 것.
+고블린 테마 전투엔 마법진 메커니즘이 없어 이 조건이 사실상 항상 거짓이라
+슬롯 1(Hurricane Shot)이 절대 선택되지 않고, 매 턴 슬롯 2(`always → Arrow
+Charge`, 코스트 없음)만 반복 실행됨 — "공격을 전혀 안 하고 재장전만
+무한 반복"이라는 신고 증상과 정확히 일치.
+
+**수정**:
+- `CONDITION_TYPES`에 `personalResource`("개인 자원 개수(화살 등)")를
+  신설 — 기존 `resource`는 "팀 자원 개수(마법진 등)"로 라벨을 명확히
+  구분. 둘 다 `resourceCatalog:"team"|"personal"` 메타데이터를 부여.
+- 패턴 빌더에 **자원 종류 선택 드롭다운을 신설**(`resourceCatalog`가 있는
+  조건에서만 노출, `TEAM_RESOURCE_TYPES`/`PERSONAL_RESOURCE_TYPES`에서
+  옵션을 뽑음) — 지금까지 "어떤 자원인지"를 고를 방법 자체가 없었던 근본
+  공백을 메움. 조건 종류를 방금 이 타입으로 바꾼 순간, 또는 화면을 렌더링할
+  때(예전에 저장된, resource가 비어있는 행) 카탈로그의 첫 항목으로 자동
+  채워짐(빈 채로 저장되는 사고 방지).
+- `battle-adapter.js`의 번역 로직 자체는 처음부터 정확했음(수정 불필요) —
+  `personalResource`/`resource` 두 조건 타입이 서로 다른 엔진 조건으로
+  가는 게 설계 의도 그대로였고, 문제는 오직 그중 하나(개인 자원)를 만들
+  UI가 없었다는 것.
+
+**남은 조치**: 이미 저장된 문제의 프리셋(위 예시)은 자동으로 고쳐지지
+않음 — `metric:"resource"`로 저장된 값을 "정말 마법진을 의도했는지 화살을
+의도했는지" 코드가 추측할 수 없기 때문. 사용자가 패턴 편집기에서 해당
+조건의 종류를 "개인 자원 개수(화살 등)"로 바꾸고 자원 드롭다운에서
+"화살"을 고른 뒤 다시 저장해야 함.
+
+**검증**: 인라인 `<script>` 블록 `node --check` 통과. `battle-adapter.js`의
+`translateCondition()`이 `personalResource`/`resource`를 이미 정확히
+분기하고 있다는 것은 코드 리딩으로 확인(로직 자체는 안 건드렸으므로 기존
+회귀 스위트에 영향 없음). 로그인 세션이 로컬에 없어 브라우저로 직접
+"화살 16개 이상 → Hurricane Shot" 패턴을 새로 짜서 확인하는 건 다음
+로그인 세션에서 할 것.
+
 ## 알려진 버그 — 상점 화살통이 아무 효과도 없어 보이던 문제 (2026-08-17, 수정됨)
 
 **증상(사용자 신고)**: 상점에서 화살통을 사서 장착해도 개인 자원(화살)을

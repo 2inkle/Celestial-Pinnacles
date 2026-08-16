@@ -267,11 +267,25 @@
 // 조건 타입 레지스트리 — 조건 종류는 계속 늘어날 예정이므로, 새 조건을 추가할 때
 // 이 객체에 항목 하나만 더하면 됨(라벨/비교연산자 필요 여부/단위). 빌더의 드롭다운과
 // 상세 입력칸 표시 여부는 전부 이 메타데이터를 읽어서 자동으로 그려짐.
+//
+// resourceCatalog(2026-08-17 신설) — "team" | "personal". battle-adapter.js의
+// translateCondition()에 metric:"resource"(팀 자원, 예: 마법진)와
+// metric:"personalResource"(개인 자원, 예: 화살)가 서로 다른 엔진 조건
+// (FACTION_RESOURCE_GREATER_THAN / MY_PERSONAL_RESOURCE_COMPARE)으로 완전히
+// 분리돼 있는데, 이 화면엔 원래 "자원 개수"라는 이름의 metric 하나만 있어서
+// (=metric:"resource") 실제로는 항상 팀 자원(마법진)만 검사할 수 있었다 —
+// "화살 개수"처럼 개인 자원을 조건으로 쓸 방법 자체가 UI에 없었던 것.
+// (신고: 화이트아크가 "화살 16개 이상 → Hurricane Shot" 패턴을 짰는데
+// 실제로는 "마법진 16개 이상"으로 번역돼 조건이 사실상 항상 거짓이 되고,
+// 폴백 슬롯인 "항상 → Arrow Charge"만 무한 반복하느라 공격을 전혀 안 하는
+// 것으로 나타남.) 이 값이 있으면 buildRowHTML()이 TEAM_RESOURCE_TYPES/
+// PERSONAL_RESOURCE_TYPES 중 해당하는 걸로 자원 선택 드롭다운을 추가로 그림.
 const CONDITION_TYPES = {
   always:   { label:"조건 없음(항상)", needsDetail:false },
   hp:       { label:"HP",           needsDetail:true, unit:"%" },
   sp:       { label:"SP",           needsDetail:true, unit:"%" },
-  resource: { label:"자원 개수",      needsDetail:true, unit:"개" },
+  resource: { label:"팀 자원 개수(마법진 등)", needsDetail:true, unit:"개", resourceCatalog:"team" },
+  personalResource: { label:"개인 자원 개수(화살 등)", needsDetail:true, unit:"개", resourceCatalog:"personal" },
   notGuarding: { label:"Guard 중이 아닐 때", needsDetail:false }
   // 새 조건 예시: turnCount: { label:"경과 턴 수", needsDetail:true, unit:"턴" }
 };
@@ -1862,6 +1876,14 @@ function actionOptionsFor() {
 function buildRowHTML(row, idx, active) {
   const type = CONDITION_TYPES[row.metric] || CONDITION_TYPES.always;
   const showDetail = type.needsDetail;
+  // resourceCatalog 조건인데 저장된 row.resource가 없거나(예전 데이터) 지금
+  // 카탈로그에 없는 키면, 화면에 보이는 <select>의 실제 선택값(카탈로그
+  // 첫 항목)과 저장될 값이 어긋나지 않도록 여기서 즉시 채워둠 — row는
+  // data.presets[...].rows[...] 원본을 그대로 참조하므로 이 대입이 곧 반영.
+  if (type.resourceCatalog) {
+    const catalog = type.resourceCatalog === "team" ? TEAM_RESOURCE_TYPES : PERSONAL_RESOURCE_TYPES;
+    if (!row.resource || !catalog[row.resource]) row.resource = Object.keys(catalog)[0];
+  }
   return `
     <div class="pattern-row ${active ? "active" : "locked"}" data-idx="${idx}">
       <div class="row-head">
@@ -1881,6 +1903,10 @@ function buildRowHTML(row, idx, active) {
           ${Object.entries(CONDITION_TYPES).map(([k,t]) => `<option value="${k}" ${row.metric===k?"selected":""}>${t.label}</option>`).join("")}
         </select>
         <span class="cb-cond-detail" style="${showDetail ? "display:flex;gap:6px;align-items:center;" : "display:none;"}">
+          ${type.resourceCatalog ? `
+          <select class="cb-resource">
+            ${Object.entries(type.resourceCatalog === "team" ? TEAM_RESOURCE_TYPES : PERSONAL_RESOURCE_TYPES).map(([k,v]) => `<option value="${k}" ${row.resource===k?"selected":""}>${v.icon} ${v.label}</option>`).join("")}
+          </select>` : ""}
           <select class="cb-comparator">
             ${Object.entries(COMPARATOR_LABEL).map(([k,v]) => `<option value="${k}" ${row.comparator===k?"selected":""}>${v}</option>`).join("")}
           </select>
@@ -2132,9 +2158,19 @@ function bindPatternEvents() {
         row.value = row.value ?? 0;
         row.unit = row.unit || type.unit;
       }
+      if (type.resourceCatalog) {
+        // 자원 종류를 하나도 선택 안 한 채로 저장되면 battle-adapter.js가
+        // 조건을 못 옮기거나(personalResource) "magicCircle"로 조용히
+        // 기본값 처리해버리므로(resource), 처음 이 조건으로 바꾸는 순간
+        // 카탈로그의 첫 항목으로 명시적으로 채워둠.
+        const catalog = type.resourceCatalog === "team" ? TEAM_RESOURCE_TYPES : PERSONAL_RESOURCE_TYPES;
+        if (!row.resource || !catalog[row.resource]) row.resource = Object.keys(catalog)[0];
+      }
       markDirty("pattern");
       renderPatternSection(); // 조건 종류별 상세 입력칸 표시 여부가 다르므로 재렌더
     });
+    const resourceSelect = rowEl.querySelector(".cb-resource");
+    if (resourceSelect) resourceSelect.addEventListener("change", e => { row.resource = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
     const cmp = rowEl.querySelector(".cb-comparator");
     if (cmp) cmp.addEventListener("change", e => { row.comparator = e.target.value; markDirty("pattern"); updateSectionSaveIndicator("pattern"); });
     const val = rowEl.querySelector(".cb-value");
