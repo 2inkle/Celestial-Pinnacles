@@ -1803,17 +1803,30 @@ function renderSkillTreeHtml() {
     return `<div class="tree-line" style="padding-left:${l.depth * 16}px">${escapedLabel}${l.learned ? ` <span class="tree-check">✓</span>` : ""}</div>`;
   }).join("");
 }
+// equipmentType(장비 "종류") -> 그 종류이기만 하면 자동으로 부여되는 스킬.
+// 화살통(arrowcase)이면 개별 아이템에 grantsSkill을 일일이 안 심어도 항상
+// Arrow Charge를 씀 — 앞으로 화살통 계열 아이템이 추가될 때마다 매번
+// grantsSkill을 붙이는 걸 잊을 위험을 원천 차단하려는 목적(2026-08-16,
+// CLAUDE.md의 "장비 종류 → 자동 부여 스킬" 절 참고). 새 종류가 생기면
+// 여기 한 줄만 추가하면 됨.
+const EQUIPMENT_TYPE_GRANTED_SKILL = {
+  arrowcase: "Arrow Charge",
+};
 // 장비가 부여하는 스킬 — SKILL_TABLE 습득 여부와 무관하게 장착 중엔 씀. 처음엔
 // skillSeal 슬롯 전용이었지만(2026-08-16 이전), 화살통의 Arrow Charge처럼
 // 다른 슬롯의 장비도 같은 방식으로 스킬을 부여할 수 있어야 해서 슬롯 종류를
-// 안 가리고 장착된 모든 장비를 훑도록 일반화함. 자기 직업 스킬이 아닐 수도
-// 있어서 jobSkillTable()이 아니라 전체에서 찾음.
+// 안 가리고 장착된 모든 장비를 훑도록 일반화함. 개별 아이템에 박아둔
+// grantsSkill(예: skillSeal류)과 EQUIPMENT_TYPE_GRANTED_SKILL(장비 종류
+// 기준 자동 부여) 둘 다 합쳐서 반환 — 자기 직업 스킬이 아닐 수도 있어서
+// jobSkillTable()이 아니라 전체에서 찾음.
 function equipmentGrantedSkillObjs() {
-  const grantedNames = new Set(
-    Object.values(data.equipment)
-      .filter(item => item && item.grantsSkill)
-      .map(item => item.grantsSkill)
-  );
+  const grantedNames = new Set();
+  Object.values(data.equipment).forEach(item => {
+    if (!item) return;
+    if (item.grantsSkill) grantedNames.add(item.grantsSkill);
+    const autoGrant = EQUIPMENT_TYPE_GRANTED_SKILL[item.equipmentType];
+    if (autoGrant) grantedNames.add(autoGrant);
+  });
   if (grantedNames.size === 0) return [];
   return allSkillsFlat().filter(s => grantedNames.has(s.name));
 }
