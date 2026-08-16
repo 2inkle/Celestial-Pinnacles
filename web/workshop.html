@@ -54,6 +54,14 @@
   .arrow { color:var(--mist-dim); margin:0 6px; }
   .flavor { font-size:12px; color:var(--mist-dim); font-style:italic; margin-top:6px; line-height:1.6; }
   .warn { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--danger); margin-top:10px; }
+
+  .filter-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .filter-chip { font-family:'JetBrains Mono',monospace; font-size:11px; background:var(--panel-raised); border:1px solid var(--line); color:var(--mist-dim); padding:6px 12px; border-radius:20px; cursor:pointer; }
+  .filter-chip:hover { border-color:var(--gold-dim); }
+  .filter-chip.active { border-color:var(--gold); color:var(--gold); background:#2b2740; }
+  .mat-need { font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .mat-need .ok { color:var(--cyan); }
+  .mat-need .short { color:var(--danger); }
 </style>
   <link rel="stylesheet" href="common.css">
 </head>
@@ -66,8 +74,9 @@
       <div class="eyebrow">Workshop</div>
       <h1>제작공방</h1>
       <div class="desc">
-        장비에 소재를 하나 넣어 성격을 바꿉니다. 소재는 넣는 순간 사라지고, 한 번 넣은 장비는 되돌릴 수 없어요.<br />
-        어떤 소재가 무슨 효과를 주는지 모르겠다면 감정을 맡겨보세요 — 감정하지 않아도 제작은 가능합니다.
+        <b>개조</b> — 장비에 소재를 하나 넣어 성격을 바꿉니다. 소재는 넣는 순간 사라지고, 한 번 넣은 장비는 되돌릴 수 없어요.<br />
+        <b>제작</b> — 재료를 모아 장비를 처음부터 만듭니다. 저확률 드랍만 바라보지 않아도 돼요.<br />
+        어떤 소재가 무슨 효과를 주는지 모르겠다면 감정을 맡겨보세요 — 감정하지 않아도 개조는 가능합니다.
       </div>
     </div>
     <div class="gold-badge" id="goldBadge">💰 0 G</div>
@@ -77,12 +86,14 @@
 <main>
   <div class="tabs">
     <button class="tab active" data-tab="craft">🔨 개조</button>
+    <button class="tab" data-tab="newcraft">🛠 제작</button>
     <button class="tab" data-tab="appraise">🔍 감정</button>
   </div>
   <div id="view"></div>
 </main>
 
 <script src="craft-materials.js"></script>
+<script src="material-table.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
@@ -163,6 +174,7 @@
   let tab = "craft";
   let selectedEquipId = null;
   let selectedMatName = null;
+  let newCraftCategory = "전체";
 
   // 개조 대상 — 강화도 안 됐고 소재도 안 들어간 순정 장비만.
   // 강화품을 제외하는 건 "강화 배율 × 소재 보정"이 겹쳐 계산이 꼬이는 걸
@@ -172,6 +184,21 @@
   }
   function ownedMaterials() {
     return warehousePool.filter((w) => w.category === "material" && (w.quantity || 0) > 0 && CRAFT_MATERIAL_TABLE[w.name]);
+  }
+
+  // 창고에 있는 재료(제작용 — CRAFT_MATERIAL_TABLE 여부와 무관하게 이름으로만
+  // 찾음. 나무/돌/광석처럼 "개조" 시스템엔 없는 순수 제작 전용 재료도 있고,
+  // 고블린의 이빨처럼 두 시스템에 동시에 쓰이는 재료도 있기 때문).
+  function ownedQuantityOf(materialName) {
+    return warehousePool
+      .filter((w) => w.category === "material" && w.name === materialName)
+      .reduce((sum, w) => sum + (w.quantity || 0), 0);
+  }
+  function canCraftRecipe(recipe) {
+    return recipe.materials.every((m) => ownedQuantityOf(m.name) >= m.quantity);
+  }
+  function recipeCategories() {
+    return ["전체", ...new Set(Object.values(RECIPE_TABLE).map((r) => r.category))];
   }
 
   function describeSpec(item) {
@@ -256,6 +283,44 @@
       </div>`;
   }
 
+  // ── 제작 탭(신규 제작) ────────────────────────────────────────────────
+  // 개조와 달리 "베이스 장비 + 소재 1개"가 아니라 "재료 여러 개 → 장비"이고,
+  // 창고에 있는 순정 장비를 소모하지도 않음 — 처음부터 만들어냄. 앞으로
+  // 레시피가 많아질 걸 감안해서, 만들 수 있는 것만 굳이 숨기지 않고 전부
+  // 보여주되(재료가 부족해도 "이걸 만들려면 뭐가 더 필요한지" 알아야 파밍
+  // 계획을 세우니까) 카테고리로 필터링만 제공함.
+  function renderNewCraft() {
+    const cats = recipeCategories();
+    const entries = Object.entries(RECIPE_TABLE).filter(([, r]) => newCraftCategory === "전체" || r.category === newCraftCategory);
+
+    return `
+      <div class="filter-row">
+        ${cats.map((c) => `<button class="filter-chip ${c === newCraftCategory ? "active" : ""}" data-newcraft-cat="${c}">${c}</button>`).join("")}
+      </div>
+      <div class="block">
+        <h2 class="section-title">제작 가능 목록 <span class="hint">재료를 모아서 장비를 처음부터 만듭니다 — 순정 장비 소모 없음</span></h2>
+        <div class="list">
+          ${entries.length ? entries.map(([name, recipe]) => {
+            const ready = canCraftRecipe(recipe);
+            const matLines = recipe.materials.map((m) => {
+              const have = ownedQuantityOf(m.name);
+              const enough = have >= m.quantity;
+              return `<span class="mat-need ${enough ? "ok" : "short"}">${m.name} ${have}/${m.quantity}</span>`;
+            }).join(" · ");
+            return `
+            <div class="row">
+              <div class="row-main">
+                <div class="row-name">${name} <span class="tag">${recipe.category}</span></div>
+                <div class="row-sub">${describeSpec(recipe.result)}</div>
+                <div class="row-sub" style="margin-top:6px;">${matLines}</div>
+              </div>
+              <button class="act primary" data-craft-recipe="${name}" ${ready ? "" : "disabled"}>${ready ? "제작" : "재료 부족"}</button>
+            </div>`;
+          }).join("") : `<div class="empty">이 카테고리엔 아직 레시피가 없어요.</div>`}
+        </div>
+      </div>`;
+  }
+
   // ── 감정 탭 ────────────────────────────────────────────────────────────
   function renderAppraise() {
     const mats = ownedMaterials();
@@ -286,7 +351,7 @@
 
   function render() {
     $("#goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
-    $("#view").innerHTML = tab === "craft" ? renderCraft() : renderAppraise();
+    $("#view").innerHTML = tab === "craft" ? renderCraft() : tab === "newcraft" ? renderNewCraft() : renderAppraise();
     bind();
   }
 
@@ -350,6 +415,71 @@
       alert(`"${base.name}" 개조 완료!`);
       render();
     });
+
+    document.querySelectorAll("[data-newcraft-cat]").forEach((b) => b.addEventListener("click", () => {
+      newCraftCategory = b.dataset.newcraftCat;
+      render();
+    }));
+
+    // 재료 하나를 지정 수량만큼 소모 — 같은 이름 재료가 행 여러 개로 흩어져
+    // 있을 수도 있다는 전제로(정상적으로는 병합돼서 한 행이지만, 방어적으로)
+    // 수량 많은 행부터 순서대로 깎아나감.
+    async function consumeMaterial(name, amount) {
+      let remaining = amount;
+      const rows = warehousePool
+        .filter((w) => w.category === "material" && w.name === name)
+        .sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+      for (const row of rows) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, row.quantity || 0);
+        if (take <= 0) continue;
+        if ((row.quantity || 0) - take <= 0) {
+          const { error } = await window.sbClient.from("warehouse_items").delete().eq("id", row.id);
+          if (error) return error;
+        } else {
+          const { error } = await window.sbClient.from("warehouse_items")
+            .update({ quantity: row.quantity - take }).eq("id", row.id);
+          if (error) return error;
+        }
+        remaining -= take;
+      }
+      return null;
+    }
+
+    document.querySelectorAll("[data-craft-recipe]").forEach((b) => b.addEventListener("click", async () => {
+      const recipeName = b.dataset.craftRecipe;
+      const recipe = RECIPE_TABLE[recipeName];
+      if (!recipe || !canCraftRecipe(recipe)) return;
+      const matSummary = recipe.materials.map((m) => `${m.name} ×${m.quantity}`).join(", ");
+      if (!confirm(`"${recipeName}"을(를) 제작합니다.\n소모: ${matSummary}\n진행할까요?`)) return;
+      b.disabled = true;
+
+      for (const m of recipe.materials) {
+        const err = await consumeMaterial(m.name, m.quantity);
+        if (err) { alert(`제작 실패: ${err.message}`); await refreshWarehousePool(); render(); return; }
+      }
+
+      // 병합 대상(이름+분류 일치, 미장착·미강화·craft_material 없음 — 신규
+      // 제작 결과는 순정 스펙 그대로라 개조 소재가 안 붙어있음) 조회.
+      const { data: stack, error: stackError } = await window.sbClient.from("warehouse_items")
+        .select("id,quantity").eq("user_id", session.user.id).eq("name", recipe.result.name)
+        .eq("category", recipe.result.category).is("held_by", null).is("enhance_level", null)
+        .is("craft_material", null).maybeSingle();
+      if (stackError) { alert(`제작 실패: ${stackError.message}`); await refreshWarehousePool(); render(); return; }
+
+      if (stack) {
+        const { error } = await window.sbClient.from("warehouse_items")
+          .update({ quantity: stack.quantity + 1 }).eq("id", stack.id);
+        if (error) { alert(`제작 실패: ${error.message}`); await refreshWarehousePool(); render(); return; }
+      } else {
+        const { error } = await window.sbClient.from("warehouse_items").insert(buildCraftedInsertPayload(recipe.result, 1));
+        if (error) { alert(`제작 실패: ${error.message}`); await refreshWarehousePool(); render(); return; }
+      }
+
+      await refreshWarehousePool();
+      alert(`"${recipeName}" 제작 완료!`);
+      render();
+    }));
 
     document.querySelectorAll("[data-appraise]").forEach((b) => b.addEventListener("click", async () => {
       const id = b.dataset.appraise;

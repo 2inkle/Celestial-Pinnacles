@@ -147,7 +147,10 @@
     { id:"goblin_scout", name:"고블린 척후병", portrait:"👺", realStats:{str:8,int:5,dex:10,spd:12,luk:5},
       combatReal:{atk:6}, tier:"normal",
       patterns:[{subject:"self",metric:"always",action:"ATTACK"}], expReward:8, goldReward:3,
-      dropTable:[{name:"고블린의 이빨",category:"material",chance:0.7,quantity:[1,2]}] },
+      dropTable:[
+        {name:"고블린의 이빨",category:"material",chance:0.7,quantity:[1,2]},
+        {name:"나무",category:"material",chance:0.5,quantity:[1,2]},
+      ] },
 
     { id:"goblin_warrior", name:"고블린 전사", portrait:"👹", realStats:{str:14,int:6,dex:9,spd:9,luk:5},
       combatReal:{atk:14,def:3}, tier:"normal",
@@ -157,6 +160,7 @@
       ], expReward:14, goldReward:5,
       dropTable:[
         {name:"고블린의 이빨",category:"material",chance:0.5,quantity:[1,2]},
+        {name:"돌",category:"material",chance:0.5,quantity:[1,2]},
         {name:"이 빠진 도끼",category:"equipment",enhanceable:true,chance:0.08,quantity:[1,1],slot:"mainhand",equipmentType:"axe",combatReal:{atk:22},weight:0},
       ] },
 
@@ -174,6 +178,7 @@
       dropTable:[
         {name:"고블린의 이빨",category:"material",chance:0.3,quantity:[1,1]},
         {name:"마력 가루",category:"material",chance:0.35,quantity:[1,3]},
+        {name:"나무",category:"material",chance:0.3,quantity:[1,2]},
         {name:"주술사의 나뭇가지",category:"equipment",enhanceable:true,chance:0.08,quantity:[1,1],slot:"mainhand",equipmentType:"wand",combatReal:{atk:1,matk:17},weight:0},
       ] },
 
@@ -189,6 +194,8 @@
       dropTable:[
         {name:"고블린 왕국 통행증",category:"keyItem",chance:1.0,quantity:[1,1]},
         {name:"고블린의 이빨",category:"material",chance:0.4,quantity:[1,2]},
+        {name:"돌",category:"material",chance:0.4,quantity:[1,2]},
+        {name:"나무",category:"material",chance:0.4,quantity:[1,2]},
       ] },
 
     { id:"goblin_elite_guard", name:"성채 수문장", portrait:"🛡️", realStats:{str:20,int:8,dex:10,spd:8,luk:6},
@@ -200,6 +207,7 @@
       dropTable:[
         {name:"고블린의 이빨",category:"material",chance:0.6,quantity:[2,3]},
         {name:"은빛 성채 열쇠",category:"material",chance:0.15,quantity:[1,1]},
+        {name:"광석",category:"material",chance:0.4,quantity:[1,2]},
         {name:"수문장의 방패",category:"equipment",enhanceable:true,chance:0.07,quantity:[1,1],slot:"subhand",equipmentType:"shield",combatReal:{def:17,mdef:12},combatBonus:{def:32,mdef:26},weight:1,passiveBonus:{completeDefenseChancePct:10}},
       ] },
 
@@ -241,6 +249,9 @@
         dropTable:[
           {name:"고블린의 이빨",category:"material",chance:1.0,quantity:[3,6]},
           {name:"은빛 성채 열쇠",category:"material",chance:0.5,quantity:[1,2]},
+          {name:"나무",category:"material",chance:0.6,quantity:[2,4]},
+          {name:"돌",category:"material",chance:0.6,quantity:[2,4]},
+          {name:"광석",category:"material",chance:0.4,quantity:[1,3]},
           {name:"이 빠진 도끼",category:"equipment",enhanceable:true,chance:0.4,quantity:[1,1],slot:"mainhand",equipmentType:"axe",combatReal:{atk:22},weight:0},
           {name:"주술사의 나뭇가지",category:"equipment",enhanceable:true,chance:0.4,quantity:[1,1],slot:"mainhand",equipmentType:"wand",combatReal:{atk:1,matk:17},weight:0},
           {name:"수문장의 방패",category:"equipment",enhanceable:true,chance:0.3,quantity:[1,1],slot:"subhand",equipmentType:"shield",combatReal:{def:17,mdef:12},combatBonus:{def:32,mdef:26},weight:1,passiveBonus:{completeDefenseChancePct:10}},
@@ -273,6 +284,7 @@
       dropTable:[
         {name:"왕관 조각",category:"material",chance:0.18,quantity:[1,1]},
         {name:"고블린의 이빨",category:"material",chance:0.7,quantity:[2,4]},
+        {name:"광석",category:"material",chance:0.4,quantity:[1,2]},
         {name:"섭정의 인장",category:"equipment",enhanceable:true,chance:0.12,quantity:[1,1],slot:"jItem",combatReal:{mdef:11},combatBonus:{mdef:17},weight:0},
       ] },
 
@@ -309,6 +321,7 @@
         // 처치했더니 왕이 도망쳤고, 그 흔적을 쫓아 수송대를 털러 간다는 흐름.
         {name:"오래된 바퀴 자국",category:"keyItem",chance:0.12,quantity:[1,1]},
         {name:"고블린의 이빨",category:"material",chance:1.0,quantity:[3,5]},
+        {name:"광석",category:"material",chance:0.6,quantity:[2,3]},
         {name:"왕의 대검",category:"equipment",enhanceable:true,chance:0.15,quantity:[1,1],slot:"mainhand",equipmentType:"greatsword",combatReal:{atk:97,def:8,mdef:4},combatBonus:{def:72,mdef:59},weight:2,twoHanded:true},
       ] },
 
@@ -413,7 +426,7 @@
       ],
       expReward:0, goldReward:0, dropTable:[] },
   ];
-  const MONSTER_SEED_VERSION = "2026-08-16q"; // 참고용 — 이제 이 값이 실제로 뭘 트리거하진 않음
+  const MONSTER_SEED_VERSION = "2026-08-17a"; // 참고용 — 이제 이 값이 실제로 뭘 트리거하진 않음
 
   function render() {
     const grid = document.getElementById("grid");
