@@ -1479,7 +1479,7 @@ function renderStatSection() {
 
     ${equipmentGrantedSkillObjs().length ? `
     <div class="block">
-      <h2 class="section-title">SkillSeal로 사용 가능한 스킬 <span class="hint">습득 여부와 무관 — 장착 해제하면 사라짐</span></h2>
+      <h2 class="section-title">장비로 사용 가능한 스킬 <span class="hint">습득 여부와 무관 — 장착 해제하면 사라짐</span></h2>
       <div class="skill-list">
         ${equipmentGrantedSkillObjs().map(s => renderSkillCard(s)).join("")}
       </div>
@@ -1803,12 +1803,19 @@ function renderSkillTreeHtml() {
     return `<div class="tree-line" style="padding-left:${l.depth * 16}px">${escapedLabel}${l.learned ? ` <span class="tree-check">✓</span>` : ""}</div>`;
   }).join("");
 }
-// SkillSeal 장비가 부여하는 스킬 — SKILL_TABLE 습득 여부와 무관하게 장착 중엔 씀.
-// 자기 직업 스킬이 아닐 수도 있어서 jobSkillTable()이 아니라 전체에서 찾음.
+// 장비가 부여하는 스킬 — SKILL_TABLE 습득 여부와 무관하게 장착 중엔 씀. 처음엔
+// skillSeal 슬롯 전용이었지만(2026-08-16 이전), 화살통의 Arrow Charge처럼
+// 다른 슬롯의 장비도 같은 방식으로 스킬을 부여할 수 있어야 해서 슬롯 종류를
+// 안 가리고 장착된 모든 장비를 훑도록 일반화함. 자기 직업 스킬이 아닐 수도
+// 있어서 jobSkillTable()이 아니라 전체에서 찾음.
 function equipmentGrantedSkillObjs() {
-  const seal = data.equipment.skillSeal;
-  if (!seal || !seal.grantsSkill) return [];
-  return allSkillsFlat().filter(s => s.name === seal.grantsSkill);
+  const grantedNames = new Set(
+    Object.values(data.equipment)
+      .filter(item => item && item.grantsSkill)
+      .map(item => item.grantsSkill)
+  );
+  if (grantedNames.size === 0) return [];
+  return allSkillsFlat().filter(s => grantedNames.has(s.name));
 }
 function actionOptionsFor() {
   const names = new Set([
