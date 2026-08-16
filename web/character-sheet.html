@@ -1662,7 +1662,7 @@ function formatTarget(s) {
 // "Eagle Eye (Passive)"/"(Active)"나 "Elemental Shield(Red)"처럼 괄호가
 // 실제로 서로 다른 스킬을 구분하는 의미일 때는 절대 지우면 안 되므로,
 // "무조건 끝 괄호 제거" 대신 알려진 직업 소속 표시 접미사만 정확히 매칭.
-const JOB_DISAMBIGUATION_SUFFIXES = [" (Priest)", " (Druid)", " (WH)"];
+const JOB_DISAMBIGUATION_SUFFIXES = [" (Priest)", " (Druid)", " (WH)", " (Bishop)"];
 function displaySkillName(name) {
   if (!name) return name;
   if (name.startsWith("Job Master:")) return name;
