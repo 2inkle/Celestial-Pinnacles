@@ -306,14 +306,19 @@ const TEAM_RESOURCE_TYPES = {
 
 // ============================================================================
 // 개인 자원 종류 레지스트리 — 진영 공유가 아니라 캐릭터 개인이 갖는 자원(화살,
-// 탄환, 열정 등). SP/HP처럼 전 캐릭터 공통이 아니라서, 캐릭터별로
-// data.personalResources에 "이 캐릭터가 실제로 뭘 얼마나 갖고 시작하는지"를 따로
-// 기록함(예: { arrows: { current:20, max:20 } }) — 이 레지스트리는 "어떤 개인
-// 자원 종류가 존재하는지"의 카탈로그일 뿐, 누가 얼마나 갖는지는 캐릭터 데이터 몫.
-// 코스트/효과에서 { type:"personalResource", resource:"arrows", amount:N } 형태로 참조함.
+// 탄환, 열정 등). SP/HP처럼 전 캐릭터 공통이 아니라서, 캐릭터별로 다르게 갖는
+// 자원 — 다만 실제 보유량은 여기 저장하지 않는다(아래 "개인 자원" 섹션 참고,
+// 2026-08-17 정정): 화살 같은 장비발 개인 자원은 battle-adapter.js가 매 전투
+// 시작마다 장착 중인 장비의 grantsResource로 처음부터 다시 채우므로, 이 화면이
+// 들고 있는 값을 저장해봐야 실제 전투엔 전혀 반영되지 않는다. 이 레지스트리는
+// "어떤 개인 자원 종류가 존재하는지"(아이콘/라벨) 카탈로그일 뿐.
+// key는 실제 스킬 costs[].resource / 장비 grantsResource.key와 정확히 일치해야
+// 함(예: { type:"personalResource", resource:"arrow", amount:N }) — "arrows"
+// (복수형)로 잘못 등록돼 있던 걸 실제 게임이 쓰는 "arrow"(단수)로 정정함
+// (2026-08-17, 상점 화살통이 아무 효과도 없어 보인다는 신고로 발견).
 // ============================================================================
 const PERSONAL_RESOURCE_TYPES = {
-  arrows:  { label:"화살", icon:"🏹" },
+  arrow:   { label:"화살", icon:"🏹" },
   bullets: { label:"탄환", icon:"🔫" },
   passion: { label:"열정", icon:"🔥" }
   // 새 개인 자원 예시: mana: { label:"마나", icon:"💧" }
@@ -388,7 +393,7 @@ const EFFECT_TYPES = {
   statUp:         { label:"핵심 스탯 증가", polarity:"buff", needsStatTarget:true },
   // 팀 자원/개인 자원 증감 — 어떤 자원인지는 effect.resource로 지정
   // (TEAM_RESOURCE_TYPES/PERSONAL_RESOURCE_TYPES 키). 예: { type:"teamResourceUp",
-  // resource:"magicCircle", value:1 }, { type:"personalResourceDown", resource:"arrows", value:1 }
+  // resource:"magicCircle", value:1 }, { type:"personalResourceDown", resource:"arrow", value:1 }
   teamResourceUp:       { label:"팀 자원 증가",   polarity:"buff" },
   teamResourceDown:     { label:"팀 자원 감소",   polarity:"debuff" },
   personalResourceUp:   { label:"개인 자원 증가", polarity:"buff" },
@@ -895,6 +900,16 @@ function calcEffective(real, bonus) {
 // describeItem()/ITEM_SET_TABLE의 description 문구는 전부 이 규칙을 따름.
 // ============================================================================
 
+// 지금 장착 중인 장비들의 grantsResource를 모아 { key: max } 형태로 반환 —
+// battle-adapter.js의 sumEquipmentCombatStats() grantedResources와 동일한 계산.
+function equipmentGrantedResources() {
+  const result = {};
+  Object.values(data.equipment || {}).forEach((item) => {
+    if (item && item.grantsResource) result[item.grantsResource.key] = item.grantsResource.max;
+  });
+  return result;
+}
+
 // 아이템의 옵션 필드들을 사람이 읽을 표시 문구로 자동 생성(고정 bonus 문자열을
 // 따로 저장하지 않아도 필드만 채우면 화면에 정확히 반영되도록).
 function describeItem(item) {
@@ -917,6 +932,10 @@ function describeItem(item) {
   if (item.twoHanded) parts.push(`양손 무기`);
   if (item.avatarPortrait) parts.push(`외형 ${item.avatarPortrait}로 변경`);
   if (item.grantsSkill) parts.push(`"${item.grantsSkill}" 사용 가능`);
+  if (item.grantsResource) {
+    const meta = PERSONAL_RESOURCE_TYPES[item.grantsResource.key];
+    parts.push(`${meta ? `${meta.icon} ${meta.label}` : item.grantsResource.key} 최대 ${item.grantsResource.max}(전투 시작 시 충전)`);
+  }
   if (item.consumable) parts.push(`소모품 · 전투당 ${item.usesPerBattle || 1}회`);
   if (item.setId && ITEM_SET_TABLE[item.setId]) parts.push(`[${ITEM_SET_TABLE[item.setId].name}]`);
   return parts.join(" · ") || "옵션 없음";
@@ -1373,14 +1392,24 @@ function renderStatSection() {
       <div class="stat-row"><div class="s-name">💥 치명타</div><div class="s-bars"><span class="s-real">${computeCritStats().rate.toFixed(1)}%</span><span class="s-bonus">×${computeCritStats().multiplier.toFixed(2)}</span></div></div>
     </div>
 
-    ${Object.keys(data.personalResources).length ? `
+    ${(() => {
+      // 화살 등 장비발 개인 자원 — battle-adapter.js와 동일하게 "지금 장착 중인
+      // 장비의 grantsResource"에서 즉석 계산(2026-08-17 정정, equipmentGrantedResources
+      // 참고). 예전엔 data.personalResources(DB 저장값)를 그대로 보여줬는데, 그
+      // 필드는 실제 전투에서 아예 안 쓰이는 죽은 값이라(매 전투 장비 기준으로
+      // 새로 채워짐) 화살통을 장착해도 이 섹션 자체가 안 뜨는 문제가 있었음.
+      const granted = equipmentGrantedResources();
+      const keys = Object.keys(granted);
+      if (!keys.length) return "";
+      return `
     <div class="block">
-      <h2 class="section-title">개인 자원 <span class="hint">진영 공유 자원과 별개 — 이 캐릭터만의 자원</span></h2>
-      ${Object.entries(data.personalResources).map(([key, r]) => {
+      <h2 class="section-title">개인 자원 <span class="hint">장비로 부여됨 — 전투 시작 시 최대치로 채워짐</span></h2>
+      ${keys.map((key) => {
         const meta = PERSONAL_RESOURCE_TYPES[key];
-        return `<div class="max-row"><span>${meta ? `${meta.icon} ${meta.label}` : key}</span><span>${r.current} / ${r.max}</span></div>`;
+        return `<div class="max-row"><span>${meta ? `${meta.icon} ${meta.label}` : key}</span><span>최대 ${granted[key]}</span></div>`;
       }).join("")}
-    </div>` : ""}
+    </div>`;
+    })()}
 
     <div class="block">
       <h2 class="section-title">장비 <span class="hint">무게 ${weightUsed} / ${weightCapacity}${over ? " — 초과" : ""}</span></h2>
@@ -1448,10 +1477,6 @@ function renderStatSection() {
         <div class="skill-item">
           <div class="sk-main"><span class="sk-name">🧪 금단의 주문서 지급</span><span class="sk-meta">일시 비활성화 — ITEM_TABLE 제거로 갱신 예정</span></div>
           <button class="assign-btn" id="devGrantSkillSealBtn" disabled>지급</button>
-        </div>
-        <div class="skill-item">
-          <div class="sk-main"><span class="sk-name">🧪 화살 20/20 지급</span><span class="sk-meta">개인 자원 테스트용 — "필살의 화살" 스킬 코스트 확인 가능</span></div>
-          <button class="assign-btn" id="devGrantArrowsBtn">지급</button>
         </div>
       </div>
       ${renderSectionSaveButton("equipment")}
@@ -1583,12 +1608,6 @@ function renderStatSection() {
   // devGrantWeaponBtn / devGrantSetPieceBtn / devGrantJItemBtn / devGrantSkillSealBtn은
   // ITEM_TABLE(마스터 테이블) 제거에 맞춰 일시 비활성화함(버튼 자체는 disabled).
   // 나중에 각자 필요한 아이템 데이터를 직접 들고 있는 형태로 갱신할 예정.
-  const arrowsBtn = document.getElementById("devGrantArrowsBtn");
-  if (arrowsBtn) arrowsBtn.addEventListener("click", () => {
-    data.personalResources.arrows = { current: 20, max: 20 };
-    markDirty("equipment"); renderStatSection();
-  });
-
   bindSkillEvents();
 }
 

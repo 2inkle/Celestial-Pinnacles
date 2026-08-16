@@ -6,6 +6,144 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 알려진 버그 — 상점 화살통이 아무 효과도 없어 보이던 문제 (2026-08-17, 수정됨)
+
+**증상(사용자 신고)**: 상점에서 화살통을 사서 장착해도 개인 자원(화살)을
+부여하는 기능이 전혀 안 보임 — "심각한 문제"로 신고됨.
+
+**실제 전투 계산은 처음부터 정상이었음**: `simulate.js`의 `loadAdapterEnv()`로
+실제 DB의 화살통 스펙(`grantsResource:{key:"arrow",max:90}`)을 장착시킨
+캐릭터를 만들어 `BattleAdapter.buildAllyFromRoster()`를 직접 호출해보면
+`personalResources.arrow`가 정확히 `{current:90,max:90}`으로 채워짐(스크래치
+스크립트로 실측 확인) — DB 데이터, `mapItemRow`의 snake_case↔camelCase
+매핑, `battle-adapter.js`의 `sumEquipmentCombatStats`/`buildAllyFromRoster`
+전부 문제없었다. 진짜 원인은 **화면에 아무 데도 안 보였다는 것** — 세 곳이
+동시에 문제였음:
+
+1. **`character-sheet.html`의 `PERSONAL_RESOURCE_TYPES` 레지스트리가 키를
+   `"arrows"`(복수형)로 등록**하고 있었는데, 실제 게임이 쓰는 키는 어디서나
+   `"arrow"`(단수형) — 상점 아이템의 `grantsResource.key`, 스킬
+   `costs[].resource`(Shoot 등), `battle-adapter.js` 전부 `"arrow"`. 이
+   레지스트리는 원래 "장비 부여 자동화"(위 "장비 종류 → 자동 부여 스킬"
+   섹션)가 만들어지기 **전**에 짜인 자리표시자였던 것으로 보이고, 그
+   기능이 실제로 구현될 때 키를 맞추는 걸 놓쳤던 것.
+2. **`character-sheet.html`의 "개인 자원" 섹션이 `data.personalResources`
+   (DB `characters.personal_resources` 컬럼)를 그대로 보여주는 구조**였는데,
+   이 컬럼은 **battle-adapter.js가 실제 전투에서 절대 읽지 않는 죽은
+   값**이었다(`buildAllyFromRoster`가 매 전투 시작마다 "지금 장착 중인
+   장비의 grantsResource"로 처음부터 다시 채움 — 로스터에 저장된 값을
+   마이그레이션할 필요가 없다는 게 애초 설계 의도, 위 "???" 섹션 주석에도
+   이미 명시돼 있었음). 그래서 화살통을 장착해도 `data.personalResources`는
+   계속 빈 객체(`{}`)였고, 이 섹션 자체가 화면에 아예 안 떴다.
+3. **`describeItem()`(character-sheet.html)/`describeShopSpec()`(shop.html)**
+   둘 다 아이템 카드 요약 문구에 `grantsResource` 필드를 아예 안 다뤄서,
+   상점에서 화살통을 구경하거나 장비 슬롯 카드를 봐도 "화살을 채워준다"는
+   문구 자체가 어디에도 없었다.
+
+세 가지가 겹쳐서, 실제로는 정상 작동하는 기능이 플레이어 입장에선 "아무
+효과도 없는 아이템"으로 보였던 것 — 엔진/DB 버그가 아니라 순수 UI 계층의
+문제였다.
+
+**수정**:
+- `PERSONAL_RESOURCE_TYPES`의 `arrows` → `arrow`로 정정(주변 주석의 예시
+  코드도 함께 정정).
+- "개인 자원" 섹션을 `data.personalResources`(죽은 DB 값) 대신 **지금
+  장착 중인 장비를 즉석에서 스캔한 결과**(`equipmentGrantedResources()`
+  신설, `battle-adapter.js`의 `sumEquipmentCombatStats` grantedResources와
+  동일한 계산)로 렌더링하도록 교체 — 장비를 장착/해제하는 즉시 반영됨.
+- `describeItem()`/`describeShopSpec()` 둘 다 `grantsResource`가 있으면
+  "🏹 화살 최대 90(전투 시작 시 충전)" 형태로 아이템 카드에 표시하도록 추가
+  (shop.html은 `PERSONAL_RESOURCE_TYPES`를 로드하지 않으므로 최소한의
+  로컬 `RESOURCE_LABELS` 매핑만 둠).
+- **`devGrantArrowsBtn`(🧪 화살 20/20 지급 개발자 버튼) 완전히 제거** —
+  `data.personalResources.arrows = {...}`로 잘못된 키에 쓰던 죽은 코드였고,
+  이제 "개인 자원" 섹션이 장비에서 실시간으로 계산되므로 이런 수동 지급
+  버튼 자체가 불필요해짐.
+- `characters.personal_resources` DB 컬럼/`SAVE_SECTIONS.equipment` 저장
+  경로 자체는 건드리지 않음(스키마 변경 없이 최소 범위로 수정) — 이제
+  아무도 쓰지 않는 죽은 컬럼으로 남지만, 남겨둬도 해가 없고 지우려면
+  `battle-view.html`/`dispatch.html`/`roster-index.html`의 읽기 경로까지
+  같이 정리해야 해서 범위가 커짐. 필요해지면 별도로 정리할 것.
+
+**검증**: `simulate.js`의 `loadAdapterEnv()`로 실제 DB 화살통 스펙을 직접
+장착시켜 `buildAllyFromRoster()` 결과의 `personalResources.arrow`가 정확한
+것 확인(수정 전부터 이미 정상이었음 — 이번 수정으로 깨진 게 없다는 회귀
+확인 겸함). 두 파일의 인라인 `<script>` 블록 `node --check` 통과.
+Discord 로그인 세션이 로컬 환경에 없어 브라우저로 직접 확인은 못 함 — 다음
+로그인 세션에서 화살통을 사서 장착했을 때 카드 문구와 "개인 자원" 섹션이
+실제로 뜨는지 실측 권장.
+
+## 임무 시스템 (2026-08-17 신규 구현)
+
+모험가 길드(`web/guild.html`)에 "임무 게시판"을 추가함. 기존 파견 의뢰권
+발행 기능과 나란히, 별도의 독립 IIFE로 구현(관심사 분리 — 티켓 로직과
+임무 로직이 서로의 상태를 참조할 필요가 없어서 굳이 하나로 합치지 않음).
+
+**동기**: "동굴 입장키를 이 경로로 얻게 할 예정이고, 앞으로도 요긴하게
+써먹을 예정이라 미리 추가해놓는 것"(사용자) — 아직 존재하지 않는 동굴
+던전(아래 "Tier 설계" 섹션)의 입장키 임무를 넣기 위한 인프라를 먼저
+갖춰두는 선행 작업. 지금은 시스템 자체를 검증하기 위한 예시 임무 2개만
+들어있고, 동굴 던전 설계가 끝나면 `web/quest-table.js`에 실제 입장키
+임무를 추가하면 됨.
+
+**진행 방식 결정(사용자 확인)**: 수락 단계 없음 — 항상 전체 임무 목록이
+보이고, 조건을 만족하는 순간 "완료" 버튼이 활성화됨. 반복 가능한 임무도
+처음부터 지원(`repeatable` 플래그).
+
+### 데이터 구조
+
+- **임무 카탈로그**(`web/quest-table.js`, `QUEST_TABLE`) — `battle-themes.js`
+  와 같은 패턴으로 정적 JS 파일에 둠(game_content DB가 아님). 임무 종류가
+  아직 적고 전용 편집기 UI 계획이 없어서, 자주 바뀌는 skillTable류 데이터와
+  달리 코드로 직접 관리하는 쪽이 지금은 더 가볍다는 판단 — 나중에 임무가
+  많아지면 game_content 방식으로 옮기는 것도 고려할 만함.
+- **진행 상태**(`quest_progress` 테이블, `supabase/migrations/0020_quest_progress.sql`)
+  — `(user_id, quest_id)` 기본키로 `completed_count`/`last_completed_at`만
+  기록. **조건 충족 여부 자체는 저장하지 않고 매번 즉석 계산**함 —
+  `battleClear` 타입은 `battle_progress` 테이블을, `itemTurnIn` 타입은
+  `warehouse_items` 수량 합계를 그때그때 대조.
+
+### 임무 타입 2종
+
+- `battleClear`: `target.battleId`를 클리어하면 조건 충족. **반복 가능
+  임무의 재도전 판정**이 까다로운 지점이었음 — `battle_progress.cleared`는
+  한 번 true가 되면 계속 true인 boolean이라, "완료 이후 다시 깼는가"를
+  구분하려면 시각 비교가 필요함. `battle_progress.cleared_at`이
+  `quest_progress.last_completed_at`보다 **나중**이면 `ready`(재도전
+  완료), 그렇지 않으면 `waiting`(조건은 예전에 채웠지만 마지막 수령 이후
+  다시 클리어한 적 없음)으로 판정.
+- `itemTurnIn`: `target.itemName`을 `target.quantity`개 이상 보유하면
+  조건 충족, 완료 시 그만큼 소모(여러 창고 행에 나뉘어 있어도
+  `workshop.html`의 `consumeMaterial`과 동일한 패턴으로 순회 차감).
+  **이 타입은 `waiting` 상태가 필요 없음** — 완료할 때 아이템을 실제로
+  소모하므로, 재도전하려면 다시 모아야 `owned >= quantity`가 자연히
+  참이 됨(시각 비교 없이 수량 비교만으로 반복 조건이 저절로 성립).
+
+### 보상 지급
+
+`rewards` 배열: `{type:"gold", amount}` 또는 `{type:"item", name, category,
+quantity, ...spec}`(장비라면 `combatReal` 등 나머지 필드까지 spread —
+`shop.html` 구매 확정 로직과 동일한 "카탈로그 필드 그대로 펼치기" 방식).
+골드는 `profiles.gold`에 read-modify-write, 아이템은 미보유(`held_by is
+null`) 동일 이름 행이 있으면 수량 병합, 없으면 새 행 insert.
+
+### 검증
+
+Discord OAuth 로그인 세션이 이 환경(로컬 정적 서버)에는 없어서 브라우저
+E2E는 이번엔 못 함 — 대신 `evaluateQuest()` 판정 로직만 그대로 복사해
+9가지 케이스(미클리어/최초완료/반복-재도전전/반복-재도전후/일회성-완료됨/
+일회성-미완료/아이템부족/아이템충분/아이템반복)를 스크래치 스크립트로
+결정적 검증함(전부 통과) — `demo-*.js`가 엔진 메커니즘을 결정적으로
+검증하는 것과 같은 접근. 인라인 `<script>` 블록 2개(`node --check`)와
+`quest-table.js` 구문 검증도 완료. **실제 로그인 세션으로 브라우저에서
+직접 확인하는 건 아직 안 됨** — 다음에 로그인된 세션에서 기회가 되면
+"고블린 왕 토벌 현상금"(전투형)/"고블린 이빨 납품"(아이템형) 두 예시
+임무로 실측할 것.
+
+`0020_quest_progress.sql`은 다른 마이그레이션과 동일하게 **사용자가
+Supabase Dashboard SQL Editor에서 직접 실행**해야 적용됨 — 아직 실행 여부
+미확인.
+
 ## Tier 설계 — 콘텐츠 단계 구분 (2026-08-17 착수, 계획 단계 — 아직 구현 없음)
 
 지금까지 "고블린 테마"(마을→왕국→그 뒤→"???")를 **0티어**라고 부르기로

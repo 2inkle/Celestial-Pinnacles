@@ -764,6 +764,12 @@
     return parts.join(" · ");
   }
 
+  // grantsResource.key → 표시용 한글 라벨. character-sheet.html의
+  // PERSONAL_RESOURCE_TYPES와 같은 목적이지만 상점은 그 레지스트리를 로드하지
+  // 않아서 최소한의 로컬 매핑만 둠(2026-08-17, 화살통 카드에 화살 부여
+  // 정보가 아예 안 보이던 문제로 추가 — 매핑에 없는 키는 그대로 노출).
+  const RESOURCE_LABELS = { arrow: "🏹 화살" };
+
   function describeShopSpec(item) {
     const parts = [];
     if (item.equipmentType) parts.push(item.equipmentType);
@@ -774,6 +780,10 @@
     });
     if (item.weight) parts.push(`무게 ${item.weight}`);
     if (item.twoHanded) parts.push(`양손 무기`);
+    if (item.grantsResource) {
+      const label = RESOURCE_LABELS[item.grantsResource.key] || item.grantsResource.key;
+      parts.push(`${label} 최대 ${item.grantsResource.max}(전투 시작 시 충전)`);
+    }
     return parts.join(" · ");
   }
 
