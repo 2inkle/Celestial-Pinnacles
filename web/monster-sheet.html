@@ -80,13 +80,7 @@
   .max-uses-line { font-size:12px; color:var(--mist-dim); }
   .cb-max-uses { width:56px; }
 
-  .save-btn {
-    font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--ember); color:#1a1108; border:none;
-    border-radius:8px; padding:11px 22px; cursor:pointer; font-weight:600; width:100%; margin-top:6px;
-  }
-  .save-btn:hover { opacity:0.9; }
-  .save-flag { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-align:center; margin-top:8px; }
-  .save-flag.dirty { color:var(--gold); }
+  fieldset:disabled .add-btn, fieldset:disabled .mini-btn { opacity:0.4; cursor:not-allowed; }
 
   .empty-wrap { text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:12px; }
   .empty-wrap a { color:var(--gold); }
@@ -95,49 +89,39 @@
 </head>
 <body>
   <script src="nav.js"></script>
-  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth-guard.js"></script>
 
 
 <header>
   <a class="back-link" href="monster-roster.html">← 몬스터 목록으로</a>
   <span class="eyebrow">Monster Sheet · 개발자 모드</span>
-  <div class="mock-badge">⚠ 스탯/패턴을 전부 직접 입력·구성 — 레벨업·장비·직업 개념 없음, 캐릭터와 같은 조건/액션 체계 사용</div>
+  <div class="mock-badge">🔒 조회 전용 — game_content DB 그대로 표시. 편집/저장 불가(SQL 마이그레이션으로만 실제 반영됨)</div>
 </header>
 
+<fieldset id="roFieldset" disabled style="border:0;padding:0;margin:0;">
 <main id="mainArea"></main>
+</fieldset>
 
 <script>
-  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
-  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
-    document.body.innerHTML = `
-      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
-        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
-      </div>
-    `;
-    throw new Error("access-denied");
-  }
-
-  function getMonsterRoster() {
-    try { return JSON.parse(localStorage.getItem("battleSim_monsterRoster")) || []; }
-    catch { return []; }
-  }
-  function saveMonsterRoster(roster) {
-    localStorage.setItem("battleSim_monsterRoster", JSON.stringify(roster));
-  }
+  // 2026-08-16 — 이 페이지는 이제 game_content DB를 조회만 하는 읽기 전용
+  // 뷰어다(monster-roster.html과 동일한 이유·동일한 날의 결정). <fieldset
+  // disabled>로 mainArea 전체를 감싸서, render()가 매번 새로 그리는 모든
+  // input/select/button이 자동으로 비활성화되도록 함(개별 필드마다 disabled를
+  // 붙이는 대신 — 아래 render()/bindEvents()는 예전 로직 그대로 재사용).
+  let session = null;
+  let roster = [];
+  let COMMON_SKILLS = [];
+  let SKILL_TABLE = {};
 
   // ============================================================================
   // 스킬 목록 — 직업/레벨 개념 없이 등록된 스킬 전부를 후보로 씀(캐릭터의
-  // "습득" 단계가 없음). 이제 character-sheet.html과 완전히 같은 공용 소스
-  // (battleSim_skillTable, dev-tools의 skill-table-editor.html에서 관리)를
-  // 읽어옴 — 예전엔 각자 하드코딩된 사본이 있어서 "마도사"/"마법사"처럼 이름이
-  // 어긋나는 실수가 실제로 있었는데, 이제 소스가 하나뿐이라 그럴 일이 없음.
+  // "습득" 단계가 없음). character-sheet.html과 완전히 같은 공용 소스
+  // (game_content.skillTable)를 읽어옴 — 예전엔 각자 하드코딩된 사본이 있어서
+  // "마도사"/"마법사"처럼 이름이 어긋나는 실수가 실제로 있었는데, 이제 소스가
+  // 하나뿐이라 그럴 일이 없음.
   // ============================================================================
-  function getSkillTable() {
-    try { return JSON.parse(localStorage.getItem("battleSim_skillTable")) || { commonSkills:[], jobSkills:{} }; }
-    catch { return { commonSkills:[], jobSkills:{} }; }
-  }
-  const COMMON_SKILLS = getSkillTable().commonSkills;
-  const SKILL_TABLE = getSkillTable().jobSkills;
   function allSkillsFlat() {
     return [...COMMON_SKILLS, ...Object.values(SKILL_TABLE).flat()];
   }
@@ -166,37 +150,12 @@
 
   const params = new URLSearchParams(location.search);
   const monsterId = params.get("id");
-  const roster = getMonsterRoster();
-  const committedIndex = roster.findIndex(m => m.id === monsterId);
-  const committed = committedIndex === -1 ? null : roster[committedIndex];
-  let data = committed ? JSON.parse(JSON.stringify(committed)) : null;
-  if (data) {
-    data.realStats = data.realStats || { str:0, int:0, dex:0, spd:0, luk:0 };
-    data.combatReal = data.combatReal || { atk:0, def:0, matk:0, mdef:0, summonEff:0 };
-    data.combatBonus = data.combatBonus || { atk:0, def:0, matk:0, mdef:0 };
-    data.dropTable = data.dropTable || [];
-    data.patterns = data.patterns || [];
-    data.summonAbility = data.summonAbility || { candidates: [] };
-    data.expReward = data.expReward ?? 0;
-    data.goldReward = data.goldReward ?? 0;
-  }
-  let isDirty = false;
-  function markDirty() { isDirty = true; renderSaveFlag(); }
-  function save() {
-    const fresh = getMonsterRoster();
-    const idx = fresh.findIndex(m => m.id === monsterId);
-    if (idx === -1) return;
-    fresh[idx] = JSON.parse(JSON.stringify(data));
-    saveMonsterRoster(fresh);
-    isDirty = false;
-    renderSaveFlag();
-  }
-  function renderSaveFlag() {
-    const el = document.getElementById("saveFlag");
-    if (!el) return;
-    el.textContent = isDirty ? "저장 안 된 변경사항 있음" : "저장됨";
-    el.className = "save-flag" + (isDirty ? " dirty" : "");
-  }
+  let data = null;
+  // 조회 전용이라 "저장" 자체가 없음(save()/renderSaveFlag() 제거, saveBtn도
+  // 템플릿에서 제거함). markDirty()는 render()/bindEvents() 안에 호출부가
+  // 수십 곳 있어서(재사용 목적상 그대로 둠 — 어차피 fieldset이 입력을 다
+  // 막아 이 콜백들 자체가 실행될 일이 없음) 빈 no-op으로만 남겨둠.
+  function markDirty() {}
 
   const ITEM_CATEGORY_OPTIONS = ["equipment", "material", "keyItem", "stash"];
 
@@ -356,10 +315,7 @@
         <button class="add-btn" id="addPatternBtn">+ 패턴 추가</button>
       </div>
 
-      <button class="save-btn" id="saveBtn">저장</button>
-      <div class="save-flag" id="saveFlag"></div>
     `;
-    renderSaveFlag();
     bindEvents(el);
   }
 
@@ -486,10 +442,45 @@
       markDirty(); render();
     });
 
-    el.querySelector("#saveBtn").addEventListener("click", save);
   }
 
-  render();
+  (async () => {
+    session = await window.AuthGuard.requireSession();
+    const isAdmin = await window.AuthGuard.isAdmin(session);
+    if (!isAdmin) {
+      document.body.innerHTML = `
+        <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+          🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+        </div>
+      `;
+      return;
+    }
+    const [monsterRes, skillRes] = await Promise.all([
+      window.sbClient.from("game_content").select("data").eq("key", "monsterRoster").single(),
+      window.sbClient.from("game_content").select("data").eq("key", "skillTable").single(),
+    ]);
+    if (monsterRes.error || skillRes.error) {
+      document.getElementById("mainArea").innerHTML = `<div class="empty-wrap">⚠ 조회 실패: ${(monsterRes.error || skillRes.error).message}</div>`;
+      return;
+    }
+    roster = monsterRes.data?.data || [];
+    COMMON_SKILLS = skillRes.data?.data?.commonSkills || [];
+    SKILL_TABLE = skillRes.data?.data?.jobSkills || {};
+
+    const committed = roster.find((m) => m.id === monsterId) || null;
+    data = committed ? JSON.parse(JSON.stringify(committed)) : null;
+    if (data) {
+      data.realStats = data.realStats || { str:0, int:0, dex:0, spd:0, luk:0 };
+      data.combatReal = data.combatReal || { atk:0, def:0, matk:0, mdef:0, summonEff:0 };
+      data.combatBonus = data.combatBonus || { atk:0, def:0, matk:0, mdef:0 };
+      data.dropTable = data.dropTable || [];
+      data.patterns = data.patterns || [];
+      data.summonAbility = data.summonAbility || { candidates: [] };
+      data.expReward = data.expReward ?? 0;
+      data.goldReward = data.goldReward ?? 0;
+    }
+    render();
+  })();
 </script>
 </body>
 </html>

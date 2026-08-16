@@ -74,7 +74,9 @@
 </head>
 <body>
   <script src="nav.js"></script>
-  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth-guard.js"></script>
 
 
 <header>
@@ -85,39 +87,24 @@
       <h1>직업 테이블</h1>
     </div>
     <div class="header-actions">
-      <button class="action-btn" id="uploadBtn">⬆ 업로드</button>
-      <input type="file" id="uploadInput" accept="application/json" style="display:none;" />
       <button class="action-btn" id="downloadBtn">⬇ 다운로드</button>
-      <button class="action-btn primary" id="saveBtn">저장</button>
     </div>
   </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:var(--mist-dim);border:1px dashed var(--line);border-radius:20px;padding:5px 12px;display:inline-block;margin-top:10px;">🔒 조회 전용 — game_content DB 그대로 표시. 편집/저장 불가(SQL 마이그레이션으로만 실제 반영됨)</div>
 </header>
 
+<fieldset id="roFieldset" disabled style="border:0;padding:0;margin:0;">
 <main id="mainArea"></main>
+</fieldset>
 
 <script>
-  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
-  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
-    document.body.innerHTML = `
-      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
-        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
-      </div>
-    `;
-    throw new Error("access-denied");
-  }
-
+  // 2026-08-16 — 조회 전용 뷰어로 전환(다른 관리자 편집기와 동일한 날의 결정).
   // ============================================================================
   // 직업 테이블 — { advancement:{ "사제":[{toJob,portrait,requirements[]}] },
-  // allowedEquipmentTypes:{ "사제":["staff",...] } } 형태로 localStorage에 저장.
-  // character-sheet.html이 여기서 읽어옴(예전엔 하드코딩돼있었음).
+  // allowedEquipmentTypes:{ "사제":["staff",...] } } 형태로 game_content(key:
+  // "jobTable")에 저장돼 있음. character-sheet.html이 여기서 읽어옴.
   // ============================================================================
-  function getJobTable() {
-    try { return JSON.parse(localStorage.getItem("battleSim_jobTable")) || { advancement:{}, allowedEquipmentTypes:{} }; }
-    catch { return { advancement:{}, allowedEquipmentTypes:{} }; }
-  }
-  function saveJobTable(t) {
-    localStorage.setItem("battleSim_jobTable", JSON.stringify(t));
-  }
+  let jobData = { advancement:{}, allowedEquipmentTypes:{} };
   function downloadJSON(filename, data) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -618,23 +605,12 @@
   // 않았음(직업 트리를 10개 라인으로 늘려도 화면엔 사제 3라인만 보이던 문제).
   // 이제 SEED_VERSION이 저장된 값과 다르면 무조건 다시 심음. 시드를 고칠
   // 때마다 아래 버전 문자열만 올리면 전원에게 반영됨.
-  const JOB_SEED_VERSION = "2026-08-09a";
-  if (localStorage.getItem("battleSim_jobSeedVersion") !== JOB_SEED_VERSION) {
-    // 덮어쓰기 전에 직전 내용을 백업 키에 남겨둠 — 편집기에서 직접 손본
-    // 내용이 시드 갱신으로 통째로 사라지는 사고를 막기 위함. 필요하면
-    // localStorage의 "battleSim_jobSeedVersionBackup"에서 되살릴 수 있음.
-    try { localStorage.setItem("battleSim_jobSeedVersionBackup", JSON.stringify(getJobTable())); } catch {}
-    saveJobTable(LEGACY_JOB_SEED);
-    localStorage.setItem("battleSim_jobSeedVersion", JOB_SEED_VERSION);
-  }
+  const JOB_SEED_VERSION = "2026-08-09a"; // 참고용 — 이제 이 값이 실제로 뭘 트리거하진 않음
 
-  let jobData = getJobTable();
-  let isDirty = false;
-  function markDirty() { isDirty = true; renderSaveFlag(); }
-  function renderSaveFlag() {
-    const el = document.getElementById("saveFlag");
-    if (el) { el.textContent = isDirty ? "저장 안 된 변경사항 있음" : "저장됨"; el.className = "save-flag" + (isDirty ? " dirty" : ""); }
-  }
+  // 조회 전용이라 저장이 없음 — markDirty()는 render()/bindEvents() 안에
+  // 호출부가 많아서(재사용 목적상 그대로 둠, fieldset이 입력을 다 막아서
+  // 이 콜백들 자체가 실행될 일이 없음) 빈 no-op으로만 남겨둠.
+  function markDirty() {}
 
   function advRowHTML(baseJob, adv, idx) {
     return `
@@ -784,34 +760,30 @@
     });
   }
 
-  document.getElementById("saveBtn").addEventListener("click", () => {
-    saveJobTable(jobData);
-    isDirty = false; renderSaveFlag();
-  });
-  document.getElementById("uploadBtn").addEventListener("click", () => {
-    document.getElementById("uploadInput").click();
-  });
-  document.getElementById("uploadInput").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let parsed;
-      try { parsed = JSON.parse(reader.result); }
-      catch { alert("올바른 JSON 파일이 아니에요."); return; }
-      if (!parsed.advancement || !parsed.allowedEquipmentTypes) { alert("직업 테이블 형식이 아니에요(advancement/allowedEquipmentTypes 필드가 있어야 함)."); return; }
-      if (!confirm("지금 이 브라우저에 저장된 직업 테이블을 파일 내용으로 완전히 덮어쓸까요?")) return;
-      saveJobTable(parsed);
-      location.reload();
-    };
-    reader.readAsText(file);
-  });
   document.getElementById("downloadBtn").addEventListener("click", () => {
     downloadJSON("job-table.json", jobData);
   });
 
-  render();
-  document.querySelector("main").insertAdjacentHTML("afterend", `<div class="save-bar"><div class="save-flag" id="saveFlag">저장됨</div></div>`);
+  (async () => {
+    const session = await window.AuthGuard.requireSession();
+    const isAdmin = await window.AuthGuard.isAdmin(session);
+    if (!isAdmin) {
+      document.body.innerHTML = `
+        <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+          🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+        </div>
+      `;
+      return;
+    }
+    const { data, error } = await window.sbClient
+      .from("game_content").select("data").eq("key", "jobTable").single();
+    if (error) {
+      document.getElementById("mainArea").innerHTML = `<div style="padding:40px;text-align:center;color:var(--mist-dim);">⚠ 조회 실패: ${error.message}</div>`;
+      return;
+    }
+    jobData = data?.data || { advancement:{}, allowedEquipmentTypes:{} };
+    render();
+  })();
 </script>
 </body>
 </html>
