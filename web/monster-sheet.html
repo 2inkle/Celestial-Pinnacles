@@ -133,16 +133,30 @@
   // 만들지 않음 — 새 조건/액션이 필요하면 여기가 아니라 character-sheet.html
   // 쪽에 추가해서 양쪽에 동시 반영해야 함(지금은 수동 동기화).
   // ============================================================================
+  // 2026-08-16 — "???"의 실제 패턴을 조회해보니 personalResource/battleTurn/
+  // battleTurnMultiple/opponentResource/effectiveStat 조건과 opponent 주체,
+  // RETREAT/REWARD_GRANT/PANIC_FULL_RECOVERY 액션이 여기 목록에 아예 없어서
+  // <select>가 전부 첫 옵션(조건 없음/마법진 생성)으로 잘못 표시되고 있었음
+  // — 데이터 자체는 정상인데 조회 화면만 틀리게 보이는 표시 버그(사용자가
+  // monster-sheet.html 스크린샷으로 재차 신고해서 발견). battle-adapter.js의
+  // translateCondition()이 실제로 지원하는 전체 목록으로 맞춤 — 이 페이지는
+  // 조회 전용(더 이상 편집 안 됨)이므로 character-sheet.html의 플레이어용
+  // 축소 목록과 굳이 똑같이 맞출 필요가 없어짐(그 파일 쪽 주석도 갱신함).
   const CONDITION_TYPES = {
     always:   { label:"조건 없음(항상)", needsDetail:false },
     hp:       { label:"HP",           needsDetail:true, unit:"%" },
     sp:       { label:"SP",           needsDetail:true, unit:"%" },
-    resource: { label:"자원 개수",      needsDetail:true, unit:"개" },
+    resource: { label:"자원 개수(자기 진영)", needsDetail:true, unit:"개" },
     notGuarding: { label:"Guard 중이 아닐 때", needsDetail:false },
+    personalResource: { label:"개인 자원(collectMana 등)", needsDetail:true, unit:"pt" },
+    battleTurn: { label:"경과 턴 수", needsDetail:true, unit:"턴" },
+    battleTurnMultiple: { label:"N턴마다(배수)", needsDetail:true, unit:"턴" },
+    opponentResource: { label:"자원 개수(상대 진영)", needsDetail:true, unit:"개" },
+    effectiveStat: { label:"자기 effective 스탯 비교", needsDetail:true, unit:"pt" },
   };
   const COMPARATOR_LABEL = { gte:"이상", gt:"초과", lte:"이하", lt:"미만", eq:"같음" };
-  const SUBJECT_LABEL = { self:"자신", allyAll:"아군 전체", allyOne:"특정 아군", enemyAll:"적 전체", enemyOne:"특정 적", allyFaction:"우리 진영 자원", enemyFaction:"상대 진영 자원" };
-  const ACTION_OPTIONS = ["마법진 생성", "마법진 폭발", "소환"];
+  const SUBJECT_LABEL = { self:"자신", allyAll:"아군 전체", allyOne:"특정 아군", enemyAll:"적 전체", enemyOne:"특정 적", allyFaction:"우리 진영 자원", enemyFaction:"상대 진영 자원", opponent:"상대 진영(개별 조건용)" };
+  const ACTION_OPTIONS = ["마법진 생성", "마법진 폭발", "소환", "RETREAT", "REWARD_GRANT", "PANIC_FULL_RECOVERY"];
 
   function actionOptionsFor() {
     return [...new Set([...ACTION_OPTIONS, ...allSkillsFlat().map(s => s.name)])];
@@ -189,6 +203,9 @@
               ${["%","pt","개","턴"].map(u => `<option ${(row.unit || type.unit)===u?"selected":""}>${u}</option>`).join("")}
             </select>
           </span>
+          ${["resource","statKey","thresholdMode"].filter(k => row[k] !== undefined).map(k =>
+            `<span class="cb-extra-note" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);border:1px dashed var(--gold-dim);border-radius:5px;padding:3px 7px;">${k}: ${row[k]}</span>`
+          ).join("")}
         </div>
         <div class="builder-line and-chain-line">
           <label style="display:flex;align-items:center;gap:6px;">
