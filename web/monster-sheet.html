@@ -156,7 +156,17 @@
   };
   const COMPARATOR_LABEL = { gte:"이상", gt:"초과", lte:"이하", lt:"미만", eq:"같음" };
   const SUBJECT_LABEL = { self:"자신", allyAll:"아군 전체", allyOne:"특정 아군", enemyAll:"적 전체", enemyOne:"특정 적", allyFaction:"우리 진영 자원", enemyFaction:"상대 진영 자원", opponent:"상대 진영(개별 조건용)" };
-  const ACTION_OPTIONS = ["마법진 생성", "마법진 폭발", "소환", "RETREAT", "REWARD_GRANT", "PANIC_FULL_RECOVERY"];
+  // src/registries.js의 ActionRegistry.register(...) 전체 목록과 정확히
+  // 일치시킴 — 고블린 마차(goblin_cart) 신고로 SUMMON_OPENING/DIALOGUE_OPENING/
+  // DIALOGUE_DEFEAT/SELF_DETONATION/ATTACK도 옵션에 없어서 똑같이 잘못
+  // 표시되고 있었던 걸 발견(전체 몬스터 전수조사 결과, 이 목록만 완전하면
+  // 다른 몬스터도 전부 해결됨 — 개별 몬스터 예외는 없음).
+  const ACTION_OPTIONS = [
+    "마법진 생성", "마법진 폭발", "소환", "아이템 사용",
+    "ATTACK", "USE_POTION", "EXTEND_BATTLE_LIMIT", "SUMMON", "SUMMON_OPENING",
+    "DIALOGUE_OPENING", "DIALOGUE_DEFEAT", "SELF_DETONATION", "RETREAT",
+    "PANIC_FULL_RECOVERY", "REWARD_GRANT",
+  ];
 
   function actionOptionsFor() {
     return [...new Set([...ACTION_OPTIONS, ...allSkillsFlat().map(s => s.name)])];
