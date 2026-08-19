@@ -137,87 +137,19 @@
 
   .battle-log-wrap { max-width:820px; width:100%; }
 
-  .turn-block { margin-bottom:22px; }
-  .turn-label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; margin-bottom:8px; }
-
-  .status-table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  .status-table th { background:var(--panel-raised); font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; padding:8px 12px; text-align:left; }
-  .status-table th.ally-col { color:var(--cyan); border-right:1px solid var(--line); }
-  .status-table th.enemy-col { color:var(--danger); }
-  .status-table td { background:var(--panel); padding:8px 12px; vertical-align:top; border-top:1px solid var(--line); }
-  .status-table td.ally-col { border-right:1px solid var(--line); }
-
-  .unit-row { display:flex; align-items:center; gap:8px; padding:3px 0; }
-  .unit-row.down { opacity:0.5; }
-  .unit-name { font-size:12px; color:#f2efe8; width:84px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .unit-row.down .unit-name { text-decoration:line-through; text-decoration-color:var(--danger-dim); }
-  .unit-bars { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .bar-line { display:flex; align-items:center; gap:6px; }
-  .bar-tag { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:14px; flex-shrink:0; }
-  .bar-wrap { flex:1; height:6px; background:var(--panel-raised); border-radius:3px; overflow:hidden; }
-  .bar-fill { height:100%; border-radius:3px; }
-  .bar-fill.hp { background:linear-gradient(90deg, var(--ember-dim), var(--ember)); }
-  .bar-fill.sp { background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
-  .bar-figure { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:64px; text-align:right; flex-shrink:0; }
-  .down-tag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); }
-
-  .status-table td.enemy-col .unit-row { flex-direction:row-reverse; }
-  .status-table td.enemy-col .unit-name { text-align:right; }
-  .status-table td.enemy-col .bar-line { flex-direction:row-reverse; }
-  .status-table td.enemy-col .bar-figure { text-align:left; }
-
-  /* 채팅창처럼 위→아래로 실제 발생 순서 그대로 하나의 흐름에 쌓되, 각
-     행동 블록만 왼쪽(아군)/오른쪽(적군)으로 정렬함 — 표 칼럼으로 나눠서
-     "같은 줄"에 놓지 않으므로 구획을 나누는 듯한 경계선이 없음(실제로도
-     없음). 번호 배지도 안 씀 — 위→아래 순서 자체가 시간 순서임. */
-  .turn-narrative { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
-  .action-block { max-width:72%; min-width:0; }
-  .action-block.ally { align-self:flex-start; text-align:left; }
-  .action-block.enemy { align-self:flex-end; text-align:right; }
-
-  .log-line { font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7; color:var(--mist-dim); white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word; }
-  .log-line.actor { color:#f2efe8; font-weight:600; }
-  .log-line.skill-activate { color:#f2efe8; }
-  .log-line.skill-activate .skill-name-strong { font-weight:700; text-decoration:underline; }
-  .log-line.skill { opacity:0.85; }
-  .log-line.damage { font-weight:600; color:var(--ember); }
-
-  .outro { padding:28px 0 10px; border-top:1px solid var(--line); margin-top:20px; }
-  .outcome-banner { text-align:center; padding:8px 20px 22px; }
-  .outcome-eyebrow { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.22em; text-transform:uppercase; color:var(--mist-dim); }
-  .outcome-title { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:10px 0 4px; }
-  .outcome-title.win { color:var(--gold); }
-  .outcome-title.lose { color:var(--danger); }
-  .outcome-title.draw { color:var(--mist); }
-  .outcome-turns { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
-  .outcome-turns b { color:var(--mist); font-weight:600; }
-
-  .result-sides { display:flex; gap:14px; margin-bottom:20px; }
-  .result-side-box { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 16px 14px; text-align:center; }
-  .result-side-box.ally { border-top:2px solid var(--cyan); }
-  .result-side-box.enemy { border-top:2px solid var(--danger); }
-  .result-side-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--mist-dim); margin-bottom:10px; }
-  .result-side-box.ally .result-side-label { color:var(--cyan); }
-  .result-side-box.enemy .result-side-label { color:var(--danger); }
-  .result-survivors { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#f2efe8; }
-  .result-survivors .of { font-family:'JetBrains Mono',monospace; font-weight:400; font-size:13px; color:var(--mist-dim); }
-  .result-sub { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:2px; }
-  .result-hp-block { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
-  .result-hp-figure { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist); }
-  .result-hp-figure b { color:#f2efe8; font-weight:600; }
-  .result-dmg-block { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
-  .result-dmg-figure { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
-  .result-dmg-figure b { color:var(--ember); font-weight:600; }
-
-  .loot-panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
-  .loot-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); }
-  .loot-row:last-child { border-bottom:none; }
-  .loot-label { font-size:12.5px; color:var(--mist); }
-  .loot-value { font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--gold); font-weight:600; }
-  .loot-value.exp { color:var(--cyan); }
-  .loot-empty { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); padding:4px 0; }
+  .save-log-box { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; text-align:center; }
+  .save-log-btn { font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--panel-raised); color:var(--gold); border:1px solid var(--gold-dim); border-radius:8px; padding:10px 22px; cursor:pointer; }
+  .save-log-btn:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+  .save-log-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .save-log-hint { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); margin-top:8px; line-height:1.6; }
+  .save-log-link-row { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+  .save-log-link-input { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-raised); color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:8px 10px; width:340px; max-width:70vw; }
+  .save-log-copy-btn { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel-raised); color:var(--cyan); border:1px solid var(--cyan-dim); border-radius:6px; padding:8px 14px; cursor:pointer; }
+  .raw-log-toggle { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); background:none; border:1px dashed var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; margin-top:14px; }
+  .raw-log-box { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist); white-space:pre-wrap; word-break:break-word; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:8px; max-height:400px; overflow-y:auto; text-align:left; }
 </style>
   <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="battle-log-render.css">
 </head>
 <body>
   <script src="nav.js"></script>
@@ -259,6 +191,7 @@
   </div>
 
   <div class="battle-log-wrap" id="battleLogWrap"></div>
+  <div class="battle-log-wrap" id="saveLogRow" style="display:none; margin-top:14px;"></div>
 </main>
 
 <script src="../src/resourceTypes.js"></script>
@@ -275,6 +208,7 @@
 <script src="battle-themes.js"></script>
 <script src="exp-table.js"></script>
 <script src="battle-adapter.js"></script>
+<script src="battle-log-render.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
@@ -290,6 +224,12 @@
   // 시점 1회 조회로 충분함(roster-index.html과 같은 패턴).
   // ============================================================================
   let session = null;
+  // 전투 로그 저장/공유용 — 직전 전투의 원문 그대로를 들고 있다가 "저장"
+  // 클릭 시 그대로 battle_logs에 insert함(재가공 금지, CLAUDE.md 참고).
+  // savedLogId는 같은 전투를 또 저장 눌렀을 때 중복 insert 대신 기존
+  // 링크를 다시 보여주기 위한 캐시 — 다음 전투를 새로 돌리면 리셋됨.
+  let lastBattleLog = null;
+  let savedLogId = null;
   let cachedRoster = [];  // characters 행 → camelCase + equipment(held_by 조회분)
   let currentGold = 0;    // profiles.gold
   let username = "플레이어";
@@ -500,251 +440,8 @@
     banner.insertAdjacentHTML("beforeend", sideHTML);
   }
 
-  // ============================================================================
-  // 아래부터는 battle-log-view.html에서 검증한 파서/렌더러를 그대로 가져온
-  // 것 — "====" 구분선은 걸러내고 내용 기반으로 파싱. 현황판은 표의 좌우
-  // 칼럼으로, 로그는 표 밖에서 채팅창처럼 위→아래 하나의 흐름으로 쌓되
-  // 아군은 왼쪽/적군은 오른쪽 정렬 — 위→아래 순서 자체가 실제 발생 순서.
-  // ============================================================================
-  const OUTCOME_LINE_PATTERN = /파티는 승리했다!$|^패배했다\.\.\.$|^비겼다\.$/;
-
-  function parseBattleLog(rawLines) {
-    const lines = rawLines
-      .map((l) => l.replace(/^\n/, ""))
-      .filter((l) => l.trim() && l !== "==================================================");
-
-    let i = 0;
-    const intro = [];
-    while (i < lines.length && !/^\[ TURN \d+ \]$/.test(lines[i])) {
-      intro.push(lines[i]);
-      i++;
-    }
-
-    const turns = [];
-    while (i < lines.length) {
-      const turnMatch = lines[i].match(/^\[ TURN (\d+) \]$/);
-      if (!turnMatch) break;
-      const turnNumber = Number(turnMatch[1]);
-      i++;
-
-      const snapshot = { ally: [], enemy: [] };
-      let side = null;
-      while (i < lines.length) {
-        if (lines[i] === "[ 아군 ]") { side = "ally"; i++; continue; }
-        if (lines[i] === "[ 적군 ]") { side = "enemy"; i++; continue; }
-        const unitMatch = lines[i].match(/^\s*(.+?)\s+HP (\d+)\/(\d+)\s+SP (\d+)\/(\d+)\s*$/);
-        if (unitMatch && side) {
-          snapshot[side].push({ name: unitMatch[1], hp: +unitMatch[2], maxHp: +unitMatch[3], sp: +unitMatch[4], maxSp: +unitMatch[5], alive: true });
-          i++; continue;
-        }
-        const downMatch = lines[i].match(/^\s*(.+?)\s+💀 전투불능\s*$/);
-        if (downMatch && side) {
-          snapshot[side].push({ name: downMatch[1], alive: false });
-          i++; continue;
-        }
-        break;
-      }
-
-      const narrative = [];
-      while (i < lines.length && !/^\[ TURN \d+ \]$/.test(lines[i]) && !OUTCOME_LINE_PATTERN.test(lines[i])) {
-        narrative.push(lines[i]);
-        i++;
-      }
-      turns.push({ turnNumber, snapshot, narrative });
-    }
-
-    return { intro, turns };
-  }
-
-  function renderUnitRow(u) {
-    if (!u.alive) {
-      return `<div class="unit-row down"><span class="unit-name">${u.name}</span><span class="down-tag">💀 전투불능</span></div>`;
-    }
-    const hpPct = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
-    const spPct = u.maxSp > 0 ? Math.max(0, Math.min(100, (u.sp / u.maxSp) * 100)) : 0;
-    return `
-      <div class="unit-row">
-        <span class="unit-name">${u.name}</span>
-        <div class="unit-bars">
-          <div class="bar-line"><span class="bar-tag">HP</span><div class="bar-wrap"><div class="bar-fill hp" style="width:${hpPct}%"></div></div><span class="bar-figure">${u.hp}/${u.maxHp}</span></div>
-          <div class="bar-line"><span class="bar-tag">SP</span><div class="bar-wrap"><div class="bar-fill sp" style="width:${spPct}%"></div></div><span class="bar-figure">${u.sp}/${u.maxSp}</span></div>
-        </div>
-      </div>
-    `;
-  }
-
-  function classifyLine(line) {
-    if (line.includes("[스킬]")) return "skill";
-    // "{증감량} {유형} ▷ {대상} (...)" — src/skillResolution.js·registries.js의
-    // statChangeLine()이 만드는 모양. 예전엔 "...에게 N의 데미지" 정규식으로
-    // 데미지만 잡았는데, " ▷ " 하나로 통일해서 앞으로 SP피해 외에 다른
-    // 증감 유형이 추가돼도 자동으로 같이 강조됨.
-    if (line.includes(" ▷ ")) return "damage";
-    return "";
-  }
-
-  function extractActorLine(line) {
-    const m = line.match(/^"(.+?)"\s*\((?:ALLY|ENEMY)\)\s*행동!$/);
-    return m ? m[1] : null;
-  }
-
-  // "{이름}, {스킬명}" — src/engine.js의 resolvePreparedSkill이 스킬 발동
-  // 시점에 내는 줄. 선딜레이가 있는 스킬의 발동은 게이지 루프가 아니라
-  // readyAtTick 도래 시점에 따로 처리되는 경로라 "(ALLY/ENEMY) 행동!" 마커가
-  // 안 붙는다 — 그래서 이 줄 자체를 새 블록의 시작으로도 인식해야 한다.
-  // 안 그러면 직전에 "행동!"을 낸 다른 유닛의 블록 밑에 잘못 묶여버림(실제로
-  // 그렇게 묶이고 있었음 — 파티원 3명이 같은 턴에 스킬을 발동하면 셋 다
-  // 마지막으로 "행동!"을 낸 한 명 블록 아래 뒤섞였음).
-  function extractSkillActivation(line) {
-    const m = line.match(/^([^,]+), (.+)$/);
-    return m ? { name: m[1], skill: m[2] } : null;
-  }
-
-  function splitNarrativeIntoBlocks(narrative, snapshot) {
-    const allyNames = new Set((snapshot?.ally || []).map((u) => u.name));
-    const enemyNames = new Set((snapshot?.enemy || []).map((u) => u.name));
-    const sideOf = (name) => allyNames.has(name) ? "ally" : enemyNames.has(name) ? "enemy" : null;
-
-    const blocks = [];
-    let current = null;
-    // "행동!" 마커는 즉발 액션(몬스터 기본 공격 등)에서만 나오고, 바로 다음
-    // 줄에 같은 유닛의 "{이름}, {행동명}" 줄이 따라온다(registries.js가 그
-    // 형태로 로그하도록 맞춰둠 — src/registries.js의 ATTACK 참조). 이 둘을
-    // 하나로 합쳐야 캐릭터 스킬(resolvePreparedSkill, 애초에 "행동!" 마커가
-    // 안 붙는 경로)과 똑같은 한 줄짜리 헤더가 된다. 아직 이 컨벤션으로 안
-    // 옮긴 다른 액션(포션/마법진 등)은 다음 줄이 안 맞으니 예전처럼 "행동!"
-    // 단독으로 plain 헤더 블록이 됨 — 회귀 없음.
-    let pendingLine = null;
-    let pendingName = null;
-    function flushPending() {
-      if (!pendingLine) return;
-      current = { side: sideOf(pendingName) || "ally", lines: [pendingLine] };
-      blocks.push(current);
-      pendingLine = null;
-      pendingName = null;
-    }
-
-    narrative.forEach((line) => {
-      const marker = extractActorLine(line);
-      if (marker) {
-        flushPending(); // 직전 "행동!"이 짝을 못 찾았으면 그대로 확정하고 새로 대기
-        pendingLine = line;
-        pendingName = marker;
-        return;
-      }
-
-      const activation = extractSkillActivation(line);
-      if (activation && activation.name === pendingName) {
-        // "행동!" 바로 다음이 같은 유닛의 발동줄 — 합쳐서 한 줄짜리 헤더로
-        current = { side: sideOf(activation.name) || "ally", lines: [line], skillHeader: true };
-        blocks.push(current);
-        pendingLine = null;
-        pendingName = null;
-        return;
-      }
-      flushPending();
-
-      if (activation) {
-        // "행동!" 없이 곧장 나온 발동줄(선딜레이 스킬의 발동 시점)
-        // 스냅샷 이름 목록으로 아군/적군을 가림 — 못 찾으면(예: 이미 죽어서
-        // 이번 턴 스냅샷에 없는 경우) 직전 블록의 진영을 이어받음.
-        const side = sideOf(activation.name) || (current ? current.side : "ally");
-        current = { side, lines: [line], skillHeader: true };
-        blocks.push(current);
-        return;
-      }
-      if (current) current.lines.push(line);
-    });
-    flushPending();
-
-    return blocks;
-  }
-
-  function renderBlock(block) {
-    const bodyLines = block.lines.map((line, idx) => {
-      if (idx === 0) {
-        if (block.skillHeader) {
-          // 볼드+밑줄은 스킬명에만 건다 — "{이름}, " 부분은 일반 텍스트.
-          const activation = extractSkillActivation(line);
-          return `<div class="log-line skill-activate">${activation.name}, <span class="skill-name-strong">${activation.skill}</span></div>`;
-        }
-        const name = extractActorLine(line) || line;
-        return `<div class="log-line actor">${name}</div>`;
-      }
-      const cls = classifyLine(line);
-      return `<div class="log-line ${cls}">${line}</div>`;
-    }).join("");
-    return `<div class="action-block ${block.side}">${bodyLines}</div>`;
-  }
-
-  const OUTCOME_META = {
-    allyWin: { cls: "win", eyebrow: "VICTORY", title: (u) => `${u}의 파티는 승리했다!` },
-    enemyWin: { cls: "lose", eyebrow: "DEFEAT", title: () => `패배했다...` },
-    draw: { cls: "draw", eyebrow: "STALEMATE", title: () => `비겼다.` },
-  };
-
-  function renderResultSideBox(label, side, counts, participants, damageDealt) {
-    const totalCurrentHp = participants.reduce((sum, p) => sum + p.currentHp, 0);
-    const totalMaxHp = participants.reduce((sum, p) => sum + p.maxHp, 0);
-    return `
-      <div class="result-side-box ${side}">
-        <div class="result-side-label">${label}</div>
-        <div class="result-survivors">${counts.alive} <span class="of">/ ${counts.total}</span></div>
-        <div class="result-sub">생존</div>
-        <div class="result-hp-block"><div class="result-hp-figure"><b>${totalCurrentHp}</b> / ${totalMaxHp} HP</div></div>
-        <div class="result-dmg-block"><div class="result-dmg-figure">상대에게 입힌 피해 <b>${damageDealt}</b></div></div>
-      </div>
-    `;
-  }
-
-  function renderResult(result) {
-    const meta = OUTCOME_META[result.outcome] || OUTCOME_META.draw;
-    return `
-      <div class="outcome-banner">
-        <div class="outcome-eyebrow">${meta.eyebrow}</div>
-        <div class="outcome-title ${meta.cls}">${meta.title(result.username || "플레이어")}</div>
-        <div class="outcome-turns">진행 턴수 <b>${result.turnsElapsed}</b></div>
-      </div>
-      <div class="result-sides">
-        ${renderResultSideBox("🛡️ 아군", "ally", result.survivorCounts.ally, result.participants.ally, result.damageDealt.ally)}
-        ${renderResultSideBox("💀 적군", "enemy", result.survivorCounts.enemy, result.participants.enemy, result.damageDealt.enemy)}
-      </div>
-      <div class="loot-panel">
-        <div class="loot-row"><span class="loot-label">✨ 경험치</span><span class="loot-value exp">+${result.expGained}</span></div>
-        <div class="loot-row"><span class="loot-label">💰 골드</span><span class="loot-value">+${result.goldGained}</span></div>
-        ${result.lootGained.length ? result.lootGained.map((it) => `
-          <div class="loot-row"><span class="loot-label">${it.name}</span><span class="loot-value">×${it.quantity}</span></div>
-        `).join("") : `<div class="loot-empty">획득한 아이템 없음</div>`}
-      </div>
-    `;
-  }
-
-  function renderBattleLog(logLines, result) {
-    const parsed = parseBattleLog(logLines);
-    let html = `<div class="intro-banner" style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mist-dim);padding:10px 0;">${parsed.intro.join("<br/>")}</div>`;
-
-    parsed.turns.forEach((t) => {
-      const blocks = splitNarrativeIntoBlocks(t.narrative, t.snapshot);
-      html += `
-        <div class="turn-block">
-          <div class="turn-label">TURN ${t.turnNumber}</div>
-          <table class="status-table">
-            <thead><tr><th class="ally-col">🛡️ 아군</th><th class="enemy-col">💀 적군</th></tr></thead>
-            <tbody>
-              <tr>
-                <td class="ally-col">${t.snapshot.ally.map(renderUnitRow).join("")}</td>
-                <td class="enemy-col">${t.snapshot.enemy.map(renderUnitRow).join("")}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="turn-narrative">${blocks.map(renderBlock).join("")}</div>
-        </div>
-      `;
-    });
-
-    html += `<div class="outro">${renderResult(result)}</div>`;
-    return html;
-  }
+  // 파서/렌더러(parseBattleLog/renderBattleLog 등)는 battle-log-render.js로
+  // 추출됨(2026-08-18) — window.BattleLogRender.* 로 호출.
 
   // ============================================================================
   // 실제 전투 실행 — BattleAdapter.runBattle()에 지금 화면에 뜬 편성 그대로 넘김.
@@ -779,9 +476,14 @@
       maxTurns: 100,
       username: getUsername(),
       logger: (line) => logLines.push(line),
+      recordEvents: true, // 전투 로그 저장 기능용 — 서사 로그 문자열과는 별개 통로
     });
 
-    document.getElementById("battleLogWrap").innerHTML = renderBattleLog(logLines, result);
+    document.getElementById("battleLogWrap").innerHTML = window.BattleLogRender.renderBattleLog(logLines, result);
+
+    lastBattleLog = { lines: logLines, result, battleId, battleName: window.BattleThemes.battleNameById(battleId) };
+    savedLogId = null;
+    renderSaveLogRow();
 
     // 연습 모드 — 보상 지급도, 클리어 기록도, 쿨다운 갱신도 하지 않음.
     // 순수하게 "이 빌드가 통하는지"만 확인하는 용도라 아무 흔적을 남기지 않음.
@@ -798,6 +500,83 @@
     }
     btn.textContent = "⚔️ 다시 전투하기";
     btn.disabled = false;
+  }
+
+  // ============================================================================
+  // 전투 로그 저장/공유 — 직전 전투(lastBattleLog)를 원문 그대로 battle_logs에
+  // 저장하고 공유 링크(battle-log-view.html?id=<uuid>)를 보여준다. 수동
+  // "저장" 버튼(자동 저장 아님) — 연습 모드에서도 가능(보상과 무관한 순수
+  // 기록이라 막을 이유 없음). 같은 전투를 또 누르면 재insert 대신 기존
+  // 링크를 다시 보여준다(10칸을 낭비하지 않도록).
+  // ============================================================================
+  function shareUrlFor(id) {
+    return new URL(`battle-log-view.html?id=${id}`, location.href).toString();
+  }
+
+  function renderSaveLogRow() {
+    const row = document.getElementById("saveLogRow");
+    if (!lastBattleLog) { row.style.display = "none"; return; }
+    row.style.display = "";
+
+    if (savedLogId) {
+      row.innerHTML = `
+        <div class="save-log-box">
+          <div>✅ 저장됐습니다. 이 링크를 아는 사람만 열람할 수 있어요.</div>
+          <div class="save-log-link-row">
+            <input class="save-log-link-input" id="shareLinkInput" readonly value="${shareUrlFor(savedLogId)}" />
+            <button class="save-log-copy-btn" id="copyShareLinkBtn">복사</button>
+          </div>
+          <button class="raw-log-toggle" id="toggleRawLogBtn">🔍 원본 로그 보기</button>
+          <div class="raw-log-box" id="rawLogBox" style="display:none;"></div>
+        </div>
+      `;
+      document.getElementById("copyShareLinkBtn").addEventListener("click", () => {
+        const input = document.getElementById("shareLinkInput");
+        input.select();
+        navigator.clipboard?.writeText(input.value).catch(() => {});
+      });
+    } else {
+      row.innerHTML = `
+        <div class="save-log-box">
+          <button class="save-log-btn" id="saveLogBtn">💾 이 전투 저장</button>
+          <div class="save-log-hint">저장하면 나만 볼 수 있는 링크가 생겨요. 그 링크를 직접 건네준 사람만 열람할 수 있습니다(비로그인도 열람 가능). 최근 10개까지 보관돼요.</div>
+          <button class="raw-log-toggle" id="toggleRawLogBtn">🔍 원본 로그 보기</button>
+          <div class="raw-log-box" id="rawLogBox" style="display:none;"></div>
+        </div>
+      `;
+      document.getElementById("saveLogBtn").addEventListener("click", saveBattleLog);
+    }
+
+    document.getElementById("toggleRawLogBtn").addEventListener("click", () => {
+      const box = document.getElementById("rawLogBox");
+      const show = box.style.display === "none";
+      box.style.display = show ? "block" : "none";
+      if (show && !box.textContent) box.textContent = lastBattleLog.lines.join("\n");
+    });
+  }
+
+  async function saveBattleLog() {
+    if (!lastBattleLog) return;
+    const btn = document.getElementById("saveLogBtn");
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+
+    const { lines, result, battleId, battleName } = lastBattleLog;
+    const { data, error } = await window.sbClient.from("battle_logs").insert({
+      user_id: session.user.id,
+      battle_id: battleId,
+      battle_name: battleName,
+      saved_by: getUsername(),
+      outcome: result.outcome,
+      turns_elapsed: result.turnsElapsed,
+      lines, // 원문 그대로(verbatim) — 재가공 금지
+      result,
+      events: result.events,
+    }).select("id").single();
+
+    if (error) { alert(`전투 로그 저장 실패: ${error.message}`); btn.disabled = false; btn.textContent = "💾 이 전투 저장"; return; }
+    savedLogId = data.id;
+    renderSaveLogRow();
   }
 
   // ============================================================================

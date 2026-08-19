@@ -522,7 +522,7 @@
   // 여전히 호출부(battle-view.html)의 몫이고, 여기선 "이미 정해진 스폰 결과(키
   // 목록)"를 받아 조회~변환~실행만 함.
   // ==========================================================================
-  function runBattle({ allyRosterChars, monsterTable, enemySpawnKeys, maxTurns, username, logger }) {
+  function runBattle({ allyRosterChars, monsterTable, enemySpawnKeys, maxTurns, username, logger, recordEvents }) {
     registerKnownSkills();
 
     const monsterKeyCounts = {};
@@ -536,7 +536,7 @@
 
     const allies = allyRosterChars.map((c) => buildAllyFromRoster(c, c.activePresetIdx));
 
-    const engine = new BS.BattleEngine(allies, enemies, logger || console.log);
+    const engine = new BS.BattleEngine(allies, enemies, logger || console.log, { recordEvents: !!recordEvents });
     // ⚠ BattleEngine 생성자가 여기서 resetForBattle()을 돌리는데, 이게
     // bonusAtk/bonusDef/bonusMatk/bonusMdef를 전부 0으로 되돌려버림(원래는
     // "전투 시작 시 버프 초기화" 용도로 만든 동작). buildAllyFromRoster가 방금

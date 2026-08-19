@@ -11,6 +11,7 @@
         <a href="battle-select.html" class="gnav-item ${isActive('battle')}">⚔️ Battle</a>
         <a href="item.html" class="gnav-item ${isActive('item')}">🎒 Item</a>
         <a href="workshop.html" class="gnav-item ${isActive('workshop')}">🔨 Workshop</a>
+        <span id="myBattleLogsNavSlot"></span>
         <span id="devToolsNavSlot"></span>
       </div>
     </nav>
@@ -33,13 +34,21 @@
   document.addEventListener("DOMContentLoaded", async () => {
     if (!window.sbClient || !window.AuthGuard) return;
     const devSlot = document.getElementById("devToolsNavSlot");
-    if (!devSlot) return;
+    const logsSlot = document.getElementById("myBattleLogsNavSlot");
+    if (!devSlot && !logsSlot) return;
 
     const { data } = await window.sbClient.auth.getSession();
     if (!data.session) return;
-    const isDev = await window.AuthGuard.isAdmin(data.session);
 
-    if (isDev) {
+    // 전투 기록 링크는 관리자 여부와 무관하게, 로그인만 했으면 누구나 보임
+    // (devToolsNavSlot과 달리 isAdmin 검사 없음 — 2026-08-18 전투 로그
+    // 저장/공유 기능과 함께 추가).
+    if (logsSlot) {
+      logsSlot.innerHTML = `<a href="battle-log-view.html" class="gnav-item ${isActive('battle-log-view')}">📜 전투 기록</a>`;
+    }
+
+    const isDev = await window.AuthGuard.isAdmin(data.session);
+    if (isDev && devSlot) {
       devSlot.innerHTML = `<a href="dev-tools.html" class="gnav-item ${isActive('dev-tools')}">🛠 개발자도구</a>`;
     }
   });

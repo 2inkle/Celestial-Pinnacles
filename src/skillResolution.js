@@ -773,6 +773,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
       const hitChancePct = BASE_PHYSICAL_HIT_CHANCE_PCT + actor.getPassiveModValue("accuracyBonusPct");
       if (Math.random() * 100 >= hitChancePct) {
         ctx.log(`   ${t.name}에게 빗나갔다.`);
+        ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "miss" });
         return;
       }
     }
@@ -782,10 +783,12 @@ function applyDamageAndEffects(actor, skill, ctx) {
     }
     if (guardDecisionCache.get(t)) {
       ctx.log(`   ${t.name}의 공격이 Guard로 완전히 무효화됨.`);
+      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "guard" });
       return;
     }
     if (t.checkAndConsumeShield(damageType)) {
       ctx.log(`   ${t.name}의 공격이 Shield로 무효화됨.`);
+      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "shield" });
       return;
     }
 
@@ -797,6 +800,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
     const completeDefenseChancePct = t.getPassiveModValue("completeDefenseChancePct");
     if (completeDefenseChancePct > 0 && Math.random() * 100 < completeDefenseChancePct) {
       ctx.log(`   ${t.name}의 완전방어 발동! 데미지 무효화.`);
+      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "completeDefense" });
       return;
     }
 
@@ -867,6 +871,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
         const totalIgnorePct = (skill.ignoreBonusDefPct || 0) + passiveIgnorePct;
         const applied = t.takeDamage(finalPower, damageType, { ignoreBonusDefPct: totalIgnorePct, minimumDamageBasis: minimumBasis, attackerTier: actor.creatureTier });
         ctx.recordDamageDealt?.(actor.side, applied);
+        ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "hit", crit: isCrit, damage: applied });
         // 대상이 보스면 statChangeLine이 ""를 반환 — 그럼 "치명타!" 접두사도
         // 덩그러니 혼자 남기지 않게 같이 생략(치명타 여부도 결국 데미지 결과에
         // 딸린 정보라 함께 숨김).

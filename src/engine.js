@@ -77,11 +77,18 @@ class BattleEngine {
    * @param {(line: string) => void} [logger] 로그 출력 함수. 기본은 console.log.
    *   브라우저 데모처럼 로그를 배열/DOM에 쌓고 싶다면 커스텀 함수를 넘기면 된다.
    */
-  constructor(allies, enemies, logger = console.log) {
+  // recordEvents(기본 false) — true면 행동/명중판정/사망을 this.events에
+  // 구조화해서 쌓는다(전투 로그 저장/공유 기능용, 2026-08-18). 서사 로그
+  // 문자열(this.log)과는 완전히 별개 통로 — 로그 포맷/파서에 영향 없음.
+  // dispatch.html의 파견 시뮬(2000턴 예산, 500회+ 반복 전투)은 이 옵션을
+  // 안 켜서 순수 낭비를 피함 — battle-view.html(직접 도전)만 켠다.
+  constructor(allies, enemies, logger = console.log, { recordEvents = false } = {}) {
     this.units = [...allies, ...enemies];
     this.allies = allies;
     this.enemies = enemies;
     this.logger = logger;
+    this.recordEvents = recordEvents;
+    this.events = [];
     this.totalBattleTick = 0;
     this.prepState = new PrepState();
     this.currentTurn = 0;
@@ -117,6 +124,11 @@ class BattleEngine {
 
   log(line) {
     this.logger(line);
+  }
+
+  /** 구조화 이벤트 1건 적립 — recordEvents가 꺼져있으면 아무 일도 안 함(0비용). */
+  recordEvent(e) {
+    if (this.recordEvents) this.events.push({ tick: this.totalBattleTick, turn: this.currentTurn, ...e });
   }
 
   getOpponents(actor) {
@@ -272,6 +284,7 @@ class BattleEngine {
       username, // 결과 화면의 "{유저명}의 파티는 승리했다!" 배너용 — 예전엔 이 필드가
                 // 없어서 화면 쪽이 항상 폴백("플레이어")을 썼음(2026-08-15 발견·수정).
       turnsElapsed: this.currentTurn,
+      events: this.events, // recordEvents:false면 항상 빈 배열(전투 로그 저장 기능용)
       goldGained: this.battleGoldGained,
       lootGained: this.battleLootGained,
       expGained: this.battleExpGained, // Result 화면 표시용 — 파티 총량 하나
@@ -336,6 +349,7 @@ class BattleEngine {
         // 이 슬롯이 실제로 발동한 횟수를 자동으로 셈 — "○회까지는 반드시" 규칙은
         // 조건 쪽(SLOT_USE_COUNT_LESS_THAN)에서 이 값을 읽어서 스스로 판단함.
         actor.slotTriggerCounts[i] = (actor.slotTriggerCounts[i] || 0) + 1;
+        this.recordEvent({ type: "act", actor: actor.name, side: actor.side, act: slot.act });
 
         if (SkillRegistry.has(slot.act)) {
           this.beginOrResolveSkill(actor, SkillRegistry.get(slot.act));
@@ -402,6 +416,7 @@ class BattleEngine {
   resolvePreparedSkill(unit) {
     const result = this.prepState.resolve(unit, unit, this.resourceManager);
     unit.isPreparing = false;
+    this.recordEvent({ type: "act", actor: unit.name, side: unit.side, act: result.skill?.name, prepared: true, activated: result.activated });
 
     if (!result.activated) {
       this.log(`\n❌ [발동 실패] ${unit.name}의 "${result.skill?.name}" 발동 실패! (${result.reason})`);
@@ -454,6 +469,7 @@ class BattleEngine {
     this.units.forEach((u) => {
       if (!u.isAlive && !u._deathProcessed) {
         u._deathProcessed = true;
+        this.recordEvent({ type: "death", unit: u.name, side: u.side });
         this.grantKillReward(u);
       }
     });

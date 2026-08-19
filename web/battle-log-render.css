@@ -1,0 +1,86 @@
+/* ============================================================================
+   전투 서사 로그 렌더링 전용 스타일 — battle-log-render.js가 만드는 HTML
+   구조(현황판/턴 블록/행동 로그/결과 화면)에 대응. battle-view.html과
+   battle-log-view.html 양쪽이 공용으로 로드함(2026-08-18, battle-view.html
+   에서 추출 — battle-log-render.js와 같은 이유).
+   ============================================================================ */
+
+.turn-block { margin-bottom:22px; }
+.turn-label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; margin-bottom:8px; }
+
+.status-table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.status-table th { background:var(--panel-raised); font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; padding:8px 12px; text-align:left; }
+.status-table th.ally-col { color:var(--cyan); border-right:1px solid var(--line); }
+.status-table th.enemy-col { color:var(--danger); }
+.status-table td { background:var(--panel); padding:8px 12px; vertical-align:top; border-top:1px solid var(--line); }
+.status-table td.ally-col { border-right:1px solid var(--line); }
+
+.unit-row { display:flex; align-items:center; gap:8px; padding:3px 0; }
+.unit-row.down { opacity:0.5; }
+.unit-name { font-size:12px; color:#f2efe8; width:84px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.unit-row.down .unit-name { text-decoration:line-through; text-decoration-color:var(--danger-dim); }
+.unit-bars { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.bar-line { display:flex; align-items:center; gap:6px; }
+.bar-tag { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:14px; flex-shrink:0; }
+.bar-wrap { flex:1; height:6px; background:var(--panel-raised); border-radius:3px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:3px; }
+.bar-fill.hp { background:linear-gradient(90deg, var(--ember-dim), var(--ember)); }
+.bar-fill.sp { background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
+.bar-figure { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:64px; text-align:right; flex-shrink:0; }
+.down-tag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); }
+
+.status-table td.enemy-col .unit-row { flex-direction:row-reverse; }
+.status-table td.enemy-col .unit-name { text-align:right; }
+.status-table td.enemy-col .bar-line { flex-direction:row-reverse; }
+.status-table td.enemy-col .bar-figure { text-align:left; }
+
+/* 채팅창처럼 위→아래로 실제 발생 순서 그대로 하나의 흐름에 쌓되, 각
+   행동 블록만 왼쪽(아군)/오른쪽(적군)으로 정렬함 — 표 칼럼으로 나눠서
+   "같은 줄"에 놓지 않으므로 구획을 나누는 듯한 경계선이 없음(실제로도
+   없음). 번호 배지도 안 씀 — 위→아래 순서 자체가 시간 순서임. */
+.turn-narrative { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.action-block { max-width:72%; min-width:0; }
+.action-block.ally { align-self:flex-start; text-align:left; }
+.action-block.enemy { align-self:flex-end; text-align:right; }
+
+.log-line { font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.7; color:var(--mist-dim); white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word; }
+.log-line.actor { color:#f2efe8; font-weight:600; }
+.log-line.skill-activate { color:#f2efe8; }
+.log-line.skill-activate .skill-name-strong { font-weight:700; text-decoration:underline; }
+.log-line.skill { opacity:0.85; }
+.log-line.damage { font-weight:600; color:var(--ember); }
+
+.outro { padding:28px 0 10px; border-top:1px solid var(--line); margin-top:20px; }
+.outcome-banner { text-align:center; padding:8px 20px 22px; }
+.outcome-eyebrow { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.22em; text-transform:uppercase; color:var(--mist-dim); }
+.outcome-title { font-family:'Cinzel',serif; font-weight:700; font-size:30px; margin:10px 0 4px; }
+.outcome-title.win { color:var(--gold); }
+.outcome-title.lose { color:var(--danger); }
+.outcome-title.draw { color:var(--mist); }
+.outcome-turns { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim); }
+.outcome-turns b { color:var(--mist); font-weight:600; }
+
+.result-sides { display:flex; gap:14px; margin-bottom:20px; }
+.result-side-box { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 16px 14px; text-align:center; }
+.result-side-box.ally { border-top:2px solid var(--cyan); }
+.result-side-box.enemy { border-top:2px solid var(--danger); }
+.result-side-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--mist-dim); margin-bottom:10px; }
+.result-side-box.ally .result-side-label { color:var(--cyan); }
+.result-side-box.enemy .result-side-label { color:var(--danger); }
+.result-survivors { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#f2efe8; }
+.result-survivors .of { font-family:'JetBrains Mono',monospace; font-weight:400; font-size:13px; color:var(--mist-dim); }
+.result-sub { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); margin-top:2px; }
+.result-hp-block { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+.result-hp-figure { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist); }
+.result-hp-figure b { color:#f2efe8; font-weight:600; }
+.result-dmg-block { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+.result-dmg-figure { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+.result-dmg-figure b { color:var(--ember); font-weight:600; }
+
+.loot-panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+.loot-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--line); }
+.loot-row:last-child { border-bottom:none; }
+.loot-label { font-size:12.5px; color:var(--mist); }
+.loot-value { font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--gold); font-weight:600; }
+.loot-value.exp { color:var(--cyan); }
+.loot-empty { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); padding:4px 0; }
