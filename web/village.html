@@ -138,7 +138,10 @@
   </div>
 </main>
 
-<footer>
+<!-- 개발/데모용 도구 — 관리자에게만 노출됨(부트스트랩에서 is_admin 확인 후 표시).
+     일반 유저에게는 "데모 초기화"·"무작위 용병 10명" 같은 버튼이 오히려 혼란을
+     주기 때문(2026-08-20 온보딩 개선). 기본은 숨김 = 페일클로즈. -->
+<footer id="devFooter" style="display:none;">
   <button class="reset-btn" id="resetBtn">🔄 데모 데이터 초기화 (로스터 · 골드 리셋)</button>
   <button class="reset-btn" id="seedExampleBtn" style="margin-left:8px;">🧪 예제 캐릭터 추가 (사제 Lv.30) → Sheet로 이동</button>
   <button class="reset-btn" id="randomTenBtn" style="margin-left:8px;">🧪 무작위 용병 10명 생성</button>
@@ -251,6 +254,11 @@
       .single();
     if (error) { document.getElementById("goldVal").textContent = "?"; return; }
     document.getElementById("goldVal").textContent = (profile?.gold ?? 0).toLocaleString();
+
+    // 개발/데모 버튼은 관리자에게만 — nav.js의 개발자도구 링크와 같은 판정.
+    if (await window.AuthGuard.isAdmin(session)) {
+      document.getElementById("devFooter").style.display = "";
+    }
   })();
 </script>
 

@@ -161,6 +161,7 @@
 <script src="battle-adapter.js"></script>
 <script src="battle-log-render.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="item-sets.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
 <script>
@@ -219,6 +220,7 @@
       grantsResource: row.grants_resource, equipmentType: row.equipment_type,
       avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
       consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+      modifiable: row.modifiable,
     };
   }
 
@@ -253,6 +255,7 @@
       consumable: loot.consumable ?? null,
       uses_per_battle: loot.usesPerBattle ?? null,
       enhanceable: loot.enhanceable ?? null,
+      modifiable: loot.modifiable ?? null,
     };
   }
 

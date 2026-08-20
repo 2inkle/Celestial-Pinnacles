@@ -11,6 +11,7 @@
         <a href="battle-select.html" class="gnav-item ${isActive('battle')}">⚔️ Battle</a>
         <a href="item.html" class="gnav-item ${isActive('item')}">🎒 Item</a>
         <a href="workshop.html" class="gnav-item ${isActive('workshop')}">🔨 Workshop</a>
+        <a href="guide.html" class="gnav-item ${isActive('guide')}">📖 길라잡이</a>
         <span id="myBattleLogsNavSlot"></span>
         <span id="devToolsNavSlot"></span>
       </div>

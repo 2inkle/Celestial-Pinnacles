@@ -88,6 +88,46 @@
     text-decoration:none; border:1px solid var(--gold-dim); padding:8px 18px; border-radius:6px;
   }
   .empty-state .e-cta:hover { border-color:var(--gold); background:#d9b45c14; }
+
+  /* ── 튜토리얼 패널 (온보딩) ───────────────────────────────────────────── */
+  .tut-panel {
+    background:var(--panel); border:1px solid var(--gold-dim); border-radius:12px;
+    padding:18px 20px; margin-bottom:20px;
+  }
+  .tut-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+  .tut-title { font-family:'Cinzel',serif; font-size:16px; color:var(--gold); }
+  .tut-sub { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); line-height:1.6; margin-bottom:14px; }
+  .tut-dismiss {
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim);
+    background:none; border:1px solid var(--line); border-radius:6px; padding:5px 12px; cursor:pointer; white-space:nowrap;
+  }
+  .tut-dismiss:hover { color:var(--mist); border-color:var(--mist-dim); }
+  .tut-steps { display:grid; gap:10px; }
+  .tut-step {
+    display:flex; align-items:flex-start; gap:12px; padding:12px 14px;
+    background:var(--panel-raised); border:1px solid var(--line); border-radius:8px;
+  }
+  .tut-step.done { opacity:0.55; }
+  .tut-step.ready { border-color:var(--gold-dim); }
+  .tut-icon { font-size:18px; line-height:1.3; }
+  .tut-body { flex:1; min-width:0; }
+  .tut-step-title { font-size:13.5px; color:#f2efe8; }
+  .tut-step-desc { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); line-height:1.6; margin-top:3px; }
+  .tut-reward { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold); margin-top:5px; }
+  .tut-actions { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  .tut-badge {
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.05em;
+    padding:3px 8px; border-radius:5px; border:1px solid var(--line); color:var(--mist-dim); white-space:nowrap;
+  }
+  .tut-badge.ready { color:var(--gold); border-color:var(--gold-dim); }
+  .tut-badge.done { color:var(--cyan); border-color:var(--cyan); }
+  .tut-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--cyan); text-decoration:none; white-space:nowrap; }
+  .tut-claim {
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; background:var(--panel);
+    color:var(--gold); border:1px solid var(--gold-dim); border-radius:6px; padding:6px 14px; cursor:pointer; white-space:nowrap;
+  }
+  .tut-claim:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+  .tut-claim:disabled { opacity:0.4; cursor:not-allowed; }
 </style>
   <link rel="stylesheet" href="common.css">
 </head>
@@ -113,10 +153,13 @@
 </header>
 
 <main>
+  <div id="tutorialPanel" style="display:none;"></div>
   <div class="grid" id="grid"></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="item-sets.js"></script>
+<script src="tutorial-table.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
 <script>
@@ -211,13 +254,154 @@
     });
   }
 
+  // ==========================================================================
+  // 튜토리얼 패널 (온보딩) — 2026-08-20 신설.
+  //
+  // 신규 유저가 계정을 만들면 "보유한 용병이 없습니다" 한 줄만 보고 무엇부터
+  // 해야 할지 알 수 없다는 피드백에서 출발함. 단계 정의는 web/tutorial-table.js에
+  // 있고(내용은 그쪽에서 채움), 여기서는 판정·렌더링·보상 지급만 담당한다.
+  //
+  // 조건은 별도 추적 없이 기존 데이터에서 즉석 계산(quest_progress와 같은 방침).
+  // 저장하는 건 "보상을 받았는가"뿐 — profiles.tutorial_state(0022).
+  // ==========================================================================
+  let tutorialState = {};   // { "<stepId>": { claimedAt }, dismissed: true }
+  let tutorialCtx = null;   // 조건 판정에 쓰는 스냅샷
+
+  function evaluateStep(step) {
+    const c = step.condition || {};
+    const need = c.count ?? 1;
+    switch (c.type) {
+      case "hasCharacter":     return tutorialCtx.characterCount >= need;
+      case "hasEquippedItem":  return tutorialCtx.equippedCount >= need;
+      case "hasPatternRows":   return tutorialCtx.maxPatternRows >= need;
+      case "hasClearedBattle": return tutorialCtx.clearedCount >= need;
+      default:
+        console.warn("[tutorial] 알 수 없는 조건 타입:", c.type, step);
+        return false;
+    }
+  }
+
+  function describeRewards(rewards) {
+    return (rewards || []).map((r) =>
+      r.type === "gold" ? `골드 ${r.amount}` : `${r.name}${(r.quantity || 1) > 1 ? ` ×${r.quantity}` : ""}`
+    ).join(" · ");
+  }
+
+  async function claimStepRewards(step) {
+    for (const reward of (step.rewards || [])) {
+      if (reward.type === "gold") {
+        if (!reward.amount) continue;
+        const { data: profile, error: readErr } = await window.sbClient
+          .from("profiles").select("gold").eq("user_id", tutorialCtx.userId).single();
+        if (readErr) throw readErr;
+        const { error } = await window.sbClient.from("profiles")
+          .update({ gold: (profile.gold || 0) + reward.amount }).eq("user_id", tutorialCtx.userId);
+        if (error) throw error;
+      } else if (reward.type === "item") {
+        // quest-table.js의 보상 지급과 같은 "카탈로그 필드 spread" 방식.
+        const { type, name, category, quantity, ...spec } = reward;
+        const { error } = await window.sbClient.from("warehouse_items").insert({
+          user_id: tutorialCtx.userId,
+          name, category, quantity: quantity || 1,
+          slot: spec.slot ?? null,
+          equipment_type: spec.equipmentType ?? null,
+          set_id: spec.setId ?? null,
+          combat_real: spec.combatReal ?? null,
+          combat_bonus: spec.combatBonus ?? null,
+          stat_bonus: spec.statBonus ?? null,
+          stat_real_bonus: spec.statRealBonus ?? null,
+          passive_bonus: spec.passiveBonus ?? null,
+          max_hp_bonus: spec.maxHpBonus ?? null,
+          max_sp_bonus: spec.maxSpBonus ?? null,
+          weight: spec.weight ?? null,
+          two_handed: spec.twoHanded ?? null,
+          required_job: spec.requiredJob ?? null,
+          enhanceable: spec.enhanceable ?? null,
+          modifiable: spec.modifiable ?? null,
+          description: spec.description ?? null,
+        });
+        if (error) throw error;
+      }
+    }
+
+    tutorialState[step.id] = { claimedAt: new Date().toISOString() };
+    const { error } = await window.sbClient.from("profiles")
+      .update({ tutorial_state: tutorialState }).eq("user_id", tutorialCtx.userId);
+    if (error) throw error;
+  }
+
+  function renderTutorial() {
+    const panel = document.getElementById("tutorialPanel");
+    const steps = (window.TutorialTable?.TUTORIAL_STEPS) || [];
+    // 닫았거나, 모든 단계를 수령했으면 더 보여주지 않음.
+    const allClaimed = steps.length > 0 && steps.every((s) => tutorialState[s.id]);
+    if (!steps.length || tutorialState.dismissed || allClaimed) { panel.style.display = "none"; return; }
+
+    panel.style.display = "";
+    const claimedCount = steps.filter((s) => tutorialState[s.id]).length;
+    panel.innerHTML = `
+      <div class="tut-panel">
+        <div class="tut-head">
+          <span class="tut-title">📖 처음이신가요?</span>
+          <button class="tut-dismiss" id="tutDismissBtn">다시 보지 않기</button>
+        </div>
+        <div class="tut-sub">아래 순서대로 따라가면 첫 전투까지 자연스럽게 이어집니다. (${claimedCount}/${steps.length} 완료)</div>
+        <div class="tut-steps">
+          ${steps.map((step) => {
+            const claimed = !!tutorialState[step.id];
+            const met = evaluateStep(step);
+            const cls = claimed ? "done" : (met ? "ready" : "");
+            const badge = claimed
+              ? `<span class="tut-badge done">완료</span>`
+              : (met ? `<span class="tut-badge ready">보상 대기</span>` : `<span class="tut-badge">진행 중</span>`);
+            const action = claimed ? ""
+              : (met
+                  ? `<button class="tut-claim" data-step="${step.id}">보상 받기</button>`
+                  : (step.linkHref ? `<a class="tut-link" href="${step.linkHref}">${step.linkLabel || "이동 →"}</a>` : ""));
+            const rewardText = describeRewards(step.rewards);
+            return `
+              <div class="tut-step ${cls}">
+                <span class="tut-icon">${step.icon || "•"}</span>
+                <div class="tut-body">
+                  <div class="tut-step-title">${step.title}</div>
+                  <div class="tut-step-desc">${step.description || ""}</div>
+                  ${rewardText ? `<div class="tut-reward">보상: ${rewardText}</div>` : ""}
+                </div>
+                <div class="tut-actions">${badge}${action}</div>
+              </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+
+    document.getElementById("tutDismissBtn").addEventListener("click", async () => {
+      tutorialState.dismissed = true;
+      await window.sbClient.from("profiles").update({ tutorial_state: tutorialState }).eq("user_id", tutorialCtx.userId);
+      renderTutorial();
+    });
+
+    panel.querySelectorAll(".tut-claim").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true; // 중복 클릭 방지
+        const step = steps.find((s) => s.id === btn.dataset.step);
+        if (!step || tutorialState[step.id]) { renderTutorial(); return; }
+        try {
+          await claimStepRewards(step);
+          alert(`보상을 받았습니다: ${describeRewards(step.rewards)}`);
+        } catch (err) {
+          alert(`보상 지급에 실패했습니다: ${err.message || err}`);
+        }
+        location.reload(); // 골드/창고 표시를 최신 상태로
+      });
+    });
+  }
+
   (async () => {
     const session = await window.AuthGuard.requireSession();
     const userId = session.user.id;
 
     try {
       const [{ data: profile, error: profileError }, { data: charRows, error: charError }] = await Promise.all([
-        window.sbClient.from("profiles").select("gold").eq("user_id", userId).single(),
+        window.sbClient.from("profiles").select("gold,tutorial_state").eq("user_id", userId).single(),
         window.sbClient.from("characters").select("*").eq("user_id", userId),
       ]);
       if (profileError) throw profileError;
@@ -240,6 +424,23 @@
       }
 
       render();
+
+      // 튜토리얼 조건 판정용 스냅샷 — 전투 클리어 기록만 추가로 조회.
+      const { data: progressRows } = await window.sbClient
+        .from("battle_progress").select("cleared").eq("user_id", userId).eq("cleared", true);
+      tutorialState = profile?.tutorial_state || {};
+      tutorialCtx = {
+        userId,
+        characterCount: roster.length,
+        equippedCount: Object.values(equippedByCharacter).reduce((n, arr) => n + arr.length, 0),
+        // "어느 캐릭터의 어느 프리셋이든" 가장 많은 행 수 — 패턴을 짜봤는지
+        // 판정용이라 전투용 프리셋(battle_preset_idx)만 보지 않고 전부 훑음
+        // (연습 삼아 다른 프리셋에 짜봤어도 인정).
+        maxPatternRows: roster.reduce((max, c) =>
+          (c.presets || []).reduce((m, p) => Math.max(m, (p?.rows || []).length), max), 0),
+        clearedCount: (progressRows || []).length,
+      };
+      renderTutorial();
     } catch (err) {
       grid.innerHTML = `
         <div class="empty-state">

@@ -285,6 +285,9 @@
     // 장비지만, 여러 개 겹쳐도 죽지 않게).
     const grantedResources = {};
     let critMultiplierBonus = 0;
+    // 매 턴 SP 회복량 — 엔진에 장비발 재생 패시브 키가 없어서, runBattle()이
+    // 이 값을 activeTicks의 영구 틱으로 심어준다(아래 참고).
+    let spRegenPerTurn = 0;
     Object.values(rosterChar.equipment || {}).forEach((item) => {
       if (!item) return;
       if (item.combatReal) {
@@ -309,8 +312,44 @@
       if (item.grantsResource) grantedResources[item.grantsResource.key] = item.grantsResource.max;
       // 크리티컬 배율은 합산이 아니라 "가장 높은 것 하나"만 적용됨
       if (item.critMultiplier) critMultiplierBonus = Math.max(critMultiplierBonus, item.critMultiplier);
+      if (item.spRegenPerTurn) spRegenPerTurn += item.spRegenPerTurn;
     });
-    return { real, bonus, statBonus, statRealBonus, maxHpBonus, maxSpBonus, passiveSources, conditionalPassiveSources, grantedResources, critMultiplierBonus };
+
+    // ── 세트(시리즈) 보너스 (2026-08-20 신설) ────────────────────────────────
+    // 예전엔 이 함수가 setId를 아예 안 봐서 **세트 효과가 캐릭터 시트에만 뜨고
+    // 실제 전투에는 전혀 반영되지 않았다**(오래 미해결로 남아있던 항목).
+    // web/item-sets.js를 공용 모듈로 빼서 시트와 이 어댑터가 같은 정의를 읽음.
+    //
+    // patternSlotBonus는 여기서 의도적으로 무시함 — 패턴 슬롯 상한은 시트가
+    // 패턴을 저장할 때 이미 적용되고, 엔진은 넘어온 슬롯 배열을 그대로 씀.
+    const itemSets = (typeof window !== "undefined" && window.ItemSets) || null;
+    if (itemSets) {
+      const equipped = Object.values(rosterChar.equipment || {}).filter(Boolean);
+      itemSets.activeTiersFor(equipped).forEach((tier) => {
+        if (tier.combatReal) {
+          real.atk += tier.combatReal.atk || 0;
+          real.def += tier.combatReal.def || 0;
+          real.matk += tier.combatReal.matk || 0;
+          real.mdef += tier.combatReal.mdef || 0;
+          real.summonEff += tier.combatReal.summonEff || 0;
+        }
+        if (tier.combatBonus) {
+          bonus.atk += tier.combatBonus.atk || 0;
+          bonus.def += tier.combatBonus.def || 0;
+          bonus.matk += tier.combatBonus.matk || 0;
+          bonus.mdef += tier.combatBonus.mdef || 0;
+        }
+        if (tier.statBonus) STAT_KEYS.forEach((k) => { statBonus[k] += tier.statBonus[k] || 0; });
+        if (tier.statRealBonus) STAT_KEYS.forEach((k) => { statRealBonus[k] += tier.statRealBonus[k] || 0; });
+        maxHpBonus += tier.maxHpBonus || 0;
+        maxSpBonus += tier.maxSpBonus || 0;
+        if (tier.passiveBonus) passiveSources.push(tier.passiveBonus);
+        if (tier.critMultiplier) critMultiplierBonus = Math.max(critMultiplierBonus, tier.critMultiplier);
+        if (tier.spRegenPerTurn) spRegenPerTurn += tier.spRegenPerTurn;
+      });
+    }
+
+    return { real, bonus, statBonus, statRealBonus, maxHpBonus, maxSpBonus, passiveSources, conditionalPassiveSources, grantedResources, critMultiplierBonus, spRegenPerTurn };
   }
 
   const STAT_KEYS = ["str", "int", "dex", "spd", "luk"];
@@ -544,11 +583,31 @@
     // 적용해줘야 함 — 이 순서를 지키지 않으면 장비의 combatBonus가 조용히
     // 반영 안 되는 버그가 생김(실제로 한 번 겪었음).
     allies.forEach((character, i) => {
-      const { bonus } = sumEquipmentCombatStats(allyRosterChars[i]);
+      const { bonus, spRegenPerTurn } = sumEquipmentCombatStats(allyRosterChars[i]);
       character.bonusAtk = bonus.atk;
       character.bonusDef = bonus.def;
       character.bonusMatk = bonus.matk;
       character.bonusMdef = bonus.mdef;
+
+      // 장비/세트발 SP 재생 — 엔진에 "장비 재생" 패시브 키가 없어서, 이미 있는
+      // activeTicks(매 턴 HP/SP 증감, src/engine.js의 processActiveTicks)에
+      // 영구 틱으로 심는다. remainingTicks를 Infinity로 두면 Infinity-1이
+      // 계속 Infinity라 자연히 "절대 안 끝남"이 됨(skillResolution의 applyTick과
+      // 동일한 관용구).
+      //
+      // ⚠ 반드시 이 블록에서 심어야 함 — resetForBattle()이 activeTicks를
+      // 비우는데(src/character.js) BattleEngine 생성자가 그걸 호출하므로,
+      // buildAllyFromRoster 안에서 심으면 전투 시작과 동시에 사라진다.
+      // 바로 위 bonusAtk 재적용이 존재하는 이유와 정확히 같은 함정.
+      if (spRegenPerTurn > 0) {
+        character.activeTicks = character.activeTicks || [];
+        character.activeTicks.push({
+          name: "장비 SP 재생",
+          kind: "sp",
+          amountPerTick: spRegenPerTurn,
+          remainingTicks: Infinity,
+        });
+      }
     });
 
     return engine.startBattle(maxTurns, username);

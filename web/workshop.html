@@ -140,6 +140,7 @@
       grantsResource: row.grants_resource, equipmentType: row.equipment_type,
       avatarPortrait: row.avatar_portrait, grantsSkill: row.grants_skill,
       consumable: row.consumable, usesPerBattle: row.uses_per_battle, enhanceable: row.enhanceable,
+      modifiable: row.modifiable,
     };
   }
 
@@ -159,6 +160,7 @@
       equipment_type: spec.equipmentType ?? null, avatar_portrait: spec.avatarPortrait ?? null,
       grants_skill: spec.grantsSkill ?? null, consumable: spec.consumable ?? null,
       uses_per_battle: spec.usesPerBattle ?? null, enhanceable: spec.enhanceable ?? null,
+      modifiable: spec.modifiable ?? null,
     };
   }
 
@@ -180,7 +182,12 @@
   // 강화품을 제외하는 건 "강화 배율 × 소재 보정"이 겹쳐 계산이 꼬이는 걸
   // 막기 위함이고, 이미 소재가 든 장비를 제외하는 건 소재 슬롯이 1개이기 때문.
   function craftableEquipment() {
-    return warehousePool.filter((w) => w.category === "equipment" && !w.enhanceLevel && !w.craftMaterial && (w.quantity || 0) > 0);
+    // modifiable === false면 개조 대상에서 제외(2026-08-20 신설) — 초심자 세트처럼
+    // "강화도 개조도 불가능한" 장비를 표현하기 위한 플래그. NULL/true는 전부
+    // 개조 가능이라 기존 아이템의 동작은 그대로다.
+    // (강화 쪽은 refinery.html의 enhanceable이 원래 opt-in이라 별도 처리 불필요.)
+    return warehousePool.filter((w) => w.category === "equipment" && !w.enhanceLevel && !w.craftMaterial
+      && w.modifiable !== false && (w.quantity || 0) > 0);
   }
   function ownedMaterials() {
     return warehousePool.filter((w) => w.category === "material" && (w.quantity || 0) > 0 && CRAFT_MATERIAL_TABLE[w.name]);

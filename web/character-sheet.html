@@ -253,6 +253,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="item-sets.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
 <script>
@@ -613,6 +614,7 @@ function mapItemRow(row) {
     consumable: row.consumable,
     usesPerBattle: row.uses_per_battle,
     enhanceable: row.enhanceable,
+    modifiable: row.modifiable,
     _raw: row, // 스택 분할(insert) 시 snake_case 원본이 그대로 필요해서 같이 들고 다님
   };
 }
@@ -1154,59 +1156,13 @@ function isItemEquippableBy(item, job, currentEquipment) {
   return { ok: true };
 }
 
-// ============================================================================
-// 아이템 시리즈(세트) 테이블 — 같은 setId 장비를 몇 개 장착했는지에 따라 문턱값
-// (thresholds)마다 추가 보너스가 붙음. 아이템 하나의 속성이 아니라 "장착 조합"에
-// 대한 규칙이라 개별 아이템 데이터(상점/창고)와는 별개로 관리함.
-// ============================================================================
-const ITEM_SET_TABLE = {
-  sage_series: {
-    name: "현자의 시리즈",
-    thresholds: [
-      { count: 2, statBonus: { int: 5 }, description: "INT +5" },
-      { count: 4, combatReal: { matk: 6 }, patternSlotBonus: 1, description: "realMATK +6, 패턴 슬롯 +1" }
-    ]
-  },
-  // 왕관 조각을 소재로 넣어 제작/개조한 장비에 자동으로 붙는 세트.
-  // 소재 하나로 세트가 결정되므로, 여러 부위를 왕관 조각으로 맞추면
-  // 자연스럽게 세트가 완성됨 — 다만 왕관 조각은 왕/섭정에게서만 나오고
-  // 부위마다 무게 +1이 붙어서, 전부 맞추려면 DEX 투자가 필요함.
-  goblin_crown_series: {
-    name: "고블린 왕관 시리즈",
-    thresholds: [
-      { count: 2, combatReal: { atk: 4, matk: 4 }, description: "realATK +4, realMATK +4" },
-      { count: 3, maxHpBonus: 150, description: "MaxHP +150" },
-      // 세트 완성 보상 — 잡졸(normal)과 소환체(creature)에게 받는 피해 15% 감소.
-      // 소환된 개체는 creatureTier가 creature로 강제 변환되므로, 둘 다 넣어야
-      // "잡졸은 함부로 덤비지 못한다"가 실제로 성립함(마차가 뱉는 물량이
-      // 정확히 creature라, normal만 걸면 정작 수송대에서 안 통했음).
-      { count: 4, statBonus: { str: 4, int: 4 }, patternSlotBonus: 1,
-        passiveBonus: {
-          damageTakenFrom_normalPct: 10, damageTakenFrom_creaturePct: 10,
-          damageDealtTo_normalPct: 10, damageDealtTo_creaturePct: 10,
-        },
-        description: "STR +4, INT +4, 패턴 슬롯 +1, 일반·소환체에게 주는 피해 +10% / 받는 피해 -10%" }
-    ]
-  }
-  // 새 세트 예시: knight_series: { name:"기사단 시리즈", thresholds:[{count:2, combatReal:{def:5}, description:"realDEF +5"}] }
-};
+// 아이템 시리즈(세트) 테이블은 web/item-sets.js로 추출됨(2026-08-20) —
+// battle-adapter.js가 같은 정의를 읽어 실제 전투에도 세트 보너스를 반영해야
+// 하기 때문(예전엔 이 파일 안에만 있어서 세트 효과가 화면 표시 전용이었음).
+const ITEM_SET_TABLE = window.ItemSets.ITEM_SET_TABLE;
 
 function getSetBonusesForEquipped() {
-  const counts = {};
-  equippedItems().forEach((it) => {
-    if (!it.setId) return;
-    counts[it.setId] = (counts[it.setId] || 0) + 1;
-  });
-
-  const active = [];
-  Object.entries(counts).forEach(([setId, count]) => {
-    const set = ITEM_SET_TABLE[setId];
-    if (!set) return;
-    set.thresholds.forEach((tier) => {
-      if (count >= tier.count) active.push({ setId, setName: set.name, ...tier });
-    });
-  });
-  return active;
+  return window.ItemSets.activeTiersFor(equippedItems());
 }
 
 // 장비 무게/스탯 보너스는 더 이상 캐릭터 객체에 고정된 숫자로 저장하지 않고,
@@ -1279,6 +1235,10 @@ function computeCritStats() {
   const passives = learnedSkillObjs().filter(s => s.passive);
   const chanceSum =
     items.reduce((sum, it) => sum + (it.passiveBonus?.critChancePct || 0), 0) +
+    // 세트 단계의 passiveBonus도 합산(2026-08-20) — 예전엔 어느 함수도 세트의
+    // passiveBonus를 읽지 않아서, 데이터에 적어둔 값이 시트에서도 전투에서도
+    // 아무 효과가 없었음(고블린 왕관 4세트가 그 사례).
+    getSetBonusesForEquipped().reduce((sum, t) => sum + (t.passiveBonus?.critChancePct || 0), 0) +
     passives.reduce((sum, s) => sum + (s.passiveMods?.critChancePct || 0), 0);
   const multiplier = Math.max(
     1.5,

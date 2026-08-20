@@ -181,7 +181,10 @@ function loadAdapterEnv({ skillTablePath, baseDir = __dirname, quiet = true } = 
     "src/resourceTypes.js", "src/resourceManager.js", "src/skillRegistry.js",
     "src/combatFormulas.js", "src/registries.js", "src/character.js",
     "src/prepState.js", "src/skillResolution.js", "src/importer.js",
-    "src/engine.js", "web/battle-adapter.js",
+    // ⚠ web/item-sets.js는 battle-adapter.js가 세트 보너스를 읽는 소스라 반드시
+    // 함께 올려야 함 — 빠뜨리면 시뮬만 조용히 세트 없이 계산된다(예전에
+    // skillTable을 안 주입해서 모든 시뮬이 맨주먹으로 돌던 사고와 같은 부류).
+    "src/engine.js", "web/item-sets.js", "web/battle-adapter.js",
   ];
   files.forEach((f) => {
     vm.runInContext(fs.readFileSync(path.join(baseDir, f), "utf8"), sandbox, { filename: f });
