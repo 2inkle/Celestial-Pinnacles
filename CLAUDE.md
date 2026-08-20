@@ -1773,6 +1773,54 @@ skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
 기존 항목(`data.dropTable[i]`)에 spread로 얹어서 폼이 관리하는 필드만
 덮어쓰는 방식으로 고침.
 
+## 알려진 버그 — 개조한 장비를 강화하면 개조 효과가 사라지던 문제 (2026-08-20, 수정됨)
+
+**증상(사용자 신고)**: 조합공방에서 소재를 넣어 개조한 장비를 강화소에서
+강화하면, 결과물에서 개조 효과가 남아있지 않음.
+
+**원인**: `refinery.html`의 `pristineSpecFor(name)`는 재강화 시 배율이
+중첩되는 걸 막으려고("이미 강화된 인스턴스의 현재 스탯을 base로 다시
+곱하면 중첩 배율이 걸림") 매번 상점/드랍 테이블에서 **이름만으로 원본
+(+0) 정의를 다시 찾아왔음**. 그런데 개조(위 "개조" 관련 섹션 참고)는
+이름을 그대로 두고 `craftMaterial` 필드로만 구분되는 방식이라
+(`workshop.html`과 동일한 방침), 이 로직이 "개조 안 된 순정 원본"으로
+통째로 덮어써버리고 있었던 것 — 배율 중첩 방지라는 원래 목적은 정확했지만
+개조 여부 자체를 전혀 고려하지 않았던 게 문제.
+
+설상가상으로 `buildEnhancedInsertPayload()`에 `craft_material` 필드가
+**아예 빠져 있어서**, 강화된 결과물은 개조했다는 사실 자체가 DB에서
+사라지고 있었다(단순히 효과 수치만 사라진 게 아니라 정체성 자체가 소실).
+강화 대상을 찾는 쿼리와 강화 후 병합 대상을 찾는 쿼리도 `craftMaterial`을
+전혀 안 가려서, 같은 이름·등급이라도 개조 여부가 다른 별개 스택(예: 순정
+"이 빠진 도끼"와 개조한 "이 빠진 도끼")이 섞일 수 있는 잠재적 문제도
+같이 있었음.
+
+**수정**:
+- `pristineSpecFor(name, instanceFallback, craftMaterial)`에 `craftMaterial`
+  인자를 추가 — 카탈로그의 진짜 +0 원본을 찾은 뒤, 개조 소재가 있으면
+  `craft-materials.js`의 `applyCraftMaterial()`을 한 번 더 적용해서
+  복원함. 매번 "불변의 카탈로그 원본 + 소재 1회 적용"에서 새로 계산하므로
+  배율 중첩 방지 원칙은 그대로 유지되면서 개조 효과도 살아남음(재강화를
+  반복해도 마찬가지).
+- `buildEnhancedInsertPayload`에 `craft_material: spec.craftMaterial ?? null`
+  추가.
+- 강화 대상 조회(`runEnhancement`의 `baseQuery`)와 병합 대상 조회
+  (`existingQuery`) 둘 다 `craft_material` 필터를 추가 — 카드에
+  `data-craft` 속성을 신설하고 `updatePreview`/`openConfirm`/
+  `runEnhancement` 체인 전체에 실어 나름.
+- `refinery.html`이 `craft-materials.js`를 아예 로드하지 않고 있었음 —
+  스크립트 태그 추가.
+
+**검증**: `craft-materials.js`의 `applyCraftMaterial()`을 그대로 불러와
+수정된 `pristineSpecFor`/`computeEnhancedSpec` 로직을 스크래치 스크립트로
+결정적 검증(9/9 통과) — 개조 효과가 강화 후에도 유지되고, 재강화를
+반복해도 원본+개조에서 매번 새로 계산되어 중첩되지 않음을 확인. 실제
+배포판에서도 실측: "이 빠진 도끼"(ATK 22) + "고블린의 이빨"(ATK+3/명중률
+-3%) 개조본을 강화소에서 +1 강화 → 결과물의 `craft_material`(정체성),
+`combat_real.atk`(25, 배율 반영 후 정확), `passive_bonus.accuracyBonusPct`
+(-3, 페널티 그대로) 전부 정확히 유지됨을 실제 DB 조회로 확인. 테스트
+데이터는 정리함.
+
 ## 재강화(이미 강화된 아이템의 추가 강화) 허용 (2026-08-14)
 
 "이미 강화한 아이템도 강화가 안 된다"는 증상은 위 스키마 문제와는 **다른
