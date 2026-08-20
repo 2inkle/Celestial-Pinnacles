@@ -778,33 +778,6 @@ function applyDamageAndEffects(actor, skill, ctx) {
       }
     }
 
-    if (!guardDecisionCache.has(t)) {
-      guardDecisionCache.set(t, t.checkAndConsumeGuard(damageType));
-    }
-    if (guardDecisionCache.get(t)) {
-      ctx.log(`   ${t.name}의 공격이 Guard로 완전히 무효화됨.`);
-      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "guard" });
-      return;
-    }
-    if (t.checkAndConsumeShield(damageType)) {
-      ctx.log(`   ${t.name}의 공격이 Shield로 무효화됨.`);
-      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "shield" });
-      return;
-    }
-
-    // 완전방어(확률형) — Guard/Shield(결정적, "항상" 막힘)와 달리 이건 매
-    // 히트마다 % 확률로만 발동함. 발동하면 이번 히트(데미지 판정 자체)를
-    // 통째로 무효화하지만, 소모되는 자원이 없어서 다음 히트에서도 똑같은
-    // 확률로 다시 시도됨(Guard/Shield처럼 "쓰면 없어지는" 자원이 아니라
-    // 그냥 상시 확률 판정).
-    const completeDefenseChancePct = t.getPassiveModValue("completeDefenseChancePct");
-    if (completeDefenseChancePct > 0 && Math.random() * 100 < completeDefenseChancePct) {
-      ctx.log(`   ${t.name}의 완전방어 발동! 데미지 무효화.`);
-      ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "completeDefense" });
-      return;
-    }
-
-    let damageLine = "";
     // damageSideCondition — "same"이면 시전자와 같은 진영일 때만, "different"면
     // 다른 진영일 때만 이 히트의 데미지 판정 자체가 발생함(Purify류 "적에게는
     // 피해, 아군에게는 회복"을 표현하는 용도). 지정 안 하면 기존처럼 대상이
@@ -812,7 +785,50 @@ function applyDamageAndEffects(actor, skill, ctx) {
     const damageSideOk =
       !skill.damageSideCondition ||
       (skill.damageSideCondition === "same" ? t.side === actor.side : t.side !== actor.side);
+    // 이 히트가 실제로 데미지를 낼 수 있는지(stat/coefficient가 없으면
+    // takeDamage() 자체를 절대 안 부름) — Guard/Shield/완전방어는 전부
+    // "데미지를 막는" 방어 자원이라, 애초에 데미지가 안 나오는 히트에는
+    // 판정할 이유가 없음. 2026-08-21 수정: 예전엔 이 판정 없이 무조건
+    // Guard/Shield부터 확인해서, 순수 버프/디버프 스킬(atkUp 등 stat/
+    // coefficient가 없는 효과)까지 "공격"으로 취급돼 Guard에 막히고
+    // Guard 자원까지 헛되이 소모됐음(아군이 Guard 중인 아군에게 버프를
+    // 걸었는데 튕겨나가거나, 캐릭터가 스스로 Guard 중일 때 자기 버프조차
+    // 막히는 버그 — 실전투에서 고블린 왕의 Break Down처럼 데미지+디버프가
+    // 결합된 스킬도 같은 코드 경로를 타다 보니 발견됨). 데미지를 낼 수
+    // 있는 히트(Break Down 등)는 기존과 동일하게 Guard가 전체를 막고,
+    // 데미지가 아예 없는 순수 버프/디버프 히트는 이제 Guard/Shield/완전방어
+    // 판정 자체를 건너뛰어 항상 정상 적용됨.
+    const canDealDamage = damageSideOk && skill.stat && skill.coefficient;
 
+    if (canDealDamage) {
+      if (!guardDecisionCache.has(t)) {
+        guardDecisionCache.set(t, t.checkAndConsumeGuard(damageType));
+      }
+      if (guardDecisionCache.get(t)) {
+        ctx.log(`   ${t.name}의 공격이 Guard로 완전히 무효화됨.`);
+        ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "guard" });
+        return;
+      }
+      if (t.checkAndConsumeShield(damageType)) {
+        ctx.log(`   ${t.name}의 공격이 Shield로 무효화됨.`);
+        ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "shield" });
+        return;
+      }
+
+      // 완전방어(확률형) — Guard/Shield(결정적, "항상" 막힘)와 달리 이건 매
+      // 히트마다 % 확률로만 발동함. 발동하면 이번 히트(데미지 판정 자체)를
+      // 통째로 무효화하지만, 소모되는 자원이 없어서 다음 히트에서도 똑같은
+      // 확률로 다시 시도됨(Guard/Shield처럼 "쓰면 없어지는" 자원이 아니라
+      // 그냥 상시 확률 판정).
+      const completeDefenseChancePct = t.getPassiveModValue("completeDefenseChancePct");
+      if (completeDefenseChancePct > 0 && Math.random() * 100 < completeDefenseChancePct) {
+        ctx.log(`   ${t.name}의 완전방어 발동! 데미지 무효화.`);
+        ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "completeDefense" });
+        return;
+      }
+    }
+
+    let damageLine = "";
     if (damageSideOk && skill.stat && skill.coefficient) {
       let power = Math.floor(computeSkillPower(actor, skill));
 
