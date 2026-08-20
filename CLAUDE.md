@@ -352,6 +352,117 @@ RLS 조건만 통과하면 응답하므로, `using (true)`인 순간 필터 없�
 - 테스트에 쓴 더미 로그 11개는 전부 정리함(`battle_logs` 다시 빈 상태로
   복구) — 실제 유저 데이터에 남은 흔적 없음.
 
+## 온보딩 개선 — 세트 보너스 전투 연결 + 튜토리얼 패널 + 길라잡이 (2026-08-20 구현, 실측 완료)
+
+**동기**: "게임이 불친절하다"는 사용자 피드백 — 신규 계정은 "보유한 용병이
+없습니다" 한 줄만 보고 무엇부터 해야 할지 알 수 없고, 상점이 직업 착용
+제한을 안 보여줘서 캐릭터 시트에서 장착을 시도할 때야 처음 알게 되는 등
+"정체를 알 수 없는 정보덩어리 속에서 헤매는" 경험이었음. 사용자가 초심자
+세트/튜토리얼 단계의 **내용은 직접 채우겠다**고 해서, 이번 작업은 **틀
+(배관·스키마·화면)만** 만듦 — 수치·문구는 전부 `TODO` 자리표시자로 남아있음.
+
+### 세트(시리즈) 보너스가 실전투에 반영되지 않던 문제 해소
+
+`web/battle-adapter.js`의 `sumEquipmentCombatStats()`가 `setId`/
+`ITEM_SET_TABLE`을 아예 안 봐서, 세트 보너스가 **캐릭터 시트에만 표시되고
+실제 전투에는 전혀 반영되지 않고 있었다**(오래 미해결로 남아있던 항목이자
+고블린 왕관 세트 설계가 막혀 있던 원인). `web/item-sets.js`로 `ITEM_SET_TABLE`을
+공용화(`battle-themes.js`와 같은 패턴)해서 시트와 어댑터가 같은 정의를
+읽게 함. `simulate.js`의 vm 로드 목록에도 추가(빠뜨리면 시뮬만 조용히
+세트 없이 돎 — 예전 skillTable 미주입 사고와 같은 부류).
+
+세트 티어의 `passiveBonus`도 이번에 연결함 — 지금까지 시트에서조차 안 읽혀서
+고블린 왕관 4세트의 데미지 옵션이 순수 장식이었음.
+
+**SP 재생**(`spRegenPerTurn` 신설)은 엔진 수정 없이 기존 `activeTicks`/
+`processActiveTicks`(매 턴 HP/SP 증감, `demo-permanent-regen-ticks.js`로
+이미 검증됨)를 영구 틱(`remainingTicks: Infinity`)으로 재사용해 구현.
+`resetForBattle()`이 `activeTicks`를 비우므로, `buildAllyFromRoster` 안이
+아니라 **`runBattle()`의 엔진 생성 이후 보정 블록**(`bonusAtk`를 다시 심는
+바로 그 자리 — 과거 같은 함정을 겪고 만들어진 곳)에 심어야 함.
+
+`demo-item-set-bonus.js` 신설 — 2부위/3부위 임계값 분기, maxHp/maxSp/
+combatReal/statBonus/statRealBonus 반영, SP 재생 틱이 전투 로그에 찍히는지,
+세트 미장착이면 틱이 안 생기는지까지 결정적으로 검증(10/10 통과).
+
+### 초심자 세트 3종 — 틀만 구현, 수치는 TODO
+
+`web/item-sets.js`에 `beginner_plate`(중갑=`armor`, 전사 계열 전용)/
+`beginner_leather`(경갑=`cloth`, 전 직업)/`beginner_robe`(천옷=`robe`, 전 직업)
+세 항목을 구조만 갖춰 배치(효과 수치는 전부 0, `description:"TODO"`).
+세 세트는 부위(갑옷·머리·신발)와 타입 매핑만 다르고 효과는 반드시 동일하게
+유지해야 함(사용자 설계 확정 사항).
+
+**강화 불가**: `enhanceable` 필드를 아예 안 줌(`refinery.html`이 opt-in
+방식이라 자동으로 막힘). **개조 불가**: `warehouse_items.modifiable`
+컬럼 신설(0022 마이그레이션, nullable) + `workshop.html`의
+`craftableEquipment()`에 `w.modifiable !== false` 조건 추가 — 예전엔
+이 함수가 **아무 플래그도 안 보고** 미강화·미개조 장비를 전부 개조
+대상으로 삼고 있었음. 모든 아이템 매퍼(9개 파일)에 `modifiable`
+필드를 추가해서 DB 왕복 시 유실되지 않게 함.
+
+### 튜토리얼 패널(`roster-index.html`) — 틀만, 단계 내용은 TODO
+
+`web/tutorial-table.js`에 4단계 스키마(고용→장착→패턴→첫 승리) 정의.
+조건은 별도 추적 테이블 없이 기존 데이터(`characters`/
+`warehouse_items.held_by`/`presets`/`battle_progress`)에서 매번 즉석
+판정(`quest_progress`와 같은 방침). 수령 여부만 `profiles.tutorial_state`
+(0022)에 저장, 보상은 `quest-table.js`와 동일한 "카탈로그 필드 spread"
+방식으로 지급. **임무 시스템과는 별개** — 임무는 길드에서 반복 수행하는
+콘텐츠이고 이건 홈 화면 온보딩 전용(신규 유저는 길드까지 못 감).
+
+### 길라잡이(`web/guide.html`) — 개념 설명 + 직업 도감
+
+**로그인 불필요**(`AuthGuard.requireSession()` 미사용) — `game_content`는
+RLS가 전체 공개 읽기라 anon 키로도 조회됨. anon 키로 직접 실측 확인함.
+
+개념 섹션(캐릭터 성장/장비와 무게/패턴/전투 진행/파견과 임무)은 내부
+수식은 감춘 채 방향성만 설명. **패턴 슬롯이 조건만 보고 코스트는 안 보는
+함정**(위 관련 섹션 참고)을 콜아웃으로 명시.
+
+**직업 도감**: 상점에 배지를 붙이는 대신(당초 제안) 여기로 옮김(사용자
+결정) — 직업별 대표 스킬 3개 + 착용 가능 장비를 보여줘서, 플레이어가
+장비를 스스로 판단하고 다른 직업의 공략 아이디어도 얻게 함. `JOB_PREVIEW`
+큐레이션 테이블(스킬은 **이름만** 지정, TODO 상태)이 `game_content.jobTable`/
+`skillTable`에서 실시간으로 상세 정보를 끌어옴 — 이름이 안 맞으면 그 줄만
+조용히 생략(밸런스 수정으로 스킬명이 바뀌어도 안 깨짐). 장비 타입 원문자열
+(`wand`/`greatsword` 등)은 `EQUIPMENT_TYPE_LABELS`로 한글 변환, 실제 타입
+제한이 안 걸리는 슬롯(`item`/`accessory`/`jItem`/`cloak`)은 오해 방지를
+위해 숨김.
+
+### `village.html` 데모 버튼 관리자 전용화
+
+데모 초기화·예제 캐릭터·무작위 용병 10명 버튼이 관리자 구분 없이 전원에게
+노출되고 있었음 — `AuthGuard.isAdmin()`으로 게이팅(기본 숨김, 페일클로즈).
+
+### 검증 (2026-08-20, 실제 로그인 세션으로 전부 실측 완료)
+
+- `demo-item-set-bonus.js` 포함 회귀 40개 전부 통과.
+- **튜토리얼 보상 수령 실측**: "장비 장착하기" 단계를 실제로 수령 →
+  `warehouse_items`에 이름·`set_id`("beginner_robe")·부위별
+  `equipment_type`(robe/cap/shoes)·`slot`·`modifiable:false`·
+  `enhanceable:null`이 전부 정확히 반영됨. `tutorial_state`에
+  `{"equip-first":{"claimedAt":...}}` 기록. 새로고침 후 해당 단계가
+  "완료"로 바뀌고 버튼이 사라져 **중복 수령 불가** 확인.
+- **캐릭터 시트 실측**: 사제에게 초심자 천옷 3부위를 실제로 장착 →
+  "착용 불가" 경고 없이 장착됨(로브/천옷 계열이 전 직업 가능이라는 설계와
+  일치) → 2부위 장착 시점에 `✨ 초심자 천옷 2세트` 배지, 3부위 완성 시
+  `✨ 초심자 천옷 3세트` 배지까지 정확히 표시(수치는 TODO라 0).
+- **강화소 실측**: 초심자 경갑 3부위 전부 "강화 불가 아이템 — 이 아이템은
+  강화할 수 없게 설정돼 있어요"로 정확히 표시.
+- **조합공방 실측**: "개조할 장비" 목록에 초심자 경갑이 전혀 안 뜸(다른
+  정상 장비들은 다 뜸) — `modifiable:false` 필터가 정확히 작동함.
+- **길라잡이 실측**: 전사(대표 기술 3개, 스킬 칩에 물리/대상/SP코스트까지
+  자동 표시)·사제(3개) 정상 렌더링, 마법사·헌터(스킬 미기재 상태)는
+  "아직 정리되지 않았어요" 폴백이 정상 동작. anon 키로 `jobTable`/
+  `skillTable` 조회 성공(HTTP 200) — 비로그인 열람 가능 확인.
+- **0022 마이그레이션 컬럼 확인**: anon 키로 `profiles.tutorial_state`/
+  `warehouse_items.modifiable` 둘 다 조회 성공(HTTP 200, "컬럼 없음" 에러
+  아님) — 사용자가 SQL Editor에서 실행 완료.
+- 테스트로 받은 초심자 세트(사제 장착분 3개 + 미장착 경갑 3개)는 실제
+  튜토리얼 진행의 정상 결과물이라 정리하지 않고 그대로 둠 — 나중에 세트
+  수치를 채울 때 실제 장착 상태에서 바로 확인 가능.
+
 ## 전투 진입 즉시 자동 실행 + 입장조건 검사를 battle-view로 이관 (2026-08-20 구현)
 
 **요청**: 전투 진입 시 (1) 진형 프리뷰가 뜨고 (2) "⚔️ 전투 시작"을 눌러야
