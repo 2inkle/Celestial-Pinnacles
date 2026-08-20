@@ -88,6 +88,7 @@
 <main id="mainArea"></main>
 <div id="modalWrap"></div>
 
+<script src="craft-materials.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
@@ -127,6 +128,7 @@
     return {
       user_id: session.user.id, name: spec.name, category: "equipment", quantity,
       description: spec.description ?? null, slot: spec.slot ?? null, enhance_level: enhanceLevel,
+      craft_material: spec.craftMaterial ?? null,
       combat_real: spec.combatReal ?? null, combat_bonus: spec.combatBonus ?? null,
       stat_bonus: spec.statBonus ?? null, passive_bonus: spec.passiveBonus ?? null,
       max_hp_bonus: spec.maxHpBonus ?? null, max_sp_bonus: spec.maxSpBonus ?? null,
@@ -249,11 +251,25 @@
   // 스탯을 새로 가져옴 — 인스턴스 자신의 combatReal은 절대 base로 안 씀.
   // 정의를 못 찾으면(예: 나중에 테이블에서 삭제된 경우) 최후 수단으로 인스턴스
   // 자신을 그대로 씀(부정확할 수 있지만 크래시보다는 나음).
-  function pristineSpecFor(name, instanceFallback) {
+  //
+  // ⚠ 개조(craftMaterial)한 장비를 강화하면 개조 효과가 사라지던 버그
+  // (2026-08-20 수정) — 개조는 이름을 그대로 두고 craftMaterial 필드로만
+  // 구분되는데(workshop.html과 동일한 방침), 위 로직이 "이름으로 원본을
+  // 다시 찾는다"만 하고 개조 여부를 전혀 고려하지 않아서, 상점/드랍
+  // 테이블의 순수 +0 원본(개조 안 된 버전)으로 통째로 덮어써버렸음. 배율
+  // 중첩을 피하려는 목적은 그대로 유지하되, 카탈로그의 진짜 +0 원본에
+  // applyCraftMaterial()을 다시 한 번 적용해서 개조 효과를 복원함 — 매번
+  // "불변의 원본 + 소재 1회 적용"에서 새로 계산하므로 재강화를 반복해도
+  // 개조 효과가 중첩되지 않음(강화 배율과 동일한 원칙).
+  function pristineSpecFor(name, instanceFallback, craftMaterial) {
     const def = findItemDef(name);
     if (!def) return instanceFallback || { name, category: "equipment" };
     const { chance, quantity, price, enhanceable, ...spec } = def;
-    return { ...spec, name, category: "equipment" };
+    const pristine = { ...spec, name, category: "equipment" };
+    if (craftMaterial && window.applyCraftMaterial) {
+      return window.applyCraftMaterial(pristine, craftMaterial);
+    }
+    return pristine;
   }
 
   const MAX_ENHANCE_LEVEL = 20;
@@ -277,7 +293,10 @@
     // 같은 이름이라도 등급(enhanceLevel)이 다르면 완전히 다른 강화 대상이라
     // (예: +0 재고와 +3 재고가 동시에 있을 수 있음) name만으로는 카드/조회를
     // 구분할 수 없음 — data-level까지 같이 키로 씀(2026-08-14, 재강화 허용
-    // 하면서 추가).
+    // 하면서 추가). 같은 이유로 craftMaterial도 키에 포함해야 함(2026-08-20) —
+    // 개조한 장비와 개조 안 한 장비가 같은 이름·등급으로 동시에 창고에 있을
+    // 수 있는데(workshop.html의 개조 방침), 이걸 안 가리면 서로 다른 두
+    // 스택이 하나로 뒤섞여 조회된다.
     el.innerHTML = items.map((it, idx) => {
       const curLevel = it.enhanceLevel || 0;
       const price = refineCostBasis(it.name);
@@ -286,12 +305,13 @@
       const lvlOptions = Array.from({ length: MAX_ENHANCE_LEVEL - curLevel }, (_, i) => curLevel + 1 + i);
       const defaultLvl = lvlOptions[Math.min(9, lvlOptions.length - 1)];
       const levelBadge = curLevel > 0 ? ` <span style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:11px;">+${curLevel}</span>` : "";
+      const craftBadge = it.craftMaterial ? ` <span style="color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:11px;">[개조: ${it.craftMaterial}]</span>` : "";
       return `
-        <div class="item-card" data-idx="${idx}" data-name="${it.name}" data-level="${curLevel}">
+        <div class="item-card" data-idx="${idx}" data-name="${it.name}" data-level="${curLevel}" data-craft="${it.craftMaterial || ""}">
           <div class="item-head">
             <div class="item-icon">⚒️</div>
             <div>
-              <div class="item-name">${it.name}${levelBadge} <span style="color:var(--mist-dim);font-family:'JetBrains Mono',monospace;font-size:11px;">×${it.quantity}</span></div>
+              <div class="item-name">${it.name}${levelBadge}${craftBadge} <span style="color:var(--mist-dim);font-family:'JetBrains Mono',monospace;font-size:11px;">×${it.quantity}</span></div>
               <div class="item-sub">${price !== null ? `개당 시행 비용 ${costPerAttempt(price).toLocaleString()} G` : `강화 불가 아이템`}</div>
             </div>
           </div>
@@ -319,7 +339,8 @@
   function updatePreview(card) {
     const name = card.dataset.name;
     const fromLevel = Number(card.dataset.level);
-    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel);
+    const craftMaterial = card.dataset.craft || null;
+    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel && (w.craftMaterial || null) === craftMaterial);
     if (!it) return;
     const price = refineCostBasis(name);
     const qty = Number(card.querySelector(".qty-select").value);
@@ -342,12 +363,12 @@
       qtySel.addEventListener("change", () => updatePreview(card));
       lvlSel.addEventListener("change", () => updatePreview(card));
       card.querySelector(".try-btn").addEventListener("click", () =>
-        openConfirm(card.dataset.name, Number(card.dataset.level), Number(qtySel.value), Number(lvlSel.value)));
+        openConfirm(card.dataset.name, Number(card.dataset.level), card.dataset.craft || null, Number(qtySel.value), Number(lvlSel.value)));
     });
   }
 
-  function openConfirm(name, fromLevel, qty, targetLevel) {
-    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel);
+  function openConfirm(name, fromLevel, craftMaterial, qty, targetLevel) {
+    const it = poolEquipmentBase().find((w) => w.name === name && (w.enhanceLevel || 0) === fromLevel && (w.craftMaterial || null) === craftMaterial);
     if (!it || it.quantity < qty) { alert("수량이 부족해요(창고 상태가 바뀌었을 수 있어요) — 새로고침 후 다시 시도해주세요."); render(); return; }
     const price = refineCostBasis(name);
     const perAttempt = costPerAttempt(price);
@@ -361,7 +382,7 @@
         <div class="modal-box">
           <div class="modal-head"><h2>제련 확인</h2></div>
           <div class="modal-body">
-            <div class="row"><span>대상</span><span class="v">${name}${fromLevel > 0 ? ` (현재 +${fromLevel})` : ""} ×${qty}</span></div>
+            <div class="row"><span>대상</span><span class="v">${name}${fromLevel > 0 ? ` (현재 +${fromLevel})` : ""}${craftMaterial ? ` [개조: ${craftMaterial}]` : ""} ×${qty}</span></div>
             <div class="row"><span>목표</span><span class="v">+${targetLevel}</span></div>
             <div class="row"><span>선차감(최대치 기준)</span><span class="v">${maxCost.toLocaleString()} G</span></div>
             <div class="row"><span>실패 시</span><span class="v danger">해당 개체 완전 파괴${fromLevel > 0 ? `(현재 +${fromLevel} 포함)` : ""}</span></div>
@@ -376,10 +397,10 @@
     document.getElementById("cancelBtn").addEventListener("click", () => { wrap.innerHTML = ""; });
     document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") wrap.innerHTML = ""; });
     const confirmBtn = document.getElementById("confirmBtn");
-    if (confirmBtn) confirmBtn.addEventListener("click", () => runEnhancement(name, fromLevel, qty, targetLevel, perAttempt));
+    if (confirmBtn) confirmBtn.addEventListener("click", () => runEnhancement(name, fromLevel, craftMaterial, qty, targetLevel, perAttempt));
   }
 
-  async function runEnhancement(name, fromLevel, qty, targetLevel, perAttempt) {
+  async function runEnhancement(name, fromLevel, craftMaterial, qty, targetLevel, perAttempt) {
     const confirmBtn = document.getElementById("confirmBtn");
     if (confirmBtn) confirmBtn.disabled = true;
 
@@ -393,11 +414,13 @@
     const totalCost = totalAttempts * perAttempt;
 
     // 시행 직전 캐시가 아니라 지금 이 순간의 DB 상태를 다시 조회해서 사용 —
-    // 이름만이 아니라 등급까지 일치해야 함(같은 이름이라도 다른 등급 스택과
-    // 섞이면 안 됨). fromLevel 0은 enhance_level이 NULL로 저장돼 있음.
+    // 이름·등급뿐 아니라 craftMaterial까지 일치해야 함(같은 이름·등급이라도
+    // 개조 여부가 다른 별개 스택일 수 있음, 2026-08-20). fromLevel 0은
+    // enhance_level이 NULL로 저장됨 — craftMaterial도 없으면 NULL.
     let baseQuery = window.sbClient.from("warehouse_items").select("*")
       .eq("user_id", session.user.id).eq("name", name).eq("category", "equipment").is("held_by", null);
     baseQuery = fromLevel > 0 ? baseQuery.eq("enhance_level", fromLevel) : baseQuery.is("enhance_level", null);
+    baseQuery = craftMaterial ? baseQuery.eq("craft_material", craftMaterial) : baseQuery.is("craft_material", null);
     const { data: baseRow, error: baseError } = await baseQuery.maybeSingle();
     if (baseError) { alert(`제련 실패: ${baseError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
     if (!baseRow || baseRow.quantity < qty) {
@@ -414,14 +437,16 @@
       if (error) { alert(`제련 실패: ${error.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
     }
 
-    // 살아남은 만큼 목표 레벨 풀에 추가(이미 같은 레벨의 풀이 있으면 병합).
-    // 배율은 항상 원본(+0) 정의 기준으로 다시 계산함(pristineSpecFor).
+    // 살아남은 만큼 목표 레벨 풀에 추가(이미 같은 레벨·같은 개조 상태의 풀이
+    // 있으면 병합). 배율은 항상 원본(+0) 정의 기준으로 다시 계산하고
+    // (pristineSpecFor), 개조 효과가 있었다면 그 위에 다시 적용함.
     if (survivedCount > 0) {
-      const pristine = pristineSpecFor(name, mapItemRow(baseRow));
+      const pristine = pristineSpecFor(name, mapItemRow(baseRow), craftMaterial);
       const enhancedSpec = computeEnhancedSpec(pristine, targetLevel);
       let existingQuery = window.sbClient.from("warehouse_items").select("id,quantity")
         .eq("user_id", session.user.id).eq("name", name).eq("category", "equipment").is("held_by", null);
       existingQuery = targetLevel > 0 ? existingQuery.eq("enhance_level", targetLevel) : existingQuery.is("enhance_level", null);
+      existingQuery = craftMaterial ? existingQuery.eq("craft_material", craftMaterial) : existingQuery.is("craft_material", null);
       const { data: existing, error: existingError } = await existingQuery.maybeSingle();
       if (existingError) { alert(`제련 실패: ${existingError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
       if (existing) {
