@@ -411,6 +411,51 @@ combatReal/statBonus/statRealBonus 반영, SP 재생 틱이 전투 로그에 찍
 방식으로 지급. **임무 시스템과는 별개** — 임무는 길드에서 반복 수행하는
 콘텐츠이고 이건 홈 화면 온보딩 전용(신규 유저는 길드까지 못 감).
 
+**튜토리얼/보상 내용을 바꾼 뒤 바로 재확인하는 방법**(2026-08-20):
+- **내용(제목/설명/보상 스펙) 수정**: `web/tutorial-table.js`만 고치면 됨 —
+  DB 필드가 아니라 정적 파일이라 배포(푸시) 후 `roster-index.html`을
+  새로고침하면 바로 반영됨. `web/item-sets.js`의 `beginner_*` 세트 수치를
+  고칠 때도 마찬가지(둘 다 `<script src>`로 그대로 로드되는 정적 테이블).
+- **이미 수령한 단계를 다시 테스트하고 싶을 때**: 수령 여부는
+  `profiles.tutorial_state`(jsonb) 하나에만 있으므로, 로그인된 브라우저
+  콘솔에서 아래처럼 특정 단계(또는 전체)를 지우면 그 단계가 다시
+  "보상 대기"로 돌아옴 — 조건 자체(캐릭터 보유/장비 장착 등)는 그대로
+  DB에서 즉석 판정하는 값이라 별도로 되돌릴 필요 없음:
+  ```js
+  // 특정 단계 하나만 다시 테스트(예: "equip-first" 재확인)
+  window.sbClient.auth.getSession().then(({data:{session}}) =>
+    window.sbClient.from("profiles").select("tutorial_state").eq("user_id", session.user.id).single()
+      .then(({data}) => {
+        const s = { ...data.tutorial_state };
+        delete s["equip-first"];
+        return window.sbClient.from("profiles").update({ tutorial_state: s }).eq("user_id", session.user.id);
+      })
+  );
+  // 전체 초기화(패널을 처음 보는 상태로): tutorial_state를 {}로
+  window.sbClient.auth.getSession().then(({data:{session}}) =>
+    window.sbClient.from("profiles").update({ tutorial_state: {} }).eq("user_id", session.user.id)
+  );
+  ```
+  (`dismissed:true`로 "다시 보지 않기"를 눌렀었다면 이 초기화로 그것도
+  같이 풀림 — `dismissed`도 같은 `tutorial_state` 객체 안의 키이므로.)
+- **지급된 보상 아이템이 의도대로 들어갔는지 확인**: `warehouse_items`에서
+  `name`으로 조회 — `set_id`/`equipment_type`/`slot`/`modifiable`/
+  `enhanceable`/`combat_real` 등이 `tutorial-table.js`의 스펙과 일치하는지
+  대조. 실측 때 실제로 이렇게 확인함(위 "검증" 절 참고).
+  ```js
+  window.sbClient.auth.getSession().then(({data:{session}}) =>
+    window.sbClient.from("warehouse_items").select("*")
+      .eq("user_id", session.user.id).ilike("name", "초심자%")
+      .then(r => console.log(r.data))
+  );
+  ```
+- **캐시 주의**: GitHub Pages가 배포 직후 낡은 버전을 서빙할 때가 있음
+  (CLAUDE.md 다른 곳에 이미 기록된 문제) — 새 내용이 안 보이면
+  `?v=2` 같은 캐시 무효화 쿼리를 붙여서 확인.
+- **패널이 다시 안 뜨는 경우**: 4단계를 전부 수령했거나(`allClaimed`)
+  "다시 보지 않기"를 눌렀으면(`dismissed:true`) `renderTutorial()`이
+  의도적으로 숨김 — 버그 아님, 위 초기화 스니펫으로 되돌리면 다시 보임.
+
 ### 길라잡이(`web/guide.html`) — 개념 설명 + 직업 도감
 
 **로그인 불필요**(`AuthGuard.requireSession()` 미사용) — `game_content`는
@@ -462,6 +507,11 @@ RLS가 전체 공개 읽기라 anon 키로도 조회됨. anon 키로 직접 실�
 - 테스트로 받은 초심자 세트(사제 장착분 3개 + 미장착 경갑 3개)는 실제
   튜토리얼 진행의 정상 결과물이라 정리하지 않고 그대로 둠 — 나중에 세트
   수치를 채울 때 실제 장착 상태에서 바로 확인 가능.
+- **미완료 단계가 계속 노출되는지도 별도로 재확인함(2026-08-20)**: 2/4
+  단계를 수령한 상태로 페이지를 새로고침 → 수령한 2단계는 "완료"로 남아있고
+  나머지 2단계(미완료)는 "보상 대기"로 계속 노출됨, 패널 자체도 안
+  사라짐(전부 완료 또는 "다시 보지 않기" 전까지 숨지 않는 `renderTutorial()`
+  조건대로) — 별도 수정 불필요.
 
 ## 전투 진입 즉시 자동 실행 + 입장조건 검사를 battle-view로 이관 (2026-08-20 구현)
 
@@ -1820,6 +1870,17 @@ skillPointCost===0`인 항목을 찾아서 가져와야 정확하다.
 `combat_real.atk`(25, 배율 반영 후 정확), `passive_bonus.accuracyBonusPct`
 (-3, 페널티 그대로) 전부 정확히 유지됨을 실제 DB 조회로 확인. 테스트
 데이터는 정리함.
+
+**나머지 3개 소재도 결정적으로 재확인함(2026-08-20)**: `CRAFT_MATERIAL_TABLE`의
+네 소재가 서로 다른 필드 조합을 쓰는데(고블린의 이빨/마력 가루 =
+`combatReal`+`passiveBonus`, 은빛 성채 열쇠 = `combatBonus`(★`combatReal`이
+아님)+`weight`, 왕관 조각 = `statBonus`+`maxHpBonus`+`weight`+`setId`),
+전부 스크래치 스크립트로 강화 파이프라인을 통과시켜봄(20/20 통과) —
+`applyCraftMaterial()`도 `buildEnhancedInsertPayload()`도 소재 종류를
+구분하지 않는 범용 로직이라, 이번 수정이 특정 소재 하나가 아니라 네
+소재 전부에 동일하게 적용됨을 확인. 왕관 조각의 `setId`가 재강화 후에도
+살아남는 것도 같이 확인(세트 효과가 실전투에 반영되게 만든 위 "온보딩
+개선" 작업과 맞물리는 지점이라 특히 중요).
 
 ## 재강화(이미 강화된 아이템의 추가 강화) 허용 (2026-08-14)
 
