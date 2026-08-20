@@ -64,8 +64,9 @@
   .pick-card.selected { border-color:var(--gold); background:#d9b45c14; }
   .pick-card .p-portrait {
     width:52px; height:52px; border-radius:50%; background:var(--panel-raised); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center; font-size:24px;
+    display:flex; align-items:center; justify-content:center; font-size:24px; overflow:hidden;
   }
+  .pick-card .p-portrait img { width:100%; height:100%; object-fit:cover; display:block; }
   .pick-card .p-name { font-family:'Cinzel',serif; font-size:14.5px; color:#f2efe8; }
   .pick-card .p-meta { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
   .pick-card .p-check {
@@ -146,6 +147,16 @@
   const { BATTLE_MONSTER_POOLS, RARE_THRESHOLD, computePoolProbabilities, getMonsterTable, setMonsterRoster } = window.BattleEncounters;
   const { battleNameById, isAftermathBattle } = window.BattleThemes;
 
+  // 초상화 이중 모드 렌더링 — character-sheet.html/roster-index.html과 동일
+  // 로직(공용 파일로 안 빼는 이유도 거기 주석 참고). 커스텀 이미지 URL을
+  // 설정한 캐릭터가 이 원형 미리보기에서 URL 문자열 그대로 노출되는 걸 막음.
+  function isImagePortrait(p) {
+    return /^(https?:|data:)/i.test(p || "");
+  }
+  function renderPortrait(p) {
+    return isImagePortrait(p) ? `<img src="${p}" alt="" />` : (p || "❓");
+  }
+
   let session = null;
   let roster = [];
 
@@ -187,7 +198,7 @@
         ${roster.map((c) => `
           <div class="pick-card ${selected.has(c.id) ? "selected" : ""}" data-id="${c.id}">
             <div class="p-check">✓</div>
-            <div class="p-portrait">${c.portrait || "❓"}</div>
+            <div class="p-portrait">${renderPortrait(c.portrait)}</div>
             <div class="p-name">${c.name}</div>
             <div class="p-meta">Lv.${c.level} · ${c.job} · ${c.row === "back" ? "후열" : "전열"}</div>
           </div>

@@ -46,10 +46,22 @@
   .block { margin-bottom:26px; }
   .block:last-child { margin-bottom:0; }
 
-  /* 프로필 */
-  .portrait { width:100%; aspect-ratio:3/4; border-radius:10px; border:1px solid var(--line);
+  /* 프로필 — 2026-08-21: 상한 300×400 지정(3:4 비율 그대로 유지). 예전엔
+     width:100%뿐이라 main 그리드가 1200px 미만에서 1열로 접힐 때 뷰포트
+     전체 폭을 그대로 먹어서 실측 1000×1333px까지 커졌던 문제 해소. */
+  .portrait { width:100%; max-width:300px; aspect-ratio:3/4; border-radius:10px; border:1px solid var(--line);
     background: repeating-linear-gradient(135deg, var(--panel) 0 10px, var(--panel-raised) 10px 20px);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:40px; }
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:40px;
+    overflow:hidden; }
+  .portrait.has-image { background:var(--panel); }
+  .portrait img { width:100%; height:100%; object-fit:cover; display:block; }
+  .portrait-url-row { margin-top:10px; }
+  .portrait-url-row input {
+    width:100%; font-family:'JetBrains Mono',monospace; font-size:10.5px; background:var(--panel-raised);
+    color:var(--mist); border:1px solid var(--line); border-radius:6px; padding:6px 9px;
+  }
+  .portrait-url-row input:focus { outline:none; border-color:var(--gold-dim); }
+  .portrait-url-hint { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); margin-top:4px; line-height:1.5; }
   .char-title { font-family:'Cinzel',serif; font-size:20px; color:#f2efe8; margin:14px 0 2px; }
   .char-sub { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
   .level-row { display:flex; align-items:baseline; gap:8px; margin-top:14px; }
@@ -498,6 +510,22 @@ const ADVANCEMENT_REQUIREMENT_TYPES = {
   // 새 조건 예시: quest: { label:"퀘스트 완료", describe:v=>`퀘스트 "${v}" 완료`, check:(data,v)=>data.completedQuests?.includes(v) }
 };
 
+// 초상화 이중 모드 렌더링(2026-08-21) — portrait 값이 이미지 URL이면 <img>,
+// 아니면 지금까지처럼 이모지 한 글자를 그대로 보여줌. 새 컬럼/테이블 없이
+// characters.portrait(nullable text, 형식 제약 없음)에 URL을 그대로 저장하는
+// 방식이라, 기존 이모지 캐릭터는 전혀 안 건드려도 회귀 없이 그대로 동작함.
+// 로직이 한 줄짜리 정규식 수준이라 공용 파일로 안 빼고(item-sets.js 등과
+// 달리 데이터 드리프트 위험이 없음) roster-select.html/roster-index.html에도
+// 각자 복붙해서 씀.
+function isImagePortrait(p) {
+  return /^(https?:|data:)/i.test(p || "");
+}
+function renderPortrait(p) {
+  return isImagePortrait(p)
+    ? `<img src="${p}" alt="" />`
+    : (p || "❓");
+}
+
 function hasItem(data, itemName) {
   const inKeyItems = (data.keyItems || []).some((name) => name === itemName);
   const inEquipment = Object.values(data.equipment || {}).some((it) => it && it.name === itemName);
@@ -737,7 +765,11 @@ function renderProfile() {
   const expPct = Math.round((data.exp / data.expToNext) * 100);
   el.innerHTML = `
     <div class="block">
-      <div class="portrait">${data.portrait}</div>
+      <div class="portrait ${isImagePortrait(data.portrait) ? "has-image" : ""}">${renderPortrait(data.portrait)}</div>
+      <div class="portrait-url-row">
+        <input type="text" id="portraitUrlInput" placeholder="이미지 URL을 붙여넣으면 초상화로 사용됩니다" value="${isImagePortrait(data.portrait) ? data.portrait : ""}" />
+        <div class="portrait-url-hint">비워두면 이모지(${data.portrait && !isImagePortrait(data.portrait) ? data.portrait : "❓"})로 표시돼요. 권장 비율 3:4(예: 300×400).</div>
+      </div>
       <div class="char-title">${data.name}</div>
       <div class="char-sub">${data.job}</div>
       <div class="level-row"><span class="lv-num">Lv. ${data.level}</span><span class="lv-label">NEXT ${data.exp.toLocaleString()} / ${data.expToNext.toLocaleString()} EXP</span></div>
@@ -786,6 +818,15 @@ function renderProfile() {
       markDirty("profile");
       renderProfile();
     });
+  });
+
+  // 초상화 URL 입력 — 비우면 이모지로 되돌아감(renderPortrait의 "" 폴백,
+  // ❓로 표시됨). blur 시점에만 반영해서 타이핑 중에는 재렌더링이 안 끼어들게 함.
+  const portraitInput = document.getElementById("portraitUrlInput");
+  if (portraitInput) portraitInput.addEventListener("change", () => {
+    data.portrait = portraitInput.value.trim();
+    markDirty("profile");
+    renderProfile();
   });
 
   const guardBtn = document.getElementById("guardToggleBtn");
@@ -844,7 +885,11 @@ function renderAdvancementSection() {
       const adv = advancements[idx];
       if (!adv) return;
       data.job = adv.toJob;
-      if (adv.portrait) data.portrait = adv.portrait;
+      // 커스텀 이미지(URL)를 설정해둔 캐릭터는 전직해도 그대로 유지함
+      // (2026-08-21) — 예전엔 무조건 전직표의 고정 이모지로 덮어써서,
+      // 어렵게 붙여둔 초상화 이미지가 전직 한 번에 날아갔음. 지금 이모지인
+      // 캐릭터만(=커스텀 이미지가 없는 경우만) 새 이모지로 갱신됨.
+      if (adv.portrait && !isImagePortrait(data.portrait)) data.portrait = adv.portrait;
       markDirty("profile");
       renderProfile();
       renderStatSection();       // 직업이 바뀌면 습득 스킬 후보(SKILL_TABLE 조회 키)도 바뀜 — 스킬 목록이 여기 있음

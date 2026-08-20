@@ -35,41 +35,35 @@
   .village-link:hover { border-color:var(--gold); color:var(--gold); }
 
   main { flex:1; padding:24px 40px 48px; }
+  /* 2026-08-21: 카드를 이미지·이름·직업·레벨만 남기는 걸로 슬림화하고
+     이미지를 크게 키움(300×400과 같은 3:4 비율) — Max HP/SP·패턴 활성
+     줄 수는 정보량이 과하다는 판단으로 뺌(정확한 값은 정보창에서 확인).
+     카드 폭은 아래 .thumb width 하나만 바꾸면 같이 조정됨. */
   .grid {
-    display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px;
   }
 
   a.card { text-decoration:none; color:inherit; }
   .card {
     background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:16px; display:flex; flex-direction:column; gap:10px;
+    overflow:hidden; display:flex; flex-direction:column;
     transition:border-color 0.15s ease, transform 0.1s ease;
   }
   .card:hover { border-color:var(--gold); transform:translateY(-2px); }
 
-  .card-top { display:flex; align-items:center; gap:12px; }
   .thumb {
-    width:52px; height:52px; border-radius:8px; flex-shrink:0;
-    background:var(--panel-raised); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center; font-size:24px;
+    width:100%; aspect-ratio:3/4;
+    background:var(--panel-raised); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-size:64px;
+    overflow:hidden;
   }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card-body { padding:12px 14px 14px; }
   .card-name { font-family:'Cinzel',serif; font-size:15px; color:#f2efe8; line-height:1.3; }
   .card-job { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); margin-top:2px; }
 
-  .lv-row { display:flex; align-items:baseline; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
+  .lv-row { display:flex; align-items:baseline; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); margin-top:8px; }
   .lv-row .lv { color:var(--gold); }
-
-  .mini-bar-row { display:flex; flex-direction:column; gap:5px; }
-  .mini-bar-label { display:flex; justify-content:space-between; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mist-dim); }
-  .mini-bar { height:5px; border-radius:3px; background:var(--panel-raised); border:1px solid var(--line); overflow:hidden; }
-  .mini-bar > i { display:block; height:100%; }
-  .mini-bar.hp > i { background:var(--ember); }
-  .mini-bar.sp > i { background:var(--cyan); }
-
-  .card-footer { display:flex; align-items:center; justify-content:space-between; margin-top:2px; }
-  .pattern-count { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
-  .open-hint { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--gold); opacity:0; transition:opacity 0.15s ease; }
-  .card:hover .open-hint { opacity:1; }
 
   .mock-badge {
     font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim);
@@ -163,6 +157,15 @@
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
 <script>
+  // 초상화 이중 모드 렌더링 — character-sheet.html과 동일한 로직(공용
+  // 파일로 안 빼는 이유도 거기 주석 참고).
+  function isImagePortrait(p) {
+    return /^(https?:|data:)/i.test(p || "");
+  }
+  function renderPortrait(p) {
+    return isImagePortrait(p) ? `<img src="${p}" alt="" />` : (p || "❓");
+  }
+
   // DB 행(snake_case)을 기존 렌더링 코드가 기대하는 camelCase 모양으로 매핑.
   // 렌더링/추정 함수 자체는 최대한 안 건드리고 이 어댑터에서만 흡수함.
   function mapCharacterRow(row) {
@@ -200,54 +203,22 @@
       return;
     }
     grid.innerHTML = "";
-    // character-sheet.html과 동일한 기본 공식(1+⌊INT/10⌋) + 장착 장비의
-    // pattern_slot_bonus. 세트 보너스까지는 카드 요약에서 생략(정확한 값은 정보창에서).
-    // warehouse_items.held_by가 장비 장착의 유일한 진실 공급원이라(equipment
-    // 컬럼 없음), 캐릭터별 장착 아이템은 배열로 미리 그룹핑해서 받음 — 예전
-    // Object.values(r.equipment)가 하던 일을 이 배열이 그대로 대신함.
-    function estimateMaxPatternSlots(r) {
-      const base = 1 + Math.floor((r.realStats?.int || 0) / 10);
-      const items = equippedByCharacter[r.id] || [];
-      const itemBonus = items.reduce((sum, it) => sum + (it.pattern_slot_bonus || 0), 0);
-      return base + itemBonus;
-    }
-    // Max HP/SP도 마찬가지로 공식(JOB_BASE_HP+STR×20 등) + 장비의 real형 스탯
-    // 보너스(stat_real_bonus)까지 반영해 추정(세트 보너스는 카드 요약에서 생략).
-    function estimateEquipRealBonus(r, key) {
-      const items = equippedByCharacter[r.id] || [];
-      return items.reduce((sum, it) => sum + ((it.stat_real_bonus && it.stat_real_bonus[key]) || 0), 0);
-    }
-    function estimateMaxHp(r) {
-      const str = (r.realStats?.str || 0) + estimateEquipRealBonus(r, "str");
-      return 200 + Math.floor(str * 20);
-    }
-    function estimateMaxSp(r) {
-      const int = (r.realStats?.int || 0) + estimateEquipRealBonus(r, "int");
-      return 50 + Math.floor(int * 10);
-    }
 
+    // 2026-08-21: 카드는 이미지·이름·직업·레벨만 보여줌(Max HP/SP·패턴 활성
+    // 줄 수 추정 로직은 정보 과다 판단으로 제거 — 정확한 값은 정보창에서
+    // 확인). equippedByCharacter는 카드 표시엔 더 이상 안 쓰이지만 fetch
+    // 자체는 유지함 — 아래 튜토리얼 조건 판정(tutorialCtx.equippedCount)이
+    // 여전히 그 데이터를 씀.
     roster.forEach(r => {
-      const rows = (r.presets && r.presets[0] && r.presets[0].rows.length) || 0;
-      const maxPatternSlots = estimateMaxPatternSlots(r);
       const a = document.createElement("a");
       a.className = "card";
       a.href = `character-sheet.html?id=${encodeURIComponent(r.id)}`;
       a.innerHTML = `
-        <div class="card-top">
-          <div class="thumb">${r.portrait}</div>
-          <div>
-            <div class="card-name">${r.name}</div>
-            <div class="card-job">${r.job}</div>
-          </div>
-        </div>
-        <div class="lv-row"><span>레벨</span><span class="lv">Lv. ${r.level}</span></div>
-        <div class="mini-bar-row">
-          <div class="mini-bar-label"><span>Max HP</span><span>${estimateMaxHp(r)}</span></div>
-          <div class="mini-bar-label"><span>Max SP</span><span>${estimateMaxSp(r)}</span></div>
-        </div>
-        <div class="card-footer">
-          <span class="pattern-count">패턴 ${Math.min(rows, maxPatternSlots)}/${maxPatternSlots} 활성 · 저장 ${rows}줄</span>
-          <span class="open-hint">정보창 열기 →</span>
+        <div class="thumb">${renderPortrait(r.portrait)}</div>
+        <div class="card-body">
+          <div class="card-name">${r.name}</div>
+          <div class="card-job">${r.job}</div>
+          <div class="lv-row"><span>레벨</span><span class="lv">Lv. ${r.level}</span></div>
         </div>
       `;
       grid.appendChild(a);
