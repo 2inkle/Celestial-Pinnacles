@@ -457,8 +457,16 @@ function applyEffect(caster, target, effect, ctx) {
       const label = { atk: "공격력", matk: "마법공격력", def: "방어력", mdef: "마법방어력" }[statKey] || statKey.toUpperCase();
       // 고정치(atkUp 등)와 달리 "그 순간 값의 %"라 실제 증가량이 매번 다름 —
       // 정확한 수치 대신 적용된 %만 알려줌(퍼센티지 효과는 전부 이 원칙).
-      const normal = `${target.name}의 ${label} +${effect.value}%.`;
-      return describeStatCap(target, capKey, label, true, normal);
+      // effect.value가 음수면 디버프(Break Down 등 실제 게임의 대부분의
+      // %디버프가 이 방식으로 구현돼 있음 — 별도 combatStatDownPercent
+      // 타입은 데이터상 전혀 안 쓰임) — atkUp/atkDown 케이스와 마찬가지로
+      // 부호에 따라 "+" 유무와 캡 판정 방향(증가 상한/감소 하한)을 갈라야
+      // 함. 2026-08-21 수정 전에는 항상 "+"를 붙이고 항상 증가 캡으로만
+      // 판정해서, 디버프인데 "+-30%"로 표시되고 캡 메시지도 "더 이상
+      // 증가할 수 없다"로 거꾸로 나왔음(실전투 로그로 발견).
+      const sign = effect.value >= 0 ? "+" : "";
+      const normal = `${target.name}의 ${label} ${sign}${effect.value}%.`;
+      return describeStatCap(target, capKey, label, effect.value >= 0, normal);
     }
 
     // STR/INT/DEX/SPD/LUK 중 하나를 그 순간 effective 값의 %만큼 올림 —
@@ -473,8 +481,12 @@ function applyEffect(caster, target, effect, ctx) {
       const currentEffective = target[`effective${capKey}`];
       const increase = Math.floor(currentEffective * (effect.value / 100));
       target[`bonus${capKey}`] += increase;
-      const normal = `${target.name}의 ${statKey.toUpperCase()} +${effect.value}%.`;
-      return describeStatCap(target, capKey, statKey.toUpperCase(), true, normal);
+      // combatStatUpPercent와 동일한 이유로 부호에 따라 "+"·캡 판정 방향을
+      // 가름(음수 = MindBreak/Exorcism 등 디버프 — statDownPercent 타입은
+      // 데이터상 안 쓰임). 2026-08-21 수정.
+      const sign = effect.value >= 0 ? "+" : "";
+      const normal = `${target.name}의 ${statKey.toUpperCase()} ${sign}${effect.value}%.`;
+      return describeStatCap(target, capKey, statKey.toUpperCase(), effect.value >= 0, normal);
     }
 
     // value(%)만큼 대상의 현재 effective 스탯을 깎음(고정치가 아니라 그 순간의
