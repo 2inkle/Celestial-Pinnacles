@@ -109,6 +109,54 @@ Jammer/FullBreak/Disarm/OMEN 등 게임 전역의 %디버프 스킬 전부(35개
 방어력 -30%."`로 바뀌는 것을 직접 실측 확인. `demo-*.js`(42개)+`index.js`
 전체 회귀 통과.
 
+## 알려진 버그 — HP/SP 조건에서 "pt"(절대치) 단위를 골라도 항상 %로 번역되던 문제 (2026-08-21, 수정됨)
+
+**증상(사용자 신고)**: 관리자 계정의 캐릭터 "레나"가 1번 패턴 슬롯
+Mana Recharge만 계속 쓰고 2/3번 슬롯(SpellFocus/Lightning Ball)을 전혀
+안 씀. 신고된 패턴:
+```json
+{ "rows": [
+  { "unit":"pt", "value":150, "action":"Mana Recharge", "metric":"sp", "subject":"self", "comparator":"lt" },
+  { "action":"SpellFocus", "metric":"always", "maxUses":1, "subject":"self" },
+  { "action":"Lightning Ball", "metric":"always", "subject":"self" }
+] }
+```
+
+**원인**: 패턴 편집기의 조건 상세 입력에는 단위 드롭다운(`["%","pt","개","턴"]`)이
+있고 사용자가 "SP < 150"을 **절대치**(pt)로 의도해서 unit을 "pt"로 저장한
+상태였다. 그런데 `battle-adapter.js`의 `translateCondition()`이
+`row.unit`을 전혀 안 보고 HP/SP 조건을 **항상** `MY_HP_LESS_THAN_PCT`/
+`MY_SP_LESS_THAN_PCT`(최대치 대비 %)로만 번역하고 있었음 — 엔진에
+절대치 비교 조건 자체가 없어서, "pt"를 골라도 사실상 무시되고 값이
+그대로 %로 취급됐다. 그 결과 "SP < 150"이 "SP% < 150"이 돼버렸는데,
+SP%의 최댓값은 100이라 **이 조건은 수학적으로 항상 참**이었다 —
+그래서 1번 슬롯이 매턴 무조건 선택되고, 아래 슬롯들은 영원히 평가될
+기회조차 없었다. 위에서 이미 문서화된 "패턴 슬롯 선택은 조건만 보고
+평가를 멈춘다"는 엔진 규칙과 결합해서, 조건이 (구현 누락 때문에) 사실상
+`always`와 동일하게 작동한 셈 — 개인 자원 조건이 UI에 아예 없었던
+과거 버그(위 "패턴 편집기에 개인 자원 개수 조건" 섹션)와 같은 계열:
+"UI가 선택지를 보여주지만 엔진이 그 선택을 실제로 반영하지 않는" 패턴.
+
+**수정**:
+- `src/registries.js`에 `MY_HP_LESS_THAN_ABS`/`MY_SP_LESS_THAN_ABS`
+  신설 — `actor.currentHp`/`actor.currentSp`를 `value`와 직접 비교(최대치
+  대비 %로 환산하지 않음). 기존 PCT 버전과 마찬가지로 `lt`/`lte`를
+  구분하지 않고 항상 `<=`로 판정(기존 컨벤션 유지 — 이번 수정 범위 밖).
+- `battle-adapter.js`의 `translateCondition()`이 HP/SP self 조건을 번역할
+  때 `row.unit === "pt"`면 새 ABS 조건으로, 아니면(기본값 `"%"`) 기존
+  PCT 조건으로 분기하도록 수정. `unit`을 지정 안 한 기존 패턴(전부 %로
+  저장돼 있음)은 그대로 PCT로 번역돼 회귀 없음.
+- UI(`character-sheet.html`)는 안 건드림 — 단위 드롭다운은 이미 "pt"를
+  선택할 수 있었고, 이번 수정으로 그 선택이 처음으로 실제 의미를 갖게 됨.
+
+**검증**: `demo-hp-sp-abs-condition.js` 신설(8개 결정적 체크) —
+`loadAdapterEnv()`로 실제 `battle-adapter.js`(수정된 진짜 코드, 복붙 아님)를
+그대로 얹어서 ①레나가 신고한 row 그대로 `translatePatternRow()`를 호출해
+`MY_SP_LESS_THAN_ABS`로 정확히 번역되는지, ②그 조건이 SP 절대값 기준으로
+정확히 참/거짓 판정되는지(풀 SP=거짓, SP=100=참, SP=151=거짓), ③unit
+미지정 기존 패턴은 여전히 PCT로 번역돼 회귀가 없는지, ④HP 쪽도 동일하게
+동작하는지 — 전부 통과. `demo-*.js`(43개)+`index.js` 전체 회귀도 통과.
+
 ## 알려진 버그 — 패턴 편집기에 "개인 자원(화살 등) 개수" 조건을 만들 방법이 아예 없었음 (2026-08-17, 수정됨)
 
 **증상(사용자 신고)**: 아래 패턴을 가진 화이트아크가 전투에서 공격을 전혀

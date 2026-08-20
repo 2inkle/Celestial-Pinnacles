@@ -72,6 +72,20 @@ ConditionRegistry.register("MY_SP_LESS_THAN_PCT", (actor, ctx, value) => {
   return (actor.currentSp / actor.maxSp) * 100 <= value;
 });
 
+// 절대치(포인트) 버전 — 패턴 편집기가 HP/SP 조건에 "%"와 "pt" 두 단위를
+// 고를 수 있게 해뒀는데, "pt"를 골라도 battle-adapter.js가 항상 위의 PCT
+// 조건으로만 번역해서 값을 그대로 %로 취급해버리던 버그가 있었음(2026-08-21,
+// 실제 유저 캐릭터 "레나"의 패턴 — "SP < 150"을 절대치로 의도하고 pt를
+// 골랐는데 "SP% < 150"으로 번역돼 사실상 항상 참이 되어 그 슬롯만 매턴
+// 반복 발동했음). battle-adapter.js가 row.unit이 "pt"면 이 조건으로,
+// 아니면 위의 PCT 조건으로 번역함.
+ConditionRegistry.register("MY_HP_LESS_THAN_ABS", (actor, ctx, value) => {
+  return actor.currentHp <= value;
+});
+ConditionRegistry.register("MY_SP_LESS_THAN_ABS", (actor, ctx, value) => {
+  return actor.currentSp <= value;
+});
+
 // MY_HP_LESS_THAN_PCT의 "파티 전체" 버전 — 자기 자신이 아니라 자기 진영
 // 아군 중 한 명이라도 HP%가 이 값 이하면 true. "누군가 위험하면 반응한다"는
 // 힐러 패턴(예: 평시엔 다른 행동, 위급 시에만 강한 회복기 사용)에 씀

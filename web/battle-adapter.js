@@ -100,15 +100,23 @@
   function translateCondition(row) {
     if (row.metric === "always") return { cond: "ALWAYS", val: 0 };
     if (row.metric === "notGuarding") return { cond: "NOT_GUARDING", val: null };
+    // row.unit === "pt"면 절대치(현재 HP/SP 값 그대로)로, 아니면(기본 "%")
+    // 최대치 대비 퍼센트로 번역함 — 예전엔 unit을 전혀 안 보고 항상 PCT로만
+    // 번역해서, "pt"를 골라도 값이 그대로 %로 취급되는 버그가 있었음
+    // (2026-08-21, MY_HP_LESS_THAN_ABS/MY_SP_LESS_THAN_ABS 참고).
     if (row.metric === "hp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
-      return { cond: "MY_HP_LESS_THAN_PCT", val: row.value };
+      return row.unit === "pt"
+        ? { cond: "MY_HP_LESS_THAN_ABS", val: row.value }
+        : { cond: "MY_HP_LESS_THAN_PCT", val: row.value };
     }
     // "자기 진영 중 누군가라도 HP가 낮으면" — subject가 "anyAlly"일 때.
     if (row.metric === "hp" && row.subject === "anyAlly" && (row.comparator === "lte" || row.comparator === "lt")) {
       return { cond: "ANY_ALLY_HP_LESS_THAN_PCT", val: row.value };
     }
     if (row.metric === "sp" && row.subject === "self" && (row.comparator === "lte" || row.comparator === "lt")) {
-      return { cond: "MY_SP_LESS_THAN_PCT", val: row.value };
+      return row.unit === "pt"
+        ? { cond: "MY_SP_LESS_THAN_ABS", val: row.value }
+        : { cond: "MY_SP_LESS_THAN_PCT", val: row.value };
     }
     if (row.metric === "battleTurn" && (row.comparator === "gte" || row.comparator === "gt")) {
       return { cond: "BATTLE_TURN_AT_LEAST", val: row.value };
