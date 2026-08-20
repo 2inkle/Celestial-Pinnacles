@@ -88,9 +88,27 @@
     return found ? found.name : battleId;
   }
 
+  // 이 전투가 속한 테마 객체(section 등 테마 단위 메타데이터를 알아야 할 때).
+  function themeOfBattle(battleId) {
+    return BATTLE_THEMES.find((t) => (t.battles || []).some((b) => b.id === battleId)) || null;
+  }
+
+  // 특수의뢰(AFTERMATH) 구획인지 — section 하나를 단일 진실 공급원으로 삼음.
+  // 2026-08-20 신설: 예전엔 roster-select.html이 `AFTERMATH_THEMES =
+  // ["goblinAftermath"]`라는 하드코딩 사본을 들고 있었는데, 나중에 추가된
+  // unknownEncounter("???")가 그 목록에 빠지면서 "AFTERMATH엔 연습 모드가
+  // 없다"는 설계가 조용히 깨져 있었음(???에 연습하기 버튼이 노출됐음).
+  // 여기서 파생시키면 새 AFTERMATH 테마를 추가해도 목록 갱신이 필요 없음.
+  function isAftermathBattle(battleId) {
+    const theme = themeOfBattle(battleId);
+    return !!theme && theme.section === "aftermath";
+  }
+
   window.BattleThemes = {
     BATTLE_THEMES,
     findBattleById,
     battleNameById,
+    themeOfBattle,
+    isAftermathBattle,
   };
 })();

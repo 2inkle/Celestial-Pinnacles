@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>전투 화면(초안) · Battle View Draft</title>
+<title>전투 · Battle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -29,23 +29,21 @@
     border:1px solid var(--line); padding:7px 14px; border-radius:20px; white-space:nowrap;
   }
   .nav-link:hover { border-color:var(--gold); color:var(--gold); }
-  .mock-badge {
-    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em; color:var(--mist-dim);
-    border:1px dashed var(--line); border-radius:20px; padding:5px 12px; display:inline-block; margin-top:12px;
-  }
 
   main { flex:1; padding:32px 40px 48px; display:flex; flex-direction:column; align-items:center; gap:18px; }
 
   /* ==========================================================
-     전투 배너 — 16:5 비율, 실제 이미지 대신 CSS로 테마 배경 표현
-     (석양 지는 폐허 아레나 콘셉트). 나중에 진짜 지역별 배경 이미지로
-     교체할 자리 — 지금은 layout-only 러프 버전.
+     전투 배너 — 실제 이미지 대신 CSS로 테마 배경 표현(석양 지는 폐허
+     아레나 콘셉트). 나중에 진짜 지역별 배경 이미지로 교체할 자리.
+     2026-08-20: 진형 프리뷰(적/아군 토큰)를 없애면서 순수 타이틀
+     스트립으로 슬림화(16:5 → 16:3) — "바로 전투" 취지에 맞게 빈
+     아레나가 결과 위를 크게 차지하지 않도록.
   ========================================================== */
   .battle-banner {
     position: relative;
     width: 100%;
     max-width: 1120px;
-    aspect-ratio: 16 / 5;
+    aspect-ratio: 16 / 3;
     border-radius: 14px;
     overflow: hidden;
     border: 1px solid var(--line);
@@ -84,55 +82,19 @@
     text-shadow:0 2px 6px #000000aa;
   }
 
-  /* 진영 컨테이너 */
-  .side { position:absolute; top:8%; bottom:10%; width:44%; display:flex; }
-  .side.ally { left:0; flex-direction:row; justify-content:flex-end; }
-  .side.enemy { right:0; flex-direction:row-reverse; justify-content:flex-end; }
-  .row-group { display:flex; flex-direction:column; justify-content:space-around; align-items:center; height:100%; padding:0 2%; }
-
-  .unit {
-    display:flex; flex-direction:column; align-items:center; gap:4px;
-    filter: drop-shadow(0 4px 8px #00000080);
+  .entry-block {
+    max-width:820px; width:100%; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--mist-dim);
+    border:1px solid var(--line); border-radius:10px; padding:16px 18px; line-height:1.7; text-align:center;
   }
-  .unit .token {
-    width:56px; height:56px; border-radius:50%;
-    display:flex; align-items:center; justify-content:center; font-size:26px;
-    background: var(--panel); border:2px solid var(--line);
-  }
-  .side.ally .unit .token { border-color: var(--cyan-dim); }
-  .side.enemy .unit .token { border-color: var(--danger); }
-  .unit.empty .token { opacity:0.25; border-style:dashed; font-size:16px; }
-  .unit .u-name {
-    font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#f2efe8;
-    background:#00000080; padding:1px 6px; border-radius:8px; white-space:nowrap;
-  }
-  .unit .u-hpbar { width:44px; height:4px; border-radius:2px; background:#00000080; overflow:hidden; }
-  .unit .u-hpbar i { display:block; height:100%; background:var(--cyan); width:100%; }
-  .side.enemy .unit .u-hpbar i { background: var(--danger); }
+  .entry-block b { color:var(--gold); }
+  .entry-block a { color:var(--cyan); }
 
-  .row-label {
-    position:absolute; font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.1em;
-    color:var(--mist-dim); text-transform:uppercase; top:-2px;
-  }
-
-  .legend { display:flex; gap:22px; flex-wrap:wrap; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); }
-  .legend b { color:#f2efe8; }
-
-  .note-box {
-    max-width:1120px; width:100%; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim);
-    border:1px dashed var(--line); border-radius:10px; padding:14px 16px; line-height:1.7;
-  }
-  .note-box b { color:var(--gold); }
-
-  /* ── 아래부터는 battle-log-view.html 벤치마크 초안에서 그대로 가져온 현황판/
-     로그/결과 스타일 — "전투 시작" 누르면 실제 어댑터→엔진으로 돌린 결과를
-     이 스타일로 렌더링함. ── */
-  .run-btn-row { display:flex; justify-content:center; width:100%; max-width:1120px; }
+  .run-btn-row { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; max-width:820px; }
   .run-btn {
     font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.04em; padding:12px 28px;
     background:var(--ember); color:#1a1108; border:none; border-radius:8px; cursor:pointer; font-weight:600;
   }
-  .run-btn:hover { opacity:0.9; }
+  .run-btn:hover:not(:disabled) { opacity:0.9; }
   .run-btn:disabled { background:var(--panel-raised); color:var(--mist-dim); cursor:not-allowed; }
 
   .battle-log-wrap { max-width:820px; width:100%; }
@@ -160,12 +122,11 @@
 <header>
   <div class="header-top">
     <div>
-      <div class="eyebrow">Battle Scene · Draft</div>
-      <h1>전투 화면 (러프 초안)</h1>
+      <div class="eyebrow">Battle</div>
+      <h1>전투</h1>
     </div>
     <a class="nav-link" href="battle-select.html">← 전투 선택으로</a>
   </div>
-  <div class="mock-badge">⚠ 레이아웃 구조 확인용 — 실제 전투 로직·이미지 자산과는 아직 연결 안 됨</div>
 </header>
 
 <main>
@@ -175,22 +136,11 @@
     <div class="battle-vignette"></div>
   </div>
 
-  <div class="legend">
-    <span><b>🔵 청록 테두리</b> = 아군</span>
-    <span><b>🔴 빨강 테두리</b> = 적군</span>
-    <span>전열이 항상 중앙 쪽(대치선)에 더 가깝게, 후열은 그 뒤에 배치됨</span>
-  </div>
-
-  <div class="note-box">
-    <b>지금 이 화면에 대해:</b> 위 배치는 실제 시작 진형 미리보기예요. 아래 <b>전투 시작</b> 버튼을 누르면 이 편성 그대로
-    실제 엔진(BattleEngine)이 돌아가고, 그 결과(턴별 로그 + 최종 결과)가 그 아래에 표시됩니다.
-  </div>
-
-  <div class="run-btn-row">
-    <button class="run-btn" id="runBattleBtn">⚔️ 전투 시작</button>
-  </div>
-
+  <div class="battle-log-wrap" id="entryGateWrap" style="display:none;"></div>
   <div class="battle-log-wrap" id="battleLogWrap"></div>
+  <div class="run-btn-row" id="rerunRow" style="display:none;">
+    <button class="run-btn" id="runBattleBtn">⚔️ 다시 전투하기</button>
+  </div>
   <div class="battle-log-wrap" id="saveLogRow" style="display:none; margin-top:14px;"></div>
 </main>
 
@@ -206,6 +156,7 @@
 <script src="../src/engine.js"></script>
 <script src="battle-encounters.js"></script>
 <script src="battle-themes.js"></script>
+<script src="battle-entry.js"></script>
 <script src="exp-table.js"></script>
 <script src="battle-adapter.js"></script>
 <script src="battle-log-render.js"></script>
@@ -351,7 +302,7 @@
   //                      우선 배치되고, 남은 자리만 가중치 추첨으로 채움.
   // ============================================================================
   // 편성 테이블과 추첨 로직은 battle-encounters.js로 분리됨(파견 페이지와 공용)
-  const { BATTLE_MONSTER_POOLS, RARE_THRESHOLD, spawnEnemies, computePoolProbabilities } = window.BattleEncounters;
+  const { spawnEnemies } = window.BattleEncounters;
 
   // 희귀 등장 표시 기준 — 이 비율 미만이면 이름 앞에 [Rare] 태그가 붙음.
   // guaranteed(보스 등 확정 등장)는 애초에 "희귀"가 아니므로 대상에서 제외.
@@ -360,43 +311,6 @@
   // 계산. maxCount가 1일 때는 이 값이 곧 정확한 등장 확률과 같음(추첨이 한 번뿐이라
   // 상한/순차 효과가 끼어들 일이 없음) — maxCount가 여러 번이면 참고용 근사치.
 
-
-  function formatMonsterLabel(entry) {
-    const monster = MONSTER_TABLE[entry.monsterId];
-    const tag = entry.isRare ? "[Rare] " : "";
-    return `${tag}${monster.name}`;
-  }
-
-
-  function weightedPick(candidates) {
-    const totalWeight = candidates.reduce((sum, c) => sum + c.weight, 0);
-    let roll = Math.random() * totalWeight;
-    for (const c of candidates) {
-      if (roll < c.weight) return c;
-      roll -= c.weight;
-    }
-    return candidates[candidates.length - 1]; // 부동소수 오차 방어
-  }
-
-  // BATTLE_MONSTER_POOLS + MONSTER_TABLE을 갖고 실제 등장할 적 유닛을 뽑음.
-  // 1) guaranteed 후보를 먼저 자리 채우고, 2) 남은 자리는 상한 안 찬 후보들
-  // 중에서 가중치 추첨 — 후보가 하나만 남으면 그 자리는 확정으로 그게 뽑힘.
-
-
-  function buildRowGroupHTML(units, maxSlots = 5) {
-    const slots = [...units];
-    while (slots.length < maxSlots) slots.push(null);
-    return slots.slice(0, maxSlots).map((u) => {
-      if (!u) return `<div class="unit empty"><div class="token">—</div></div>`;
-      return `
-        <div class="unit">
-          <div class="token">${u.portrait || "❓"}</div>
-          <div class="u-hpbar"><i></i></div>
-          <div class="u-name">${u.name}</div>
-        </div>
-      `;
-    }).join("");
-  }
 
   // 전투 이름은 battle-themes.js(BATTLE_THEMES) 공용 정의를 씀 — 예전엔 이
   // 파일에 따로 사본이 있었는데, 존재하지 않는 "gate-ambush"가 들어있고 실제
@@ -409,36 +323,13 @@
     if (name) document.getElementById("bannerCaption").textContent = name;
   }
 
-  function render() {
-    const roster = cachedRoster;
-    const params = new URLSearchParams(location.search);
-    const partyParam = params.get("party");
-    const battleId = params.get("battle");
-    // roster-select.html에서 party(선택된 용병 id 목록)를 넘겨줬으면 그 인원만,
-    // 없으면(직접 접속 등) 기존처럼 로스터 전체를 보여줌 — 하위 호환용 폴백.
-    const party = partyParam
-      ? roster.filter((r) => partyParam.split(",").includes(String(r.id)))
-      : roster;
-
-    const enemies = spawnEnemies(battleId);
-    const allyFront = party.filter((r) => (r.row || "front") === "front");
-    const allyBack = party.filter((r) => r.row === "back");
-    const enemyFront = enemies.filter((e) => e.row === "front");
-    const enemyBack = enemies.filter((e) => e.row === "back");
-
-    const banner = document.getElementById("banner");
-    const sideHTML = `
-      <div class="side ally">
-        <div class="row-group">${buildRowGroupHTML(allyBack)}</div>
-        <div class="row-group">${buildRowGroupHTML(allyFront)}</div>
-      </div>
-      <div class="side enemy">
-        <div class="row-group">${buildRowGroupHTML(enemyBack)}</div>
-        <div class="row-group">${buildRowGroupHTML(enemyFront)}</div>
-      </div>
-    `;
-    banner.insertAdjacentHTML("beforeend", sideHTML);
-  }
+  // 2026-08-20: 진형 프리뷰(render(), buildRowGroupHTML())를 제거함 —
+  // spawnEnemies()가 캐싱 없는 순수 랜덤이라 프리뷰가 뽑은 적과 실제
+  // 전투(runRealBattle)가 뽑는 적이 서로 달랐음(사용자가 "임의의 로스터
+  // 프리뷰"라 부른 이유). 어떤 몬스터가 나올 수 있는지는 이미
+  // roster-select.html의 renderMonsterPreview()가 등장 확률까지 정확히
+  // 보여주므로 정보 손실 없이 제거됨. formatMonsterLabel/weightedPick도
+  // 호출부가 없던 battle-encounters.js 로직의 낡은 사본이라 같이 제거.
 
   // 파서/렌더러(parseBattleLog/renderBattleLog 등)는 battle-log-render.js로
   // 추출됨(2026-08-18) — window.BattleLogRender.* 로 호출.
@@ -451,15 +342,83 @@
     return username;
   }
 
+  // ============================================================================
+  // 입장조건 검사·차감 — 2026-08-20 신설. 예전엔 이 비용을 battle-select.html이
+  // 페이지를 떠나기 "직전"에 딱 한 번만 부과했는데, battle-view.html은 입장
+  // 조건을 한 번도 검사하지 않아서 URL을 직접 열거나 재전투를 반복하면
+  // AFTERMATH를 조건 없이 무한 재도전할 수 있었다. 이제 전투를 "실행할 때마다"
+  // (최초 자동 실행이든, 새로고침이든, 아래 재전투 버튼이든 전부 이 함수를
+  // 거침) 여기서 자격을 확인하고 비용을 차감한다 — "새로고침으로 재도전해도
+  // 좋다, 입장조건만 제대로 확인하고 통과시킨다면"이라는 방침 그대로.
+  // battle-select.html은 더 이상 비용을 부과하지 않음(이중 차감 방지,
+  // web/battle-entry.js 참고) — 배지 표시만 남아있음.
+  // ============================================================================
+  async function ensureEntryAllowed(battleId, isPractice) {
+    if (isPractice) return true; // 연습은 비용 없음(기존 방침 그대로)
+
+    const battle = window.BattleThemes.findBattleById(battleId);
+    const costly = (battle?.requirements || []).filter(
+      (r) => r.type === "consumesItem" || r.type === "attemptCooldownHours");
+    if (costly.length === 0) return true; // 비용 없는 전투 — 마찰 없이 즉시 실행
+
+    window.BattleEntry.setContext({ sbClient: window.sbClient, userId: session.user.id });
+
+    const attemptReq = costly.find((r) => r.type === "attemptCooldownHours");
+    if (attemptReq) {
+      const progress = await window.BattleEntry.fetchProgress(battleId);
+      const remainingMs = window.BattleEntry.remainingAttemptCooldownMs(progress.attemptedAt, attemptReq.value);
+      if (remainingMs > 0) {
+        renderEntryGate(`아직 재도전할 수 없어요. <b>${window.BattleEntry.formatDuration(remainingMs)}</b> 뒤에 다시 시도해 주세요.`);
+        return false;
+      }
+    }
+    if (!(await window.BattleEntry.hasEntryItems(battle))) {
+      renderEntryGate(`필요한 아이템이 부족해요.`);
+      return false;
+    }
+
+    const costLines = window.BattleEntry.describeEntryCost(battle);
+    if (!confirm(`이 전투에 입장합니다.\n\n${costLines.join("\n")}\n\n진행할까요?`)) {
+      renderEntryGate(`입장을 취소했어요.`);
+      return false;
+    }
+
+    if (!(await window.BattleEntry.consumeEntryItems(battle))) {
+      renderEntryGate(`필요한 아이템이 부족해요.`);
+      return false;
+    }
+    // 소모재 차감에 성공했으면 이 시점이 곧 "도전 시작" — 성패를 기다리지
+    // 않고 여기서 시계를 돌림(실패해도 대가를 치르게 하기 위함).
+    if (attemptReq) await window.BattleEntry.markAttempt(battleId);
+    return true;
+  }
+
+  function renderEntryGate(message) {
+    const el = document.getElementById("entryGateWrap");
+    el.style.display = "";
+    el.innerHTML = `<div class="entry-block">${message}<br/><a href="battle-select.html">← 전투 선택으로 돌아가기</a></div>`;
+  }
+
   async function runRealBattle() {
+    const rerunRow = document.getElementById("rerunRow");
     const btn = document.getElementById("runBattleBtn");
-    btn.disabled = true;
-    btn.textContent = "전투 진행 중...";
+    rerunRow.style.display = "none";
+    document.getElementById("entryGateWrap").style.display = "none";
 
     const roster = cachedRoster;
     const params = new URLSearchParams(location.search);
     const partyParam = params.get("party");
     const battleId = params.get("battle");
+    const isPractice = params.get("practice") === "1";
+
+    if (!(await ensureEntryAllowed(battleId, isPractice))) return;
+
+    // 계산은 동기라 긴 전투에서 화면이 잠깐 멈춘 것처럼 보일 수 있음 —
+    // placeholder를 먼저 그리고 한 번 페인트를 양보한 뒤 실제로 돌림.
+    document.getElementById("battleLogWrap").innerHTML =
+      `<div class="entry-block">⚔️ 전투를 치르는 중…</div>`;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     const party = partyParam
       ? roster.filter((r) => partyParam.split(",").includes(String(r.id)))
       : roster;
@@ -487,19 +446,31 @@
 
     // 연습 모드 — 보상 지급도, 클리어 기록도, 쿨다운 갱신도 하지 않음.
     // 순수하게 "이 빌드가 통하는지"만 확인하는 용도라 아무 흔적을 남기지 않음.
-    const isPractice = params.get("practice") === "1";
     if (isPractice) {
       const wrap = document.getElementById("battleLogWrap");
-      const notice = document.createElement("div");
-      notice.style.cssText = "margin:14px auto 0; max-width:900px; padding:12px 16px; border:1px dashed var(--cyan-dim); border-radius:8px; color:var(--cyan); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center;";
-      notice.textContent = "🧪 연습 모드 — 경험치·아이템·골드가 지급되지 않았고, 클리어 기록과 재도전 대기시간에도 영향이 없어요.";
-      wrap.parentNode.insertBefore(notice, wrap);
+      if (!document.getElementById("practiceNotice")) {
+        const notice = document.createElement("div");
+        notice.id = "practiceNotice"; // 재전투 때마다 안내가 중복으로 쌓이지 않게 함
+        notice.style.cssText = "margin:14px auto 0; max-width:900px; padding:12px 16px; border:1px dashed var(--cyan-dim); border-radius:8px; color:var(--cyan); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:center;";
+        notice.textContent = "🧪 연습 모드 — 경험치·아이템·골드가 지급되지 않았고, 클리어 기록과 재도전 대기시간에도 영향이 없어요.";
+        wrap.parentNode.insertBefore(notice, wrap);
+      }
     } else {
       await applyBattleRewards(result, roster);
       if (result.outcome === "allyWin") await markCleared(battleId);
     }
-    btn.textContent = "⚔️ 다시 전투하기";
-    btn.disabled = false;
+
+    // AFTERMATH는 "1회 진입 = 1회 전투"라 재전투 버튼을 아예 숨김(위
+    // ensureEntryAllowed가 비용을 다시 부과하긴 하지만, 소모재를 쥐고 있는
+    // 한 계속 재도전할 수 있는 건 이 구획의 설계 의도와 맞지 않음 — "몇 번이고
+    // 다시 도전 가능"이 아니라 "한 번의 시도가 신중해야 한다"가 핵심이므로).
+    if (isPractice || !window.BattleThemes.isAftermathBattle(battleId)) {
+      btn.textContent = "⚔️ 다시 전투하기";
+      btn.disabled = false;
+      rerunRow.style.display = "";
+    } else {
+      renderEntryGate(`이 전투는 한 번의 진입에 한 번만 도전할 수 있어요.`);
+    }
   }
 
   // ============================================================================
@@ -649,17 +620,15 @@
     }
   }
 
-  // 리스너는 즉시 등록하되 버튼은 부트스트랩이 끝날 때까지 비활성 상태로 둠
-  // (hire.html의 고용 버튼과 같은 방식) — runRealBattle이 session/cachedRoster/
-  // MONSTER_TABLE이 이미 채워졌다고 가정할 수 있어야 하기 때문.
-  const runBattleBtn = document.getElementById("runBattleBtn");
-  runBattleBtn.disabled = true;
-  runBattleBtn.addEventListener("click", runRealBattle);
+  // "다시 전투하기" 리스너 — 최초 전투는 부트스트랩이 자동으로 실행하므로
+  // 이 버튼은 재전투 전용(2026-08-20, 프리뷰+수동 시작 버튼 제거).
+  document.getElementById("runBattleBtn").addEventListener("click", runRealBattle);
 
   // ============================================================================
   // 부트스트랩 — 로그인 확인 → 캐릭터(+장착 장비) · 몬스터 로스터 · 골드를
-  // 받아온 뒤 첫 렌더. 렌더/전투 코드는 전부 위 캐시를 동기로 읽으므로 이게
-  // 끝나기 전에는 아무것도 그리지 않고 전투 버튼도 열지 않음.
+  // 받아온 뒤 곧바로 전투를 실행함(2026-08-20, 프리뷰+수동 "전투 시작" 버튼을
+  // 없애고 진입 즉시 자동 실행으로 바꿈). 전투/보상 코드는 전부 위 캐시를
+  // 동기로 읽으므로 이게 끝나기 전에는 아무것도 실행하지 않음.
   // ============================================================================
   (async () => {
     session = await window.AuthGuard.requireSession();
@@ -704,8 +673,7 @@
     }
 
     applyBattleCaption();
-    render();
-    runBattleBtn.disabled = false;
+    await runRealBattle();
   })();
 </script>
 

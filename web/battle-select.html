@@ -146,11 +146,12 @@
 </main>
 
 <script src="battle-themes.js"></script>
+<script src="battle-entry.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
 <script>
-  const { BATTLE_THEMES, findBattleById, battleNameById } = window.BattleThemes;
+  const { BATTLE_THEMES, battleNameById } = window.BattleThemes;
 
   let session = null;
   // battle_progress 캐시 — { battleId: { cleared, clearedAt, attemptedAt } }.
@@ -273,12 +274,6 @@
     if (!last) return 0;
     return Math.max(0, new Date(last).getTime() + hours * 3600 * 1000 - Date.now());
   }
-  async function markAttempt(battleId) {
-    const { error } = await window.sbClient.from("battle_progress")
-      .upsert({ user_id: session.user.id, battle_id: battleId, attempted_at: new Date().toISOString() }, { onConflict: "user_id,battle_id" });
-    if (error) { alert(`기록 실패: ${error.message}`); return; }
-    battleProgress[battleId] = { ...(battleProgress[battleId] || {}), attemptedAt: new Date().toISOString() };
-  }
   function remainingAttemptCooldownMs(battleId, hours) {
     const last = battleProgress[battleId]?.attemptedAt;
     if (!last) return 0;
@@ -292,37 +287,6 @@
     const h = Math.floor(total / 60), m = total % 60;
     return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
   }
-  // 입장 시 consumesItem 조건에 걸린 아이템을 창고에서 1개씩 실제로 차감함.
-  // 수량이 0이 되면 행 자체를 지움. 차감에 성공했는지를 반환 — 실패하면
-  // 입장을 막아야 함. DB에 바로 반영하되, 지금 이 순간의 상태를 다시
-  // 조회해서 확인(캐시가 살짝 낡았을 가능성 대비).
-  async function consumeEntryItems(battle) {
-    const needed = (battle.requirements || [])
-      .filter((r) => r.type === "consumesItem")
-      .map((r) => r.value);
-    if (needed.length === 0) return true;
-
-    const { data: rows, error } = await window.sbClient.from("warehouse_items")
-      .select("id,name,quantity").eq("user_id", session.user.id).in("name", needed);
-    if (error) { alert(`창고 조회 실패: ${error.message}`); return false; }
-    for (const itemName of needed) {
-      const entry = rows.find((it) => it.name === itemName && it.quantity > 0);
-      if (!entry) return false; // 창고에 없음 — 입장 불가
-    }
-    for (const itemName of needed) {
-      const entry = rows.find((it) => it.name === itemName);
-      if (entry.quantity <= 1) {
-        const { error: delError } = await window.sbClient.from("warehouse_items").delete().eq("id", entry.id);
-        if (delError) { alert(`차감 실패: ${delError.message}`); return false; }
-      } else {
-        const { error: updError } = await window.sbClient.from("warehouse_items").update({ quantity: entry.quantity - 1 }).eq("id", entry.id);
-        if (updError) { alert(`차감 실패: ${updError.message}`); return false; }
-      }
-    }
-    await refreshWarehouseItems();
-    return true;
-  }
-
   function isBattleUnlocked(battle) {
     // battle.id를 함께 넘김 — 쿨다운처럼 "어느 전투인지"를 알아야 판정할 수
     // 있는 조건이 있기 때문(대부분의 조건은 두 번째 인자를 무시함).
@@ -422,34 +386,11 @@
       });
     });
 
-    // consumesItem 조건이 붙은 전투는 링크 이동 전에 아이템을 실제로 차감함.
-    // 차감에 실패하면(그 사이 아이템이 없어졌다면) 이동 자체를 막음. 비동기
-    // 작업이 끼어들어야 해서 항상 preventDefault 후 성공 시에만 수동으로 이동.
-    el.querySelectorAll(".battle-item[data-consumes], .battle-item[data-attempt-cd]").forEach((link) => {
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        const battleId = link.dataset.battleId;
-        const battle = findBattleById(battleId);
-        if (!battle) return;
-        const names = (battle.requirements || []).filter(r => r.type === "consumesItem").map(r => r.value);
-        const attemptReq = (battle.requirements || []).find(r => r.type === "attemptCooldownHours");
-        const lines = [];
-        if (names.length) lines.push(`${names.map(n => `"${n}"`).join(", ")} 1개가 소모돼요.`);
-        if (attemptReq) lines.push(`성패와 관계없이 ${formatHours(attemptReq.value)} 동안 재도전할 수 없어요.`);
-        if (lines.length && !confirm(`이 전투에 입장합니다.\n\n${lines.join("\n")}\n\n진행할까요?`)) {
-          return;
-        }
-        if (!(await consumeEntryItems(battle))) {
-          alert("필요한 아이템이 부족해요.");
-          render();
-          return;
-        }
-        // 소모재 차감에 성공했으면 이 시점이 곧 "도전 시작" — 성패를 기다리지
-        // 않고 여기서 시계를 돌림(실패해도 대가를 치르게 하기 위함).
-        if ((battle.requirements || []).some((r) => r.type === "attemptCooldownHours")) await markAttempt(battleId);
-        location.href = link.href;
-      });
-    });
+    // consumesItem/attemptCooldownHours 조건이 붙은 전투도 이제 그냥 평범한
+    // 링크 이동임(2026-08-20) — 소모재 차감/도전 시각 기록은 battle-view.html
+    // 이 "전투를 실제로 실행할 때마다" 수행함(web/battle-entry.js 참고). 여기서
+    // 미리 부과하면 이중 차감이 되므로 절대 하면 안 됨. data-consumes/
+    // data-attempt-cd 속성은 카드에 비용 배지를 표시하는 용도로만 남아있음.
   }
 
   document.getElementById("devClearPlayBtn").addEventListener("click", async () => { await markBattleCleared("goblin-play"); render(); });
