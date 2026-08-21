@@ -44,6 +44,13 @@
 
   label { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.06em; color:var(--mist-dim); text-transform:uppercase; display:block; margin-bottom:6px; }
   .field { display:flex; flex-direction:column; }
+  .name-row { display:flex; gap:8px; }
+  .name-row input[type=text] { flex:1; }
+  .roll-name-btn {
+    font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:7px; padding:0 14px; cursor:pointer; flex-shrink:0;
+  }
+  .roll-name-btn:hover { border-color:var(--gold); color:var(--gold); }
   input[type=text], select {
     font-family:'Inter',sans-serif; font-size:13.5px; background:var(--panel-raised); color:#f2efe8;
     border:1px solid var(--line); border-radius:7px; padding:10px 12px; width:100%;
@@ -126,7 +133,10 @@
 
     <div class="field">
       <label for="nameInput">이름</label>
-      <input type="text" id="nameInput" placeholder="용병의 이름을 입력하세요" maxlength="16" />
+      <div class="name-row">
+        <input type="text" id="nameInput" placeholder="용병의 이름을 입력하세요" maxlength="16" />
+        <button type="button" class="roll-name-btn" id="rollNameBtn" title="이름 무작위로 채우기">🎲 랜덤</button>
+      </div>
     </div>
 
     <div class="field">
@@ -238,6 +248,18 @@
   // ============================================================================
   // 폼 세팅
   // ============================================================================
+  // 이름 무작위 생성기(2026-08-22) — "이름을 뭘로 할지 고민된다"는 사용자
+  // 피드백으로 추가. 40개 정도의 판타지풍 이름 목록에서 하나를 무작위로
+  // 뽑아 입력칸에 채워줌 — 직업(select)처럼 이름도 고민 없이 바로 고를
+  // 수 있게 하는 것이 목적, 저장/검증 로직은 전혀 안 건드림(그냥 입력칸에
+  // 값을 채우는 것뿐이라 이후 흐름은 사용자가 직접 입력한 것과 동일).
+  const RANDOM_NAME_POOL = [
+    "아렌", "카일런", "로한", "세라핀", "이리스", "다미안", "브리아나", "칼릭스", "노아", "셀레나",
+    "루시안", "에일린", "가레스", "미라벨", "자칸", "오린", "페트라", "발렌", "시엘", "라이언",
+    "테오도르", "나딘", "코르빈", "아스트리드", "데클란", "유노아", "카엘", "소피아", "로건", "이바나",
+    "빈센트", "레아", "자비에르", "클로에", "발디르", "프리야", "사이먼", "헤스티아", "도르반", "밀라",
+  ];
+
   const nameInput = document.getElementById("nameInput");
   const jobSelect = document.getElementById("jobSelect");
   const hireBtn = document.getElementById("hireBtn");
@@ -284,6 +306,19 @@
 
   nameInput.addEventListener("input", updatePreview);
   jobSelect.addEventListener("change", updatePreview);
+
+  // 직전에 뽑힌 이름은 되도록 안 나오게(연속 두 번 눌러도 같은 이름이면
+  // "랜덤"이라는 느낌이 안 들어서) — 풀이 1개뿐인 극단적 상황을 대비해
+  // 후보가 하나뿐이면 그냥 그걸 씀.
+  let lastRolledName = null;
+  document.getElementById("rollNameBtn").addEventListener("click", () => {
+    const candidates = RANDOM_NAME_POOL.filter((n) => n !== lastRolledName);
+    const pool = candidates.length ? candidates : RANDOM_NAME_POOL;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    lastRolledName = picked;
+    nameInput.value = picked;
+    updatePreview();
+  });
 
   function showToast(msg) {
     toastEl.textContent = msg;
