@@ -19,7 +19,7 @@ const { ConditionRegistry, ActionRegistry } = require("./registries");
 const { SkillRegistry } = require("./skillRegistry");
 const { PrepState, checkAffordability, payCosts } = require("./prepState");
 const { applyDamageAndEffects } = require("./skillResolution");
-const { TEAM_RESOURCE_TYPES } = require("./resourceTypes");
+const { TEAM_RESOURCE_TYPES, PERSONAL_RESOURCE_TYPES } = require("./resourceTypes");
 
 // ============================================================================
 // 한국어 조사 자동 처리 — 이름의 마지막 글자에 받침이 있는지에 따라 "이"/"가",
@@ -412,7 +412,8 @@ class BattleEngine {
       this.log(`   ❌ [발동 실패] ${actor.name}의 "${skill.name}" 발동 실패! (코스트 부족: ${affordability.detail})`);
       return;
     }
-    payCosts(actor, skill.costs || [], this.resourceManager);
+    const resourceLogs = payCosts(actor, skill.costs || [], this.resourceManager);
+    resourceLogs.forEach((msg) => this.log(`   ${msg}`));
     this.log(`   ${skill.name}`);
     applyDamageAndEffects(actor, skill, this);
     actor.actionGauge -= (skill.postDelay || 0) * postDelayMul * actor.effectiveSpeed;
@@ -434,6 +435,7 @@ class BattleEngine {
       // 새로 열어주지 않으면 직전에 "행동!"을 낸 다른 유닛 블록 밑에 잘못
       // 묶여버림).
       this.log(`\n${unit.name}, ${result.skill.name}`);
+      (result.resourceLogs || []).forEach((msg) => this.log(`   ${msg}`));
       applyDamageAndEffects(unit, result.skill, this);
     }
 
@@ -457,13 +459,32 @@ class BattleEngine {
    * 같은 목적(패턴 발동 기준선이 되는 절대 HP/SP 수치를 역산 못 하게)이지만
    * 별개 코드 경로라 여기서도 따로 처리해야 함. web/battle-log-render.js의
    * parseBattleLog()가 "HP x/y SP a/b" 형태만 퍼센티지 게이지로 그리므로,
-   * 이 형태 자체를 안 찍으면 게이지도 자동으로 안 그려짐.
+   * 이 형태 자체를 안 찍으면 게이지도 자동으로 안 그려짐. 보스는 "???" 한
+   * 줄로 이미 전부(HP/SP뿐 아니라 아래 개인 자원까지) 가려지므로 별도
+   * 처리가 필요 없음 — 자원 표시는 비보스 분기에서만 이어붙임.
+   *
+   * ⚠ 개인 자원(집속 마력 등) 표시 — 2026-08-22 신설. 예전엔 HP/SP만
+   * 찍고 personalResources는 전혀 안 보여줘서, 전투 중 그 자원이 어떻게
+   * 변하는지 알 방법이 없다는 신고가 있었음(사용자). PERSONAL_RESOURCE_TYPES
+   * 카탈로그에 등록된 자원 중 그 유닛이 실제로 갖고 있고 max>0인 것만
+   * 이어붙임 — tp(모든 유닛이 갖는 시스템 자원, 카탈로그에 없음)는 자동으로
+   * 제외돼서 노이즈가 안 됨.
    */
   renderStatusBoard() {
+    const personalResourceSuffix = (u) => {
+      const parts = [];
+      Object.keys(PERSONAL_RESOURCE_TYPES).forEach((key) => {
+        const pool = u.personalResources?.[key];
+        if (!pool || pool.max <= 0) return;
+        const meta = PERSONAL_RESOURCE_TYPES[key];
+        parts.push(`${meta.label} ${pool.current}/${pool.max}`);
+      });
+      return parts.length ? `   ${parts.join("   ")}` : "";
+    };
     const line = (u) => {
       if (!u.isAlive) return `  ${u.name}   💀 전투불능`;
       if (u.creatureTier === "boss") return `  ${u.name}   ???`;
-      return `  ${u.name}   HP ${u.currentHp}/${u.maxHp}   SP ${u.currentSp}/${u.maxSp}`;
+      return `  ${u.name}   HP ${u.currentHp}/${u.maxHp}   SP ${u.currentSp}/${u.maxSp}${personalResourceSuffix(u)}`;
     };
     this.log(`\n==================================================`);
     this.log(`[ TURN ${this.currentTurn} ]`);

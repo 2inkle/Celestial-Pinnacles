@@ -175,12 +175,12 @@ class PrepState {
       return { activated: false, reason: `코스트 부족으로 발동 실패 (${affordability.detail})`, skill: record.skill };
     }
 
-    payCosts(actor, record.skill.costs || [], resourceManager);
-    return { activated: true, skill: record.skill };
+    const resourceLogs = payCosts(actor, record.skill.costs || [], resourceManager);
+    return { activated: true, skill: record.skill, resourceLogs };
   }
 }
 
-const { TEAM_RESOURCE_TYPES } = require("./resourceTypes");
+const { TEAM_RESOURCE_TYPES, PERSONAL_RESOURCE_TYPES } = require("./resourceTypes");
 
 /** cost.resource(TEAM_RESOURCE_TYPES 키)를 FactionResourceManager에 실제 등록된 이름으로 변환 */
 function resolveTeamResourceKey(resource) {
@@ -217,21 +217,30 @@ function checkAffordability(actor, costs, resourceManager) {
   return { ok: true };
 }
 
-/** 코스트를 실제로 소모함(감당 가능하다고 이미 확인된 다음에만 호출). */
+/**
+ * 코스트를 실제로 소모함(감당 가능하다고 이미 확인된 다음에만 호출).
+ * @returns {string[]} 자원 변화 중 로그로 남길 만한 문구 목록(대부분 빈 배열 —
+ *   스탠스로 개인 자원이 실제로 적립됐을 때만 채워짐, 2026-08-22 신설). 호출부가
+ *   반드시 이 배열을 순회해서 로그에 남겨야 "집속 마력이 쌓이는데 전투 로그에는
+ *   아무것도 안 보인다"는 문제(사용자 신고)가 재발하지 않음.
+ */
 function payCosts(actor, costs, resourceManager) {
+  const resourceLogs = [];
   costs.forEach((c) => {
     if (c.type === "sp") {
       const reductionPct = actor.getPassiveModValue("spCostReductionPct");
       let amount = c.amount * (1 - reductionPct / 100) * actor.getStanceMultiplier("spCostMultiplier");
       const finalAmount = Math.max(0, Math.round(amount));
       actor.currentSp -= finalAmount;
-      applyResourceOnCost(actor, "sp", finalAmount);
+      const msg = applyResourceOnCost(actor, "sp", finalAmount);
+      if (msg) resourceLogs.push(...msg);
     } else if (c.type === "hp") {
       const reductionPct = actor.getPassiveModValue("hpCostReductionPct");
       let amount = c.amount * (1 - reductionPct / 100) * actor.getStanceMultiplier("hpCostMultiplier");
       const finalAmount = Math.max(0, Math.round(amount));
       actor.currentHp -= finalAmount;
-      applyResourceOnCost(actor, "hp", finalAmount);
+      const msg = applyResourceOnCost(actor, "hp", finalAmount);
+      if (msg) resourceLogs.push(...msg);
     } else if (c.type === "teamResource" && resourceManager) {
       resourceManager.consumeResource(actor.side, resolveTeamResourceKey(c.resource), c.amount);
     } else if (c.type === "personalResource") {
@@ -239,6 +248,7 @@ function payCosts(actor, costs, resourceManager) {
       if (pool) pool.current -= c.amount;
     }
   });
+  return resourceLogs;
 }
 
 // 스탠스의 resourceOnCost 훅 — {resource, costType, ratio} 형태. 현재 켜져있는
@@ -246,16 +256,28 @@ function payCosts(actor, costs, resourceManager) {
 // 있는 스탠스마다 각각 적립함(스탠스 여러 개가 동시에 이 규칙을 가질 수도
 // 있으므로 전부 개별 적용). 지급량 × ratio(기본 1)만큼을 지정된
 // personalResource에 적립함(상한은 그 자원의 max로 자동 클램프).
+// 2026-08-22: 예전엔 pool.current만 조용히 올리고 아무것도 반환 안 해서, 둠로드의
+// Corrupted Focus처럼 SP를 쓸 때마다 집속 마력이 쌓이는데 전투 로그에는 그
+// 변화가 전혀 안 보였음(사용자 신고) — 실제로 자원이 늘었을 때만(gain>0) 로그
+// 문구 배열을 반환하도록 수정.
 function applyResourceOnCost(actor, paidCostType, paidAmount) {
-  if (paidAmount <= 0) return;
+  if (paidAmount <= 0) return [];
+  const logs = [];
   Object.values(actor.stances || {}).forEach((mods) => {
     const rule = mods.resourceOnCost;
     if (!rule || rule.costType !== paidCostType) return;
     const pool = actor.personalResources?.[rule.resource];
     if (!pool) return;
     const gain = Math.floor(paidAmount * (rule.ratio ?? 1));
+    if (gain <= 0) return;
+    const before = pool.current;
     pool.current = Math.min(pool.max, pool.current + gain);
+    const actualGain = pool.current - before;
+    if (actualGain <= 0) return; // 이미 최대치라 안 쌓였으면 로그도 안 남김(teamResourceGain과 동일 관례)
+    const label = PERSONAL_RESOURCE_TYPES[rule.resource]?.label || rule.resource;
+    logs.push(`${actor.name}의 ${label} +${actualGain}. (${pool.current}/${pool.max})`);
   });
+  return logs;
 }
 
 module.exports = { PrepState, checkAffordability, payCosts, resolveTeamResourceKey, DELAY_RESISTANCE_CAP_RATIO };

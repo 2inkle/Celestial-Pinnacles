@@ -345,10 +345,15 @@ const TEAM_RESOURCE_TYPES = {
 // (2026-08-17, 상점 화살통이 아무 효과도 없어 보인다는 신고로 발견).
 // ============================================================================
 const PERSONAL_RESOURCE_TYPES = {
-  arrow:   { label:"화살", icon:"🏹" },
-  bullets: { label:"탄환", icon:"🔫" },
-  passion: { label:"열정", icon:"🔥" }
+  arrow:     { label:"화살", icon:"🏹" },
+  bullets:   { label:"탄환", icon:"🔫" },
+  passion:   { label:"열정", icon:"🔥" },
+  focusMana: { label:"집속 마력", icon:"🌀" }
   // 새 개인 자원 예시: mana: { label:"마나", icon:"💧" }
+  // ⚠ 2026-08-22: focusMana가 src/resourceTypes.js의 카탈로그엔 이미
+  // 있었는데 이 사본에만 빠져 있어서 패턴 편집기에서 "집속 마력" 조건을
+  // 아예 만들 수 없던 버그가 있었음(둠로드 실전투로 발견) — 새 개인 자원을
+  // 추가할 때는 반드시 이 두 카탈로그(resourceTypes.js/여기)를 같이 갱신할 것.
 };
 
 // ============================================================================
@@ -415,12 +420,17 @@ const EFFECT_TYPES = {
   spDown:         { label:"SP 감소",     polarity:"debuff" },
   // STR/INT/DEX/SPD/LUK 중 하나의 bonus를 고정치만큼 올림 — effect.stat으로
   // 어떤 스탯인지 지정(예: { type:"statUp", stat:"str", value:20 }). 매 발동마다
-  // 그대로 누적됨(statDownPercent처럼 "그 순간 값의 %"가 아니라 순수 고정치라
-  // 여러 번 걸면 계속 쌓임).
-  statUp:         { label:"핵심 스탯 증가", polarity:"buff", needsStatTarget:true },
+  // 그대로 누적됨(statUpPercent처럼 "그 순간 값의 %"가 아니라 순수 고정치라
+  // 여러 번 걸면 계속 쌓임). 어떤 스탯인지는 effectChips가 e.stat을 직접 읽어서
+  // 붙임(STAT_LABELS 참고) — 예전엔 needsStatTarget 플래그만 선언돼 있고 아무
+  // 데도 안 읽혀서 "핵심 스탯 증가 +100"처럼 어떤 스탯인지 안 나왔었음(2026-08-22 수정).
+  statUp:         { label:"핵심 스탯 증가", polarity:"buff" },
   // 팀 자원/개인 자원 증감 — 어떤 자원인지는 effect.resource로 지정
   // (TEAM_RESOURCE_TYPES/PERSONAL_RESOURCE_TYPES 키). 예: { type:"teamResourceUp",
   // resource:"magicCircle", value:1 }, { type:"personalResourceDown", resource:"arrow", value:1 }
+  // ⚠ 실제 스킬 데이터에서는 이 4개 대신 teamResourceGain/stealTeamResource/
+  // refillPersonalResource/drainPersonalResource(아래)가 쓰임 — 이 4개는 엔진
+  // 쪽 지원은 있지만 데이터상 미사용. 만일을 위해 카탈로그는 유지.
   teamResourceUp:       { label:"팀 자원 증가",   polarity:"buff" },
   teamResourceDown:     { label:"팀 자원 감소",   polarity:"debuff" },
   personalResourceUp:   { label:"개인 자원 증가", polarity:"buff" },
@@ -445,9 +455,219 @@ const EFFECT_TYPES = {
   // 종류별로 guardPhysical/guardMagic/guardAll 같은 별도 타입을 만들지 않고,
   // 이 하나의 타입에 하위 옵션만 다르게 주는 쪽으로 통일(기존 자원 효과 관례와
   // 일관성 유지). guardType 생략 시 기본값은 "all"(모든 피해 무효화).
-  guard: { label:"Guard(피격 무효화)", polarity:"buff" }
+  guard: { label:"Guard(피격 무효화)", polarity:"buff" },
+  exitStance: { label:"상태 해제", polarity:"neutral" },
+  // ============================================================================
+  // 2026-08-22 추가분 — 실제 스킬 데이터의 27종 effects[].type 중 이 위까지는
+  // 5종(heal/spUp/statUp/actionDelay/castDelay)만 카드에 설명이 붙고 있었고
+  // 나머지 20종은 renderSkillCard()가 조용히 걸러내서 스킬 카드에 아무 표시도
+  // 없었음(combatStatUpPercent·scaledHeal처럼 game 전역에서 압도적으로 많이
+  // 쓰이는 효과 포함) — "스킬 설명은 하나도 빠뜨리면 안 된다"는 사용자 요청으로
+  // 전수 등록함. 라벨/부호 판정 로직은 renderSkillCard()의 effectChips 안에서
+  // e.stat/e.value 등을 직접 읽어서 처리(아래 STAT_LABELS/PASSIVE_MOD_LABELS
+  // 참고), 여기 polarity는 방향이 고정인 것만 정확히, 부호에 따라 달라지는
+  // 것(%효과류)은 effectChips가 동적으로 덮어씀.
+  // ============================================================================
+  combatStatUpPercent: { label:"전투 스탯 변화", polarity:"buff" }, // 부호는 effectChips가 동적 판정
+  statUpPercent:       { label:"핵심 스탯 변화", polarity:"buff" }, // 위와 동일
+  maxHpUpPercent:      { label:"최대 HP 변화",   polarity:"buff" },
+  maxSpUp:             { label:"최대 SP 증가",   polarity:"buff" },
+  scaledHeal:          { label:"HP 회복(스탯 비례)", polarity:"buff" },
+  healMissingPercent:  { label:"결손 HP 비례 회복", polarity:"buff" },
+  applyTick:           { label:"지속 효과", polarity:"neutral" }, // 재생(buff)/출혈(debuff) 둘 다 있어 동적 판정
+  setRow:              { label:"진형 변경", polarity:"neutral" },
+  clearTicks:          { label:"지속효과 해제", polarity:"neutral" },
+  clearCastDelay:      { label:"영창 즉시 완성", polarity:"buff" },
+  shield:              { label:"보호막", polarity:"buff" },
+  huntingSign:         { label:"사냥의 표식", polarity:"debuff" },
+  barrierUp:           { label:"비전 방어막 증가", polarity:"buff" },
+  grantPassiveMod:     { label:"패시브 효과 부여", polarity:"buff" }, // 음수 value도 있어 동적 판정
+  enterStance:         { label:"상태 진입", polarity:"neutral" },
+  teamResourceGain:    { label:"팀 자원 획득", polarity:"buff" },
+  stealTeamResource:   { label:"팀 자원 탈취", polarity:"buff" },
+  convertResource:     { label:"자원 전환", polarity:"neutral" },
+  resurrect:           { label:"부활", polarity:"buff" },
+  refillPersonalResource: { label:"개인 자원 재충전", polarity:"buff" },
+  drainPersonalResource:  { label:"개인 자원 소진", polarity:"debuff" }
   // 새 효과 예시: stun: { label:"기절", polarity:"debuff" }
 };
+
+// 스탯 코드 → 한글/영문 라벨(statUp/statUpPercent/combatStatUpPercent/
+// grantPassiveMod의 scaleByStat 등 "어떤 스탯인지"를 표시해야 하는 모든 곳에서
+// 공용으로 씀 — 2026-08-22 신설.
+const STAT_LABELS = {
+  str:"STR", int:"INT", dex:"DEX", spd:"SPD", luk:"LUK",
+  atk:"공격력", matk:"마법공격력", def:"방어력", mdef:"마법방어력"
+};
+
+// grantPassiveMod의 effect.key(예: "accuracyBonusPct")에 대한 한글 라벨 —
+// src/combatFormulas.js·character.js의 getPassiveModValue()가 실제로 참조하는
+// 키들 중 스킬 데이터에서 자주 쓰이는 것 위주. 여기 없는 키는 원문 그대로
+// 표시(폴백 — 절대 안 숨김, 2026-08-22).
+const PASSIVE_MOD_LABELS = {
+  accuracyBonusPct: "명중률",
+  physicalIgnoreBonusDefPct: "물리 방어 무시율",
+  magicIgnoreBonusDefPct: "마법 방어 무시율",
+  completeDefenseChancePct: "완전방어 확률",
+  healingDealtPct: "가하는 회복량(%)",
+  healingDealtFlat: "가하는 회복량(고정치)",
+  spCostReductionPct: "SP 소모 절감률",
+  hpCostReductionPct: "HP 소모 절감률",
+  critMultiplier: "치명타 배율",
+  physicalDamageDealtPct: "가하는 물리 피해(%)",
+  physicalDamageTakenPct: "받는 물리 피해(%)",
+  magicDamageDealtPct: "가하는 마법 피해(%)",
+  magicDamageTakenPct: "받는 마법 피해(%)",
+};
+
+// 효과 하나를 사람이 읽을 텍스트로 변환 — src/skillResolution.js의 applyEffect()
+// 스위치가 실제로 하는 일을 그대로 정적 설명으로 옮긴 것(2026-08-22, renderSkillCard
+// 전면 개편의 일부). polarity는 대체로 부호(e.value)로 동적 판정 — 같은 타입이
+// 버프로도 디버프로도 쓰이기 때문(예: combatStatUpPercent는 Break Down 같은
+// 디버프에도 음수 value로 그대로 쓰임, "퍼센트 디버프 +-30%" 버그 항목 참고).
+// ⚠ 알 수 없는 타입(EFFECT_TYPES에 등록 안 됨)이어도 절대 빈 문자열을 반환하지
+// 않음 — "{type}(설명 미등록)"으로라도 존재를 알림(예전엔 조용히 버려져서
+// 스킬 카드에서 효과가 통째로 사라졌었음).
+function describeEffect(e) {
+  const meta = EFFECT_TYPES[e.type];
+  const stat = e.stat ? (STAT_LABELS[e.stat] || e.stat) : "";
+  const resourceMeta = e.resource ? (TEAM_RESOURCE_TYPES[e.resource] || PERSONAL_RESOURCE_TYPES[e.resource]) : null;
+  const resourceLabel = resourceMeta ? `${resourceMeta.icon} ${resourceMeta.label}` : (e.resource || "");
+
+  switch (e.type) {
+    case "statUp": {
+      const sign = e.value >= 0 ? "+" : "";
+      return { text: `${stat} ${sign}${e.value}`, polarity: e.value >= 0 ? "buff" : "debuff" };
+    }
+    case "combatStatUpPercent":
+    case "statUpPercent": {
+      const sign = e.value >= 0 ? "+" : "";
+      return { text: `${stat} ${sign}${e.value}%`, polarity: e.value >= 0 ? "buff" : "debuff" };
+    }
+    case "maxHpUpPercent": {
+      const sign = e.value >= 0 ? "+" : "";
+      return { text: `최대 HP ${sign}${e.value}%`, polarity: e.value >= 0 ? "buff" : "debuff" };
+    }
+    case "maxSpUp": {
+      const sign = e.value >= 0 ? "+" : "";
+      return { text: `최대 SP ${sign}${e.value}`, polarity: e.value >= 0 ? "buff" : "debuff" };
+    }
+    case "scaledHeal": {
+      const intFactor = e.intFactor ?? 0.01;
+      const multiplier = e.multiplier ?? 1;
+      return { text: `HP 회복 (INT×${intFactor}×${multiplier})`, polarity: "buff" };
+    }
+    case "healMissingPercent":
+      return { text: `결손 HP의 ${e.value}% 회복`, polarity: "buff" };
+    case "applyTick": {
+      const kindLabel = e.kind === "sp" ? "SP" : "HP";
+      const rawAmount = e.percentOfMax ?? e.amountPerTick ?? 0;
+      const amountText = e.percentOfMax != null ? `${e.percentOfMax}%` : `${e.amountPerTick ?? 0}`;
+      const sign = rawAmount >= 0 ? "+" : "";
+      const duration = (e.duration == null || e.duration === Infinity) ? "영구" : `${e.duration}턴`;
+      return { text: `${kindLabel} 매턴 ${sign}${amountText} (${duration})`, polarity: rawAmount >= 0 ? "buff" : "debuff" };
+    }
+    case "setRow":
+      return { text: `진형을 ${e.value === "back" ? "후열" : "전열"}로 전환`, polarity: "neutral" };
+    case "clearTicks":
+      return { text: "지속효과 전부 해제", polarity: "neutral" };
+    case "clearCastDelay":
+      return { text: "영창 즉시 완성", polarity: "buff" };
+    case "shield": {
+      const typeLabel = e.shieldType === "physical" ? "물리" : e.shieldType === "magic" ? "마법" : "전체";
+      return { text: `보호막 ${e.charges || 1}회 (${typeLabel})`, polarity: "buff" };
+    }
+    case "guard": {
+      const typeLabel = e.guardType === "physical" ? "물리" : e.guardType === "magic" ? "마법" : "전체";
+      return { text: `Guard(피격 무효화) (${typeLabel})`, polarity: "buff" };
+    }
+    case "huntingSign":
+      return { text: "사냥의 표식 부여", polarity: "debuff" };
+    case "barrierUp": {
+      const capText = (e.cap != null && e.cap !== Infinity) ? ` (최대 ${e.cap})` : "";
+      return { text: `비전 방어막 +${e.value}${capText}`, polarity: "buff" };
+    }
+    case "grantPassiveMod": {
+      const label = PASSIVE_MOD_LABELS[e.key] || e.key;
+      const scaleText = e.scaleByStat ? ` (${STAT_LABELS[e.scaleByStat] || e.scaleByStat} 비례)` : "";
+      const val = e.value ?? 0;
+      const valueText = e.scaleByStat ? "" : ` ${val >= 0 ? "+" : ""}${val}`;
+      return { text: `${label}${valueText} 부여${scaleText}`, polarity: val >= 0 ? "buff" : "debuff" };
+    }
+    case "enterStance":
+      return { text: `"${e.label || e.key}" 상태 진입`, polarity: "neutral" };
+    case "exitStance":
+      return { text: e.key ? `"${e.key}" 상태 해제` : "모든 상태 해제", polarity: "neutral" };
+    case "teamResourceGain":
+      return { text: `${resourceLabel} ${e.value ?? 1}개 획득`, polarity: "buff" };
+    case "stealTeamResource": {
+      const erase = e.eraseAmount ?? e.value ?? 1;
+      const gain = e.gainAmount ?? e.value ?? 1;
+      return { text: `${resourceLabel} 상대 ${erase}개 삭제 시도 (성공 시 자기 진영 ${gain}개 획득)`, polarity: "buff" };
+    }
+    case "convertResource": {
+      const kindLabel = { hp: "HP", sp: "SP" };
+      return { text: `${kindLabel[e.from] || e.from} ${e.fromPct ?? 0}% 소모 → ${kindLabel[e.to] || e.to} ${e.toPct ?? 0}% 충전`, polarity: "neutral" };
+    }
+    case "resurrect":
+      return { text: `부활 (TP ${e.tpCost ?? 20} 소모, HP 50%로)`, polarity: "buff" };
+    case "refillPersonalResource":
+      return { text: `${resourceLabel} 재충전`, polarity: "buff" };
+    case "drainPersonalResource":
+      return { text: `${resourceLabel} 완전 소진`, polarity: "debuff" };
+    default: {
+      if (!meta) return { text: `${e.type}(설명 미등록)`, polarity: "neutral" };
+      const unit = meta.valueUnit || "";
+      const valueLabel = e.value !== undefined ? ` ${e.value > 0 ? "+" : ""}${e.value}${unit}` : "";
+      const resourcePart = resourceLabel ? `(${resourceLabel})` : "";
+      return { text: `${meta.label}${resourcePart}${valueLabel}`, polarity: meta.polarity || "neutral" };
+    }
+  }
+}
+
+// 패시브 전용 필드(effects 배열이 아니라 스킬 객체에 직접 붙는 statBonus 등)를
+// "패시브 효과" 칩 목록으로 변환 — 2026-08-22 신설. 이 필드들은 이미 실제
+// 스탯 계산(computeCritStats/computeMaxPatternSlots 등)에 반영되고 있었지만
+// Sheet 카드에는 전혀 안 보였음(Job Master류 패시브 스킬이 이름만 뜨고
+// "무슨 효과인지" 알 수 없던 문제).
+function describePassiveFields(s) {
+  const chips = [];
+  if (s.statBonus) {
+    Object.entries(s.statBonus).forEach(([k, v]) => {
+      chips.push({ text: `${STAT_LABELS[k] || k} +${v}`, polarity: "buff" });
+    });
+  }
+  if (s.maxHpBonus) chips.push({ text: `최대 HP +${s.maxHpBonus}`, polarity: "buff" });
+  if (s.maxSpBonus) chips.push({ text: `최대 SP +${s.maxSpBonus}`, polarity: "buff" });
+  if (s.combatBonus) {
+    Object.entries(s.combatBonus).forEach(([k, v]) => {
+      chips.push({ text: `${STAT_LABELS[k] || k} +${v}`, polarity: "buff" });
+    });
+  }
+  if (s.patternSlotBonus) chips.push({ text: `패턴 슬롯 +${s.patternSlotBonus}`, polarity: "buff" });
+  if (s.passiveMods) {
+    Object.entries(s.passiveMods).forEach(([k, v]) => {
+      const label = PASSIVE_MOD_LABELS[k] || k;
+      chips.push({ text: `${label} ${v >= 0 ? "+" : ""}${v}`, polarity: v >= 0 ? "buff" : "debuff" });
+    });
+  }
+  if (s.conditionalPassiveMods) {
+    s.conditionalPassiveMods.forEach((cond) => {
+      const condLabel = {
+        isGuarding: "Guard 중일 때",
+        isShielded: "보호막이 있을 때",
+        guardAlliesIs: `아군 보호가 ${cond.condition?.value ? "켜져" : "꺼져"} 있을 때`,
+        rowIs: `${cond.condition?.value === "back" ? "후열" : "전열"}일 때`,
+        hpPctBelow: `HP가 ${cond.condition?.value}% 미만일 때`,
+        hpPctAbove: `HP가 ${cond.condition?.value}% 초과일 때`,
+        hasBarrier: "비전 방어막이 있을 때",
+      }[cond.condition?.type] || `조건(${cond.condition?.type || "?"}) 충족 시`;
+      const label = PASSIVE_MOD_LABELS[cond.key] || cond.key;
+      chips.push({ text: `${condLabel}: ${label} ${cond.value >= 0 ? "+" : ""}${cond.value}`, polarity: cond.value >= 0 ? "buff" : "debuff" });
+    });
+  }
+  return chips;
+}
 
 // ============================================================================
 // 선딜레이 종류 레지스트리 — 스킬 발동 전 준비 동작이 어떤 성격인지에 따라
@@ -1727,19 +1947,12 @@ function renderSkillCard(s, { learnBtnState } = {}) {
   const typeChip = s.skillType && SKILL_TYPES[s.skillType]
     ? `<span class="sk-chip ${SKILL_TYPES[s.skillType].cls}">${SKILL_TYPES[s.skillType].label}</span>` : "";
   const effectChips = (s.effects || []).map(e => {
-    const meta = EFFECT_TYPES[e.type];
-    if (!meta) return "";
-    const unit = meta.valueUnit || "";
-    const valueLabel = e.value !== undefined ? ` ${e.value > 0 ? "+" : ""}${e.value}${unit}` : "";
-    const resourceMeta = e.resource ? (TEAM_RESOURCE_TYPES[e.resource] || PERSONAL_RESOURCE_TYPES[e.resource]) : null;
-    const resourceLabel = resourceMeta ? `(${resourceMeta.icon} ${resourceMeta.label})` : "";
-    // guard는 팀/개인 자원 효과가 resource로 종류를 구분하는 것과 같은 방식으로
-    // guardType 하위 필드로 물리/마법/전체를 구분함(생략 시 전체로 취급).
-    const guardTypeLabel = e.type === "guard"
-      ? `(${e.guardType === "physical" ? "물리" : e.guardType === "magic" ? "마법" : "전체"})`
-      : "";
-    return `<span class="sk-chip sk-effect ${meta.polarity || "neutral"}">${meta.label}${resourceLabel}${guardTypeLabel}${valueLabel}</span>`;
+    const { text, polarity } = describeEffect(e);
+    return `<span class="sk-chip sk-effect ${polarity}">${text}</span>`;
   }).join("");
+  const passiveChips = describePassiveFields(s).map(({ text, polarity }) =>
+    `<span class="sk-chip sk-effect ${polarity}">${text}</span>`
+  ).join("");
 
   const chips = [
     `<span class="sk-chip">${s.skillPointCost}pt</span>`,
@@ -1749,6 +1962,7 @@ function renderSkillCard(s, { learnBtnState } = {}) {
     typeChip,
     invalidBadge,
     effectChips,
+    passiveChips,
     delay ? `<span class="sk-chip">${delay}</span>` : "",
   ].filter(Boolean).join("");
 

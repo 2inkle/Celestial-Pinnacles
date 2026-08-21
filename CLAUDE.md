@@ -6,6 +6,145 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 실전투 신고 4건 일괄 수정 — 패턴 빌더 자원 누락/Vortex Overload 오작동/개인 자원 비가시성/Sheet 설명 누락 (2026-08-22)
+
+동굴 테마 작업 착수 전, 사용자가 실전투에서 발견한 4가지 문제를 한 번에
+정리해 요청함. 조사 결과 4건 모두 서로 다른 근본 원인을 가진 독립 버그.
+
+### 1. 패턴 빌더에 "집속 마력" 자원이 없었음
+
+`src/resourceTypes.js`의 `PERSONAL_RESOURCE_TYPES`엔 `focusMana`(집속 마력,
+둠로드/스펠마용)가 이미 있는데, 패턴 편집기가 실제로 읽는
+`web/character-sheet.html`의 **별도 사본** `PERSONAL_RESOURCE_TYPES`에는
+`arrow`/`bullets`/`passion`만 있고 빠져 있었음 — "두 카탈로그가 손으로
+각각 관리된다"는 기존에 이미 문서화된 구조적 한계가 실제로 드러난 사례.
+`focusMana` 항목 추가로 수정(두 카탈로그 통합 리팩터는 이번 범위 밖).
+
+### 2. Vortex Overload가 시전자가 아니라 피격 대상의 집속 마력을 지움
+
+**증상**: "???"전에서 Vortex Overload를 맞으면 시전자(보스)가 아니라 맞은
+플레이어의 집속 마력이 0이 됨 — 둠로드 잡을 쓰는 플레이어는 이 스킬에
+한 번이라도 맞으면 그동안 쌓은 자원이 통째로 날아가서, "가끔 위협적인
+일격"이어야 할 궁극기가 사실상 "둠로드 직업 자체를 못 쓰게 만드는" 수준의
+문제가 됨.
+
+**원인(순수 데이터 버그)**: Vortex Overload의 `drainPersonalResource`
+효과 객체에 `"target": "self"`가 빠져 있었음. `src/skillResolution.js`의
+`resolveOneHit()`은 `effect.target === "self"`일 때만 시전자(`actor`)
+자신에게 적용하고, 없으면 무조건 피격 대상(`t`)에게 적용함(Charge
+Attack의 "자신 전열화"와 동일한 기존 메커니즘) — `drainPersonalResource`
+구현 자체는 그저 넘겨받은 target의 자원을 0으로 만들 뿐이라 잘못이 없었고,
+호출부(스킬 데이터)에 target 지정이 빠진 게 전부.
+
+앞의 STR/INT/DEX -5% 디버프 3개(`statUpPercent`)는 **사용자 확인 결과
+그대로 둠** — "강력한 일격을 맞은 대상이 약해진다"는 의도된 디버프.
+
+**수정**: `drainPersonalResource` 효과에만 `"target": "self"` 추가.
+**⚠ DB 반영 필요**: `skill-table-editor.html`은 2026-08-16부터 game_content
+DB를 그대로 보여주는 조회 전용 뷰어로 전환됐음(`LEGACY_SKILL_SEED`는 이제
+편집/저장에 전혀 안 쓰이는 과거 유물 — 실제 라이브 스킬 데이터는
+`game_content(key:'skillTable')`에만 있음). 그래서 이 수정은 파일 편집만
+으로는 라이브에 반영 안 되고, `supabase/migrations/0023_fix_vortex_overload_self_drain.sql`
+(전체 블롭 재삽입이 아니라 jobSkills["???"] 배열에서 이름으로 찾아 그
+effects 중 drainPersonalResource 항목에만 target:self를 병합하는 정밀
+수정 — 이후 있었을 수 있는 다른 라이브 데이터 변경분을 안 건드리기 위해
+일부러 이렇게 함, 재실행해도 안전)을 **사용자가 Supabase Dashboard SQL
+Editor에서 직접 실행**해야 실제로 반영됨 — 아직 실행 여부 미확인.
+`LEGACY_SKILL_SEED`도 참고용으로 동일하게 갱신해뒀지만 이건 이제 아무
+것도 트리거하지 않는 문서용 사본.
+
+### 3. 전투 중 개인 자원(집속 마력 등) 수치 변화가 안 보였음
+
+세 갈래 문제, 전부 수정(사용자 지적대로 앞으로 생길 다른 자원에도 똑같이
+적용되는 구조적 공백이라 focusMana 하나만 땜질하지 않음):
+
+- **자원 로그가 원문 키를 그대로 씀**: `refillPersonalResource`/
+  `drainPersonalResource`(`src/skillResolution.js`)가 `"focusMana"` 같은
+  내부 키를 로그에 그대로 넣고 있었음 — `teamResourceGain`은 이미
+  `TEAM_RESOURCE_TYPES[...].label`로 한글 라벨을 찾아 쓰는데 개인 자원
+  쪽만 이 처리가 없었음. `PERSONAL_RESOURCE_TYPES` require 추가하고 라벨
+  조회하도록 수정.
+- **스탠스로 쌓이는 자원은 로그 자체가 없었음**: 둠로드의 Corrupted Focus
+  같은 스탠스가 SP 지불 시 `resourceOnCost` 규칙으로 개인 자원을 적립하는
+  `src/prepState.js`의 `applyResourceOnCost()`가 `pool.current`만 조용히
+  올리고 아무것도 로그 안 했음. 이 함수가 로그 문구 배열을 반환하도록
+  바꾸고, 호출부 `payCosts()`가 그 배열을 모아 반환하게 함 — `payCosts`는
+  두 곳에서 불리는데(`src/engine.js`의 `beginOrResolveSkill`, `src/prepState.js`
+  `PrepState.resolve()` 내부) 후자는 로거 접근이 없어서 `resolve()`의
+  반환 객체에 `resourceLogs`로 실어보내고, 그 호출부(`engine.js`의
+  `resolvePreparedSkill`)가 로그하도록 함.
+- **현황판에 개인 자원이 아예 없었음**: `src/engine.js`의
+  `renderStatusBoard()`(2026-08-21에 보스 HP/SP 은폐용으로 이미 손봤던
+  그 함수)가 `personalResources`를 전혀 안 봤음 — `PERSONAL_RESOURCE_TYPES`
+  중 그 유닛이 실제로 갖고 있고 `max>0`인 것만 HP/SP 뒤에 이어붙이도록
+  확장(`tp`는 카탈로그에 없는 시스템 자원이라 자동 제외돼 노이즈 없음).
+  **보스는 이 자원도 여전히 `???` 한 줄로 전부 가려짐** — HP/SP 은폐와
+  정확히 같은 이유(패턴 발동 기준 수치를 역산 못 하게 함, "???"의 집속
+  마력 500/1000 문턱값이 그 사례) — 보스 분기는 원래도 "???" 하나뿐이라
+  별도 처리 없이 자동으로 성립.
+
+**검증**: `demo-focus-mana-visibility.js` 신설(4개 시나리오, 11개
+결정적 체크) — ①Vortex Overload가 시전자(보스)만 소진시키고 피격 대상은
+그대로인지(피격 대상의 스탯 디버프는 회귀 없이 정상 적용), ②
+refillPersonalResource/drainPersonalResource 로그에 한글 라벨이 나오는지,
+③스탠스로 SP를 지불하면 payCosts가 정확한 증가량과 라벨이 담긴 로그
+배열을 반환하는지(스탠스 없는 유닛은 빈 배열 — 회귀 없음), ④
+renderStatusBoard가 자원 보유 유닛/미보유 유닛/보스 세 경우를 정확히
+구분하는지(보스는 절대 수치가 안 보임) — 전부 통과.
+
+### 4. Sheet 화면 스킬 카드가 효과의 74%를 설명 안 하고 있었음(중요 문제)
+
+**조사 결과**: 실제 스킬 데이터에 쓰이는 `effects[].type` 27종 중
+`web/character-sheet.html`의 `EFFECT_TYPES`에 대응 항목이 있던 건
+5종(`heal`/`spUp`/`statUp`/`actionDelay`/`castDelay`)뿐이고,
+`renderSkillCard()`의 효과 칩 빌더는 매치 안 되는 타입을 `if (!meta)
+return "";`로 **그냥 조용히 버리고 있었음**(폴백 문구조차 없음) — 20종이
+완전히 안 보임. 그중 `combatStatUpPercent`(60회 이상 쓰이는 최다빈도
+효과)와 `scaledHeal`(기본 힐 스킬 전부)이 포함돼 있어 실질적으로 이 게임
+대부분의 스킬이 최소 한 가지 이상 설명 누락 상태였음. `statUp`은 항목은
+있지만 "무슨 스탯인지" 표시하는 로직 자체가 없어서(`needsStatTarget`
+플래그만 선언되고 아무 데도 안 읽힘) Concentration이 "핵심 스탯 증가
++100"이라고만 뜨고 DEX인지 안 알려줬음. 패시브 전용 스킬(`effects` 없이
+`statBonus`/`passiveMods`/`combatBonus` 등 필드로만 존재, Job Master류)은
+카드에 이름 말고 아무것도 안 떴음.
+
+**수정**: `renderSkillCard()`의 칩 빌더를 `describeEffect(e)`(신설,
+`src/skillResolution.js`의 `applyEffect()` 실제 동작을 그대로 정적
+설명으로 옮김)로 전면 교체 — 27종 전부 텍스트 생성 로직을 갖추고,
+`combatStatUpPercent`/`statUpPercent`/`maxHpUpPercent`는 `effect.value`의
+부호로 버프/디버프와 `+`/`-` 표시를 동적 판정(엔진 쪽 "퍼센트 디버프
++-30%" 버그 수정과 동일한 원칙을 Sheet 쪽에도 처음으로 적용). `statUp`은
+`e.stat`을 직접 읽어 `STAT_LABELS`로 스탯명을 붙임. `grantPassiveMod`는
+`PASSIVE_MOD_LABELS`(자주 쓰이는 키 위주, 없는 키는 원문 그대로 폴백)로
+라벨링. **알 수 없는 타입에 대한 폴백 신설** — `EFFECT_TYPES`에 없는
+타입도 이제 `"{type}(설명 미등록)"`으로 최소한 존재를 알림(예전엔 빈
+문자열로 완전히 사라졌음) — 앞으로 새 효과 타입을 추가하면서 설명을
+깜빡해도 "완전히 안 보이는" 사고는 코드 차원에서 재발 불가능해짐.
+
+**패시브 전용 필드 표시 신설**: `describePassiveFields(s)`(신설)가
+`statBonus`/`maxHpBonus`/`maxSpBonus`/`combatBonus`/`patternSlotBonus`/
+`passiveMods`/`conditionalPassiveMods`를 전부 칩으로 변환해 카드에 추가 —
+`conditionalPassiveMods`는 `condition.type`(`isGuarding`/`isShielded`/
+`guardAlliesIs`/`rowIs`/`hpPctBelow`/`hpPctAbove`/`hasBarrier`, 관리자
+편집기 힌트 텍스트 기준 전수 반영)까지 "Guard 중일 때: ..." 형태로 조건
+설명을 붙여서 표시.
+
+**검증**: `demo-skill-card-effect-descriptions.js` 신설(5개 시나리오, 38개
+결정적 체크) — `character-sheet.html`의 실제 파일 텍스트에서 관련 구간을
+그대로 잘라내 vm으로 실행해 검증(로직을 복붙하지 않고 실 파일을 그대로
+쓰므로 앞으로 로직이 바뀌면 이 스크립트가 자동으로 최신 버전을 검증함).
+①실제 데이터에 쓰이는 27종(guard 포함) 전부 빈 문자열이 아닌 텍스트를
+반환하는지, ②guard의 물리/마법/전체 구분이 회귀 없이 유지되는지,
+③statUp/statUpPercent/combatStatUpPercent가 스탯명과 부호를 정확히
+보여주는지, ④완전히 새로운(등록 안 된) 타입도 폴백 문구로 존재를
+알리는지, ⑤패시브 전용 필드 8종 조합이 전부 칩으로 나오고 조건부
+패시브의 조건 라벨도 정확한지 — 전부 통과.
+
+전체 4건 공통: `node index.js` + `demo-*.js`(47개) 전체 회귀 통과.
+1/3/4번은 순수 정적 파일 수정이라 배포(git push)만으로 반영되지만, 2번은
+DB 데이터 수정이라 위 마이그레이션을 사용자가 직접 실행해야 함 — 실행
+전까지는 라이브에서 여전히 버그가 남아있는 상태.
+
 ## 알려진 버그 — Guard가 데미지 없는 순수 버프/디버프까지 막아버리던 문제 (2026-08-21, 수정됨)
 
 **증상(사용자 신고)**: 고블린의 왕 전투에서 왕이 쓰는 Break Down(공격+

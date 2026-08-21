@@ -15,7 +15,7 @@
   }
 
 const { computeSkillPower, applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
-const { TEAM_RESOURCE_TYPES } = require("./resourceTypes");
+const { TEAM_RESOURCE_TYPES, PERSONAL_RESOURCE_TYPES } = require("./resourceTypes");
 
 // 한국어 조사(받침 유무에 따른 이/가) 자동 처리 — engine.js/registries.js에도
 // 같은 헬퍼가 있음(중복 관리 지점).
@@ -643,7 +643,11 @@ function applyEffect(caster, target, effect, ctx) {
       const pool = target.personalResources?.[effect.resource];
       if (!pool) return null;
       pool.current = pool.max;
-      return `${target.name}의 ${effect.resource} 재충전. (${pool.current}/${pool.max})`;
+      // 2026-08-22: 원문 키(예:"focusMana")를 그대로 로그에 넣던 걸
+      // PERSONAL_RESOURCE_TYPES의 한글 라벨로 정정 — teamResourceGain이
+      // 이미 TEAM_RESOURCE_TYPES로 라벨을 찾아 쓰던 것과 동일하게 맞춤.
+      const label = PERSONAL_RESOURCE_TYPES[effect.resource]?.label || effect.resource;
+      return `${target.name}의 ${label} 재충전. (${pool.current}/${pool.max})`;
     }
 
     // refillPersonalResource의 반대 — 개인 자원을 완전히 소진시킴(0으로).
@@ -653,7 +657,8 @@ function applyEffect(caster, target, effect, ctx) {
       const pool = target.personalResources?.[effect.resource];
       if (!pool) return null;
       pool.current = 0;
-      return `${target.name}의 ${effect.resource}이(가) 완전히 소진됨.`;
+      const label = PERSONAL_RESOURCE_TYPES[effect.resource]?.label || effect.resource;
+      return `${target.name}의 ${label}${josa(label, "이", "가")} 완전히 소진됨.`;
     }
 
     // 진영 공유 자원(마법진 등) 증가 — FactionResourceManager는 이미
