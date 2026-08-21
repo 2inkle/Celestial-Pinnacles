@@ -252,6 +252,7 @@
       uses_per_battle: loot.usesPerBattle ?? null,
       enhanceable: loot.enhanceable ?? null,
       modifiable: loot.modifiable ?? null,
+      craft_material: null, // 드랍 전리품은 항상 미개조(위 병합 필터와 짝을 이룸)
     };
   }
 
@@ -406,12 +407,14 @@
     }
 
     // 전리품 병합 — 병합 조건은 상점 구매/직접 전투와 동일. held_by(누군가
-    // 장착 중인 개별 인스턴스)나 enhance_level(강화품)과는 절대 안 섞임.
+    // 장착 중인 개별 인스턴스)나 enhance_level(강화품), craft_material(개조품)
+    // 과는 절대 안 섞임(2026-08-22, craft_material 필터 추가 — shop.html/
+    // battle-view.html과 동일한 버그가 이 파일에도 있었음).
     for (const l of lootList) {
       const { data: existing, error: findError } = await window.sbClient
         .from("warehouse_items").select("id,quantity")
         .eq("user_id", session.user.id).eq("name", l.name).eq("category", l.category)
-        .is("held_by", null).is("enhance_level", null).maybeSingle();
+        .is("held_by", null).is("enhance_level", null).is("craft_material", null).maybeSingle();
       if (findError) { alert(`전리품 저장 실패(${l.name}): ${findError.message}`); continue; }
 
       if (existing) {

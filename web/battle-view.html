@@ -256,6 +256,7 @@
       uses_per_battle: loot.usesPerBattle ?? null,
       enhanceable: loot.enhanceable ?? null,
       modifiable: loot.modifiable ?? null,
+      craft_material: null, // 드랍 전리품은 항상 미개조(위 병합 필터와 짝을 이룸)
     };
   }
 
@@ -602,11 +603,17 @@
       // 병합 조건은 상점 구매와 동일하게 맞춤 — held_by(누군가 장착 중인
       // 개별 인스턴스)나 enhance_level(강화품)과는 절대 안 섞여야 함.
       // 예전엔 이 조건이 없어서 드랍품이 강화된 같은 이름 장비에 합쳐지면서
-      // 강화 수치가 공짜로 늘어나는 문제가 있었음.
+      // 강화 수치가 공짜로 늘어나는 문제가 있었음. craft_material도 마찬가지
+      // 이유로 필터함(2026-08-22 추가) — 없으면 드랍품(항상 미개조)이
+      // 조합공방에서 개조해둔 같은 이름 장비 스택에 합쳐져서 "개조된 장비가
+      // 드랍만으로 늘어나는" 문제가 생김(shop.html 구매 병합에서 동일 버그를
+      // 사용자가 신고해서 발견 — 왕관 조각으로 개조한 모자가 구매 후 늘어난
+      // 사례. workshop.html의 개조/제작 병합 로직은 이미 처음부터 이 필드를
+      // 봤는데 상점/전리품 두 경로만 놓쳐 있었음).
       const { data: existing, error: findError } = await window.sbClient
         .from("warehouse_items").select("id,quantity")
         .eq("user_id", session.user.id).eq("name", loot.name).eq("category", loot.category)
-        .is("held_by", null).is("enhance_level", null).maybeSingle();
+        .is("held_by", null).is("enhance_level", null).is("craft_material", null).maybeSingle();
       if (findError) { alert(`전리품 저장 실패(${loot.name}): ${findError.message}`); continue; }
 
       if (existing) {

@@ -1012,6 +1012,7 @@
       uses_per_battle: it.usesPerBattle ?? null,
       enhanceable: it.enhanceable ?? null,
       modifiable: it.modifiable ?? null,
+      craft_material: null, // 상점 구매품은 항상 미개조(위 poolRows 필터와 짝을 이룸)
     };
   }
 
@@ -1028,11 +1029,20 @@
     // heldBy가 붙은 항목(누군가 이미 장착한 개별 인스턴스)과는 절대 안 섞임.
     // enhanceLevel도 같이 봐야 함 — 상점 구매품은 항상 +0(강화 안 됨)인데,
     // 창고에 이미 강화된 같은 이름의 장비가 있으면 절대 같이 섞이면 안 됨.
+    // craftMaterial도 마찬가지 이유로 반드시 같이 봐야 함(2026-08-22 추가) —
+    // 상점 구매품은 항상 미개조인데, 이 필터가 없으면 조합공방에서 개조해둔
+    // 같은 이름의 장비 스택에 상점에서 새로 산 미개조 장비가 그대로 합쳐져서
+    // "개조된 장비가 101개"처럼 개조 여부가 뒤섞여버림(사용자 신고로 발견 —
+    // 왕관 조각으로 개조한 모자 1개를 갖고 있는 상태에서 모자를 100개 사니
+    // 개조된 모자가 101개가 됨). refinery.html의 강화 시 재개조 소실 버그
+    // (2026-08-20)와 정확히 같은 계열 — "이름은 같지만 craft_material이
+    // 다르면 별개 스택"이라는 원칙이 그때 강화 경로에서만 적용되고 이
+    // 구매 병합 경로에는 안 옮겨져 있었음.
     const names = entries.map((it) => it.name);
     const { data: poolRows, error: poolError } = await window.sbClient
       .from("warehouse_items").select("id,name,category,quantity")
       .eq("user_id", session.user.id).in("name", names)
-      .is("held_by", null).is("enhance_level", null);
+      .is("held_by", null).is("enhance_level", null).is("craft_material", null);
     if (poolError) { alert(`구매 실패: ${poolError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
 
     for (const it of entries) {
