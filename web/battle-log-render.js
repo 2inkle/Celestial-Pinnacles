@@ -43,7 +43,18 @@
       while (i < lines.length) {
         if (lines[i] === "[ 아군 ]") { side = "ally"; i++; continue; }
         if (lines[i] === "[ 적군 ]") { side = "enemy"; i++; continue; }
-        const unitMatch = lines[i].match(/^\s*(.+?)\s+HP (\d+)\/(\d+)\s+SP (\d+)\/(\d+)\s*$/);
+        // ⚠ 2026-08-22 수정: 뒤에 "(?:\s+.*)?"를 추가해서 SP 수치 뒤에
+        // 개인 자원 표시(예: "   집속 마력 350/1000", src/engine.js의
+        // renderStatusBoard() 참고)가 붙어도 매칭되게 함 — 예전엔 "\s*$"라
+        // 줄이 SP 수치 직후 바로 끝나야만 매칭됐는데, 개인 자원 접미사가
+        // 생기면서 이 줄 전체가 매칭 실패 -> break로 현황판 스캔이 그
+        // 자리에서 통째로 끝남 -> 아직 못 훑은 [ 적군 ] 섹션이 전부 빈
+        // snapshot.enemy로 남음 -> 모든 적 행동이 sideOf()에서 null ->
+        // "ally" 폴백 -> 보스 전투의 모든 로그가 좌측정렬(아군)로 표시되던
+        // 버그였음(실전투 재신고로 발견). 개인 자원 수치 자체는 이번엔
+        // 구조화 파싱 안 하고 그냥 무시함(원문 로그에는 그대로 남아있어
+        // "원본 로그 보기" 토글로 확인 가능 — 범위를 좁게 유지).
+        const unitMatch = lines[i].match(/^\s*(.+?)\s+HP (\d+)\/(\d+)\s+SP (\d+)\/(\d+)(?:\s+.*)?$/);
         if (unitMatch && side) {
           snapshot[side].push({ name: unitMatch[1], hp: +unitMatch[2], maxHp: +unitMatch[3], sp: +unitMatch[4], maxSp: +unitMatch[5], alive: true });
           i++; continue;

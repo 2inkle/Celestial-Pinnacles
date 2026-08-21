@@ -347,9 +347,10 @@ function applyEffect(caster, target, effect, ctx) {
       const healAmount = Math.max(0, Math.floor((base + healFlat) * (1 + healPct / 100) + 1e-9));
       const before = target.currentHp;
       target.currentHp = Math.min(target.maxHp, target.currentHp + healAmount);
-      // 보스면 statChangeLine이 ""를 반환 — "(결손분의 N%)" 같은 수치 부연도
-      // 그 위에 덧붙이면 안 되므로(뭘 결손분으로 삼았는지는 결국 수치 정보라),
-      // 빈 문자열이면 접미사도 같이 생략.
+      // statChangeLine은 항상 비어있지 않은 문자열을 반환함(보스도 "???"로
+      // 가려진 형태로 반환 — 2026-08-21 이후, 예전엔 보스면 ""였음)이라
+      // 이 `line ?` 검사는 지금은 항상 참이지만, line 자체가 언젠가 다시
+      // null/""을 반환하게 바뀔 가능성에 대비해 방어적으로 유지.
       const line = statChangeLine(target, healAmount, "회복", before, target.currentHp);
       return line ? `${line} (결손분의 ${effect.value}%)` : "";
     }
@@ -916,9 +917,9 @@ function applyDamageAndEffects(actor, skill, ctx) {
         const applied = t.takeDamage(finalPower, damageType, { ignoreBonusDefPct: totalIgnorePct, minimumDamageBasis: minimumBasis, attackerTier: actor.creatureTier });
         ctx.recordDamageDealt?.(actor.side, applied);
         ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "hit", crit: isCrit, damage: applied });
-        // 대상이 보스면 statChangeLine이 ""를 반환 — 그럼 "치명타!" 접두사도
-        // 덩그러니 혼자 남기지 않게 같이 생략(치명타 여부도 결국 데미지 결과에
-        // 딸린 정보라 함께 숨김).
+        // statChangeLine은 항상 비어있지 않은 문자열을 반환함(보스도 amount는
+        // 노출하고 before/after만 "???"로 가림 — 2026-08-21 이후). `hitLine ?`
+        // 검사는 지금은 항상 참이지만 방어적으로 유지.
         const hitLine = statChangeLine(t, applied, "데미지", before, t.currentHp);
         damageLine = hitLine ? `${isCrit ? "치명타! " : ""}${hitLine}` : "";
         applyLifesteal(actor, applied, ctx);
