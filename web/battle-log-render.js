@@ -209,14 +209,20 @@
   };
 
   function renderResultSideBox(label, side, counts, participants, damageDealt) {
-    const totalCurrentHp = participants.reduce((sum, p) => sum + p.currentHp, 0);
-    const totalMaxHp = participants.reduce((sum, p) => sum + p.maxHp, 0);
+    // 이 진영에 보스(creatureTier:"boss")가 하나라도 있으면 HP 합계 자체를
+    // 안 보여줌(2026-08-21) — 합계는 "이 진영 전체 HP"라 보스 하나만 가려도
+    // 나머지 참전 인원의 HP를 알면 뺄셈으로 보스 HP가 그대로 역산된다. 그래서
+    // 부분적으로 가리는 게 의미가 없어 합계 전체를 "???"로 통일함.
+    const hasBoss = participants.some((p) => p.creatureTier === "boss");
+    const hpFigure = hasBoss
+      ? `<b>???</b> / ??? HP`
+      : `<b>${participants.reduce((sum, p) => sum + p.currentHp, 0)}</b> / ${participants.reduce((sum, p) => sum + p.maxHp, 0)} HP`;
     return `
       <div class="result-side-box ${side}">
         <div class="result-side-label">${label}</div>
         <div class="result-survivors">${counts.alive} <span class="of">/ ${counts.total}</span></div>
         <div class="result-sub">생존</div>
-        <div class="result-hp-block"><div class="result-hp-figure"><b>${totalCurrentHp}</b> / ${totalMaxHp} HP</div></div>
+        <div class="result-hp-block"><div class="result-hp-figure">${hpFigure}</div></div>
         <div class="result-dmg-block"><div class="result-dmg-figure">상대에게 입힌 피해 <b>${damageDealt}</b></div></div>
       </div>
     `;

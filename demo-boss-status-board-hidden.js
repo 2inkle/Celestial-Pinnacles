@@ -9,6 +9,15 @@
 // 그대로 텍스트로 찍는 "현황판" 줄을 만들고, web/battle-log-render.js가 그
 // 줄을 정규식으로 파싱해서 %게이지로 그린다. 보스는 이 두 곳 모두에서
 // 수치가 새지 않아야 함.
+//
+// 시나리오 5(2026-08-21 추가): 위 4가지를 다 고친 뒤 사용자가 "다른 건 다
+// 숨기는 데에 성공했는데, 결과창에서는 여전히 정상적으로 출력되고 있다"고
+// 재신고 — battle-view.html/battle-log-view.html이 공통으로 쓰는 결과
+// 화면(renderResultSideBox)이 statChangeLine/renderStatusBoard 둘 다와도
+// 다른 세 번째 별개 경로였음: engine.js의 summarize()가 만드는
+// result.participants(진영별 참전 인원의 currentHp/maxHp)를 그대로 합산해서
+// "1234 / 2000 HP" 식으로 진영 전체 HP를 보여주는데, 보스가 그 진영의
+// 유일한(또는 주요) 참전자면 이 합계가 사실상 보스의 정확한 HP 그 자체임.
 const { BattleEngine } = require("./src/engine");
 const { BattleCharacter } = require("./src/character");
 const fs = require("fs");
@@ -100,7 +109,39 @@ console.log("==================================================");
   engine.startBattle(100, "테스터"); // player.currentHp=0이라 첫 턴에 즉시 패배로 종료됨
 
   const bossResultLine = logs.find((l) => l.includes("고블린의 왕") && l.includes("HP"));
-  check(`최종 결과에도 보스 HP는 "???"로 나옴: "${bossResultLine}"`, !!bossResultLine && bossResultLine.includes("???") && !/HP \d+\/\d+/.test(bossResultLine));
+  check(`최종 결과 텍스트 로그에도 보스 HP는 "???"로 나옴: "${bossResultLine}"`, !!bossResultLine && bossResultLine.includes("???") && !/HP \d+\/\d+/.test(bossResultLine));
+}
+
+console.log("\n==================================================");
+console.log("5) 결과 화면(renderResultSideBox) — 보스가 낀 진영은 HP 합계 자체가 \"???\"로 나옴");
+console.log("==================================================");
+{
+  // battle-view.html/battle-log-view.html이 실제로 렌더링하는 결과 화면
+  // (renderBattleLog -> renderResult -> renderResultSideBox)이 result.participants
+  // (engine.js의 summarize() 산출물)를 그대로 받아 진영별 HP 합계를 보여주는데,
+  // statChangeLine()/renderStatusBoard()와는 또 다른 별개 경로라 이전 수정
+  // 때는 빠져있었음 — 사용자가 "결과창에서는 여전히 정상 출력된다"고 재신고해서
+  // 발견됨(2026-08-21). summarize()에 creatureTier를 실어서 renderResultSideBox가
+  // "이 진영에 보스가 있으면 합계 전체를 가린다"고 판정하도록 수정.
+  const player = new BattleCharacter("전사", "ally", { str: 30 });
+  const boss = new BattleCharacter("고블린의 왕", "enemy", { def: 999999 });
+  boss.creatureTier = "boss";
+  player.currentHp = 0;
+
+  const engine = new BattleEngine([player], [boss], () => {});
+  const result = engine.startBattle(100, "테스터");
+
+  check("engine.js의 summarize()가 creatureTier를 참전 정보에 실어보냄", result.participants.enemy[0].creatureTier === "boss");
+
+  const enemyBoxHtml = sandbox.window.BattleLogRender.renderResultSideBox(
+    "💀 적군", "enemy", result.survivorCounts.enemy, result.participants.enemy, result.damageDealt.enemy
+  );
+  check(`보스가 낀 진영은 HP 합계가 "???"로 가려짐: "${enemyBoxHtml.match(/result-hp-figure">(.+?)<\/div>/)[1]}"`, enemyBoxHtml.includes("???") && !/\d+\s*<\/b>\s*\/\s*\d+ HP/.test(enemyBoxHtml));
+
+  const allyBoxHtml = sandbox.window.BattleLogRender.renderResultSideBox(
+    "🛡️ 아군", "ally", result.survivorCounts.ally, result.participants.ally, result.damageDealt.ally
+  );
+  check(`보스가 없는 진영(아군)은 회귀 없이 실제 HP 합계가 그대로 보임: "${allyBoxHtml.match(/result-hp-figure">(.+?)<\/div>/)[1]}"`, /\d+\s*<\/b>\s*\/\s*\d+ HP/.test(allyBoxHtml));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

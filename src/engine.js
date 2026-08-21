@@ -249,7 +249,9 @@ class BattleEngine {
     // Result 화면용 참전 현황 — 진영별로 참여한 모든 캐릭터의 현재/최대 HP.
     // "이 지역에서 계속 안정적으로 싸울 수 있는지"를 가늠하는 지표로 쓰일
     // 데이터라, 죽었어도(HP 0) 빠지지 않고 전부 포함됨.
-    const summarize = (units) => units.map((u) => ({ name: u.name, currentHp: u.currentHp, maxHp: u.maxHp, isAlive: u.isAlive }));
+    // creatureTier도 같이 담음 — web/battle-log-render.js의 결과 화면이 이걸로
+    // "이 진영에 보스가 있으면 HP 합계를 안 보여준다"를 판정함(2026-08-21).
+    const summarize = (units) => units.map((u) => ({ name: u.name, currentHp: u.currentHp, maxHp: u.maxHp, isAlive: u.isAlive, creatureTier: u.creatureTier }));
     const countSurvivors = (units) => ({ alive: units.filter((u) => u.isAlive).length, total: units.length });
     const survivorCounts = { ally: countSurvivors(this.allies), enemy: countSurvivors(this.enemies) };
 
