@@ -414,6 +414,115 @@ Discord 로그인 세션이 로컬 환경에 없어 브라우저로 직접 확�
 로그인 세션에서 화살통을 사서 장착했을 때 카드 문구와 "개인 자원" 섹션이
 실제로 뜨는지 실측 권장.
 
+## 임무 상세 페이지 신설 + 목록 필터링 + 납품 배치 완료 (2026-08-21 구현, 실측 완료)
+
+**동기(사용자 요청)**: 임무가 아직 2개뿐이라 지금까지 길드(`web/guild.html`)
+목록에 전체 카드(설명·조건·보상 텍스트 전부)를 항상 나열해왔는데, 앞으로
+임무가 늘어나면 가독성이 나빠진다는 판단 — ①퀘스트 ID로 개별 내용을
+조회하는 독립 상세 페이지 신설, ②목록은 "수주 가능한"(조건을 만족한)
+임무만 간단히 보여줌, ③`itemTurnIn`이면서 완료 제한이 없는(`repeatable:true`)
+임무는 한 번에 여러 차례 납품 가능(단위 1/10/100, 10의 등비수열).
+
+**목록 필터 기준(AskUserQuestion으로 명시적 확인)**: "조건을 만족한" =
+`evaluateQuest()`의 `ready`(지금 바로 완료 가능) 또는 `waiting`(반복형,
+예전에 조건을 채운 적은 있음) — 이 둘만 목록에 남기고, `locked`(조건
+미충족)와 `done`(반복 불가+이미 완료)은 숨김. 사용자가 명시: 이 필터가
+나중에 "연계 퀘스트"(선행 임무를 깨야 다음 임무가 노출되는 구조)의 기반이
+될 수 있다는 의도까지 포함 — `locked`을 숨기는 게 곧 "아직 안 풀린 임무는
+안 보인다"는 구조라 별도 구현 없이도 미래 연계 퀘스트 설계를 그대로 지원함.
+
+### 공용 로직 파일 신설 — `web/quest-logic.js`
+
+`guild.html`의 임무 게시판 IIFE에만 있던 `evaluateQuest`/`loadState`/
+`consumeItem`/`grantRewards`/`completeQuest`(+조건·보상 텍스트 포맷터)를
+통째로 추출해 `window.QuestLogic`로 노출함 — `battle-themes.js`/
+`item-sets.js`/`battle-entry.js`와 동일한 이 프로젝트의 확립된 패턴.
+상세 페이지를 새로 만들면서 이 로직을 두 파일에 각자 복제해뒀다면
+`battle-log-view.html`의 로그 파서가 예전에 그랬던 것과 똑같은 드리프트
+문제가 재발했을 것 — 그래서 처음부터 공용 파일로 뺌. `session`을
+클로저로 감추지 않고 매 함수에 명시적 인자로 받도록 함(두 페이지가 각자
+`AuthGuard.requireSession()`으로 얻은 세션으로 부르므로).
+
+`loadState(session, questIds?)`는 `questIds`를 생략하면 지금처럼
+`QUEST_TABLE` 전체 기준(길드 목록용), 배열로 주면 그 임무들만 걸러서
+`quest_progress`/`battle_progress`/`warehouse_items` 세 쿼리를 좁힘 —
+상세 페이지는 `loadState(session, [quest.id])`로 불러서 무관한 진행
+데이터를 안 긁어옴(지금은 임무가 2개뿐이라 성능 차이는 없지만, 나중에
+늘어나도 상세 페이지가 계속 가벼운 채로 남게 하려고 처음부터 이 모양으로
+만듦).
+
+### `completeQuest(session, quest, state, multiplier=1)` — 배치 납품
+
+itemTurnIn이면 `consumeItem`을 `target.quantity * multiplier`로 호출,
+보상(`rewards`)은 골드면 `amount * multiplier`, 아이템이면
+`quantity * multiplier`로 스케일, `quest_progress.completed_count`는
+`+= multiplier`(스키마 변경 불필요 — 그냥 정수 컬럼이라 1이 아니라
+N씩 늘려도 무방, `0020_quest_progress.sql`에 제약조건 없음 확인함).
+`battleClear`나 상세 페이지의 단일 완료 버튼은 항상 `multiplier=1`로
+호출 — 배치 UI 자체가 `itemTurnIn && repeatable:true` 조합에만 노출되므로
+다른 경로는 이 인자를 신경 쓸 필요가 없음.
+
+### `web/guild.html` — 목록 슬림화
+
+카드를 아이콘·이름·상태 배지만 있는 `<a class="quest-card quest-card-link"
+href="quest-detail.html?id=...">`로 교체(완료 버튼·설명·조건·보상 텍스트는
+전부 상세 페이지로 이관, 관련 죽은 CSS도 정리). `battle-themes.js` 스크립트
+태그도 제거함 — 이 페이지에서 조건 텍스트를 그리는 유일한 사용처였는데
+그 로직 자체가 상세 페이지로 옮겨가서 더 이상 필요 없어짐(위의 티켓 발급
+IIFE는 애초에 안 씀, 확인 완료). 아무 임무도 안 보일 때(전부 조건
+미충족)는 "지금 수행할 수 있는 임무가 없습니다. 조건을 채우면 여기에
+다시 나타납니다." 안내.
+
+### 신설 `web/quest-detail.html`
+
+`battle-log-view.html`의 `?id=` 조회 관례 + `character-sheet.html`류의
+`.back-link` 패턴을 따름. `?id=`가 없거나, 오타거나, 그 임무가
+`QUEST_TABLE`에서 제거됐는데 옛 `quest_progress` 행만 남아있는 경우 —
+전부 "`QUEST_TABLE`에서 그 id를 못 찾음"이라는 같은 상황으로 동일하게
+"임무를 찾을 수 없습니다" 처리(조회를 항상 `QUEST_TABLE` 기준으로만
+하고 `quest_progress`를 직접 조회해 존재를 판정하지 않으므로 자동으로
+성립함).
+
+**배치 UI(itemTurnIn && repeatable:true)**: `×1`/`×10`/`×100` 버튼 그룹,
+각 버튼은 `owned >= target.quantity * N`이 아니면 비활성 + "(N개 필요)"
+병기. **2단계 확인 흐름** — 버튼 클릭 → 선택 상태로 표시 + "소모 N개 →
+보상 M" 미리보기 노출 → 별도 "확정 납품" 버튼을 눌러야 실제
+`completeQuest` 호출. `×100` 같은 큰 배수를 실수로 즉시 소모하지 않게
+하려는 목적(이 앱 어디에도 `confirm()` 다이얼로그를 쓰는 곳이 없어서
+그 패턴 대신 선택). **확정 클릭 직전에 반드시 `loadState`를 다시 불러
+보유량을 재확인** — `consumeItem()`은 부분 소모 후 실패해도 롤백을
+안 하므로, 페이지를 띄워둔 사이 재료가 줄었을 가능성에 대한 유일한
+방어선.
+
+### 검증
+
+`quest-logic.js`를 vm 샌드박스에 그대로 얹어 ①`evaluateQuest` 9가지
+케이스(원래 임무 시스템 구현 때 검증했던 것과 동일 — 미클리어/최초완료/
+반복-재도전전/반복-재도전후/일회성-완료됨/일회성-미완료/아이템부족/
+아이템충분/아이템반복) 전부 그대로 성립, ②`completeQuest`의 ×1/×10/×100
+스케일링(소모량·보상량·`completed_count` 증가분이 각각 정확히 N배)을
+결정적으로 검증(총 24개 체크 통과).
+
+**실제 로그인 세션으로 전부 실측 완료**(원래 임무 시스템 구현 때 못 했던
+부분 — 이번엔 진행함): 길드 목록에서 두 예시 임무가 `ready`/`waiting`
+상태로 정상 노출(`locked`/`done`이었다면 숨겨졌을 것), 카드 클릭 →
+`quest-detail.html?id=...`로 정확히 이동. "고블린 이빨 납품"(itemTurnIn,
+repeatable) 상세 페이지에서 조건 텍스트("고블린의 이빨 3441/5개 납품")·
+보상 텍스트·×1/×10/×100 버튼(전부 보유량 충분해 활성)이 정확히 렌더링,
+×10 선택 → 미리보기("소모: 고블린의 이빨 50개 → 보상: 골드 1500") 정확히
+표시 → 확정 → DB 대조 결과 골드 21437→22937(+1500=150×10 정확),
+창고 수량 3441→3391(-50=5×10 정확), `completed_count` 10→20(+10 정확,
+1 아님) 전부 실측 확인. "고블린 왕 토벌 현상금"(battleClear,
+`repeatable:true`)은 배치 버튼 없이 단일 완료 버튼만 뜨는 것도 확인
+(요구사항이 itemTurnIn에 국한됨 재확인) — `waiting` 상태라 버튼 비활성
++ "예전에 조건을 채운 적은 있지만..." 경고 문구도 정상 노출.
+`quest-detail.html?id=존재안함` 직접 접속 → 콘솔 에러 없이 "임무를 찾을
+수 없습니다" 정상 처리. 콘솔에 뜬 401 에러는 기존에 이미 문서화된
+무해한 세션 갱신 잡음(이번 변경과 무관, 이전 세션들에서도 반복 관측됨).
+테스트로 소비한 아이템·골드·`completed_count`는 정확한 이전 값(골드
+21437, 아이템 3441개, `completed_count`10, `last_completed_at` 원래
+타임스탬프)으로 전부 복구함.
+
 ## 임무 시스템 (2026-08-17 신규 구현)
 
 모험가 길드(`web/guild.html`)에 "임무 게시판"을 추가함. 기존 파견 의뢰권
