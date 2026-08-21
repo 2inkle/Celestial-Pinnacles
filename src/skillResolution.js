@@ -33,12 +33,20 @@ function josa(word, withBatchim, withoutBatchim) {
 // ({전} > {후})". web/battle-view.html이 " ▷ " 포함 여부로 이 줄을 감지해
 // 강조 스타일을 입힌다(그 파일의 classifyLine 참조) — 이 함수가 만드는
 // 문자열 모양을 바꾸면 그쪽도 같이 맞춰야 함.
-// target(문자열 아님, 유닛 객체) — creatureTier가 "boss"면 HP/SP 변화량을
-// 아예 표기하지 않음(2026-08-16, 사용자 요청). "더 이상 증가/감소할 수
+// target(문자열 아님, 유닛 객체) — creatureTier가 "boss"면 정확한 수치
+// (증감량/전/후 값)를 전부 "???"로 가림(2026-08-16, 사용자 요청: 보스의
+// MaxHP/MaxSP/HP/SP와 그 증감을 노출하지 않음). "더 이상 증가/감소할 수
 // 없다"(describeStatCap) 같은 상한 알림은 이 함수를 안 거치는 별도
 // 문구라 영향 안 받음 — 그건 그대로 노출.
+// ⚠ 2026-08-21 수정: 예전엔 빈 문자열("")을 반환해서 "가릴 수치만 빼고
+// 나머지는 보여준다"가 아니라 "그 히트/행동의 로그 줄 전체가 통째로
+// 사라지는" 결과가 됐었음 — 호출부(applyDamageAndEffects 등)가 전부
+// `if (line)`으로 "내용이 있어야 로그를 남긴다"는 패턴이라, 빈 문자열은
+// "이 행동이 아예 로그에 안 남아도 된다"는 신호로 해석돼버렸다. 실전투에서
+// "보스에게 가한 공격이 로그에서 통째로 빠진다"로 발견됨 — 수치를 감추는
+// 것과 그 행동이 있었다는 사실 자체를 감추는 것은 다른 문제였다.
 function statChangeLine(target, amount, label, before, after) {
-  if (target?.creatureTier === "boss") return "";
+  if (target?.creatureTier === "boss") return `??? ${label} ▷ ${target.name} (??? > ???)`;
   return `${amount} ${label} ▷ ${target.name} (${before} > ${after})`;
 }
 

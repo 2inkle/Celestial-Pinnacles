@@ -24,11 +24,13 @@ const { applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
 // skillResolution.js에도 같은 이름·같은 모양으로 있음(중복 — josa 헬퍼가
 // 이 코드베이스에서 이미 그렇게 관리되는 것과 동일한 방식). "{증감량} {유형}
 // ▷ {대상} ({전} > {후})" — web/battle-view.html이 " ▷ " 포함 여부로 감지해
-// 강조 스타일을 입힘. target(유닛 객체)의 creatureTier가 "boss"면 빈 문자열
-// 반환 — HP/SP 변화량을 아예 안 보여줌(2026-08-16, skillResolution.js와
-// 동일 규칙).
+// 강조 스타일을 입힘. target(유닛 객체)의 creatureTier가 "boss"면 수치만
+// "???"로 가림(2026-08-16, skillResolution.js와 동일 규칙). 2026-08-21:
+// 예전엔 빈 문자열을 반환해서 호출부의 `if (line)` 패턴과 만나 "행동 전체가
+// 로그에서 통째로 빠지는" 버그가 됐었음(skillResolution.js 쪽 주석 참고) —
+// 수치를 가리는 것과 로그 자체를 없애는 것은 다른 문제.
 function statChangeLine(target, amount, label, before, after) {
-  if (target?.creatureTier === "boss") return "";
+  if (target?.creatureTier === "boss") return `??? ${label} ▷ ${target.name} (??? > ???)`;
   return `${amount} ${label} ▷ ${target.name} (${before} > ${after})`;
 }
 
@@ -540,9 +542,9 @@ ActionRegistry.register("DIALOGUE_DEFEAT", (actor, ctx) => {
 // 자폭 — 방어력/Guard 등 어떤 경감도 거치지 않고 즉시 HP를 0으로 만듦
 // ("자신의 체력이 50% 미만이 될 경우 최대체력의 100%만큼 자해"라는 설계
 // 의도 자체가 "무조건 죽는다"이므로, takeDamage()의 방어 파이프라인을
-// 거치면 오히려 의도가 흐려짐 — 직접 0으로 설정). HP/SP 변화 표기는
-// creatureTier가 "boss"면 이미 로그에서 빠지므로(statChangeLine 규칙)
-// 여기서는 그냥 서술형 한 줄만 남김.
+// 거치면 오히려 의도가 흐려짐 — 직접 0으로 설정). 여기선 애초에
+// statChangeLine을 거치지 않고 서술형 한 줄만 남기므로 보스 여부와
+// 무관하게 항상 동일한 문구.
 ActionRegistry.register("SELF_DETONATION", (actor, ctx) => {
   actor.currentHp = 0;
   ctx.log(`   ${actor.name}이(가) 스스로 자폭했다!`);
