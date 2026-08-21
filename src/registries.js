@@ -24,13 +24,12 @@ const { applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
 // skillResolution.js에도 같은 이름·같은 모양으로 있음(중복 — josa 헬퍼가
 // 이 코드베이스에서 이미 그렇게 관리되는 것과 동일한 방식). "{증감량} {유형}
 // ▷ {대상} ({전} > {후})" — web/battle-view.html이 " ▷ " 포함 여부로 감지해
-// 강조 스타일을 입힘. target(유닛 객체)의 creatureTier가 "boss"면 수치만
-// "???"로 가림(2026-08-16, skillResolution.js와 동일 규칙). 2026-08-21:
-// 예전엔 빈 문자열을 반환해서 호출부의 `if (line)` 패턴과 만나 "행동 전체가
-// 로그에서 통째로 빠지는" 버그가 됐었음(skillResolution.js 쪽 주석 참고) —
-// 수치를 가리는 것과 로그 자체를 없애는 것은 다른 문제.
+// 강조 스타일을 입힘. target(유닛 객체)의 creatureTier가 "boss"면 절대
+// HP/SP 수치(전/후 값)만 "???"로 가리고 증감량(amount)은 그대로 보여줌
+// (2026-08-21, skillResolution.js와 동일 규칙 — "데미지 자체는 보이되
+// 총 HP/SP는 역산 못 하게" 하는 게 목적).
 function statChangeLine(target, amount, label, before, after) {
-  if (target?.creatureTier === "boss") return `??? ${label} ▷ ${target.name} (??? > ???)`;
+  if (target?.creatureTier === "boss") return `${amount} ${label} ▷ ${target.name} (??? > ???)`;
   return `${amount} ${label} ▷ ${target.name} (${before} > ${after})`;
 }
 

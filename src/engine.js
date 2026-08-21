@@ -263,11 +263,15 @@ class BattleEngine {
     this.log(`\n==================================================`);
     this.log(resultMessage);
     this.log(`진행 턴수: ${this.currentTurn}`);
+    // Boss는 renderStatusBoard()와 동일하게 최종 결과 요약에서도 절대 HP를
+    // 안 보여줌(2026-08-21) — 전투가 끝났다고 예외를 두면 그 시점의 정확한
+    // HP를 알아내는 우회로가 남기 때문.
+    const resultLine = (u) => u.creatureTier === "boss" ? `  ${u.name}: HP ???` : `  ${u.name}: HP ${u.currentHp}/${u.maxHp}`;
     this.log(`\n[아군]`);
-    this.allies.forEach((u) => this.log(`  ${u.name}: HP ${u.currentHp}/${u.maxHp}`));
+    this.allies.forEach((u) => this.log(resultLine(u)));
     this.log(`생존 ${survivorCounts.ally.alive} / ${survivorCounts.ally.total}`);
     this.log(`\n[적군]`);
-    this.enemies.forEach((u) => this.log(`  ${u.name}: HP ${u.currentHp}/${u.maxHp}`));
+    this.enemies.forEach((u) => this.log(resultLine(u)));
     this.log(`생존 ${survivorCounts.enemy.alive} / ${survivorCounts.enemy.total}`);
     this.log(`\n획득:`);
     this.log(`  경험치 ${this.battleExpGained}`);
@@ -445,18 +449,26 @@ class BattleEngine {
    * 출력 자체가 새 턴의 시작을 대신함(턴 종료 안내도 마찬가지로 없음 — 다음
    * 턴은 그냥 이 현황판부터 다시 보여줌). 생존/전투불능 여부와 HP/SP(현재치/
    * 최대치, 퍼센티지 없이)를 진영별로 보여줌.
+   *
+   * ⚠ Boss(creatureTier:"boss")는 생존 중이면 HP/SP를 아예 안 찍고 "???"만
+   * 남김(2026-08-21, 사용자 요청) — statChangeLine()의 데미지 줄 마스킹과
+   * 같은 목적(패턴 발동 기준선이 되는 절대 HP/SP 수치를 역산 못 하게)이지만
+   * 별개 코드 경로라 여기서도 따로 처리해야 함. web/battle-log-render.js의
+   * parseBattleLog()가 "HP x/y SP a/b" 형태만 퍼센티지 게이지로 그리므로,
+   * 이 형태 자체를 안 찍으면 게이지도 자동으로 안 그려짐.
    */
   renderStatusBoard() {
+    const line = (u) => {
+      if (!u.isAlive) return `  ${u.name}   💀 전투불능`;
+      if (u.creatureTier === "boss") return `  ${u.name}   ???`;
+      return `  ${u.name}   HP ${u.currentHp}/${u.maxHp}   SP ${u.currentSp}/${u.maxSp}`;
+    };
     this.log(`\n==================================================`);
     this.log(`[ TURN ${this.currentTurn} ]`);
     this.log(`[ 아군 ]`);
-    this.allies.forEach((u) => {
-      this.log(u.isAlive ? `  ${u.name}   HP ${u.currentHp}/${u.maxHp}   SP ${u.currentSp}/${u.maxSp}` : `  ${u.name}   💀 전투불능`);
-    });
+    this.allies.forEach((u) => this.log(line(u)));
     this.log(`[ 적군 ]`);
-    this.enemies.forEach((u) => {
-      this.log(u.isAlive ? `  ${u.name}   HP ${u.currentHp}/${u.maxHp}   SP ${u.currentSp}/${u.maxSp}` : `  ${u.name}   💀 전투불능`);
-    });
+    this.enemies.forEach((u) => this.log(line(u)));
     this.log(`==================================================`);
   }
 

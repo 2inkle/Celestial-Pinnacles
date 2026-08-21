@@ -28,6 +28,7 @@
 .bar-fill.sp { background:linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
 .bar-figure { font-family:'JetBrains Mono',monospace; font-size:8.5px; color:var(--mist-dim); width:64px; text-align:right; flex-shrink:0; }
 .down-tag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--danger); }
+.hidden-tag { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--mist-dim); }
 
 .status-table td.enemy-col .unit-row { flex-direction:row-reverse; }
 .status-table td.enemy-col .unit-name { text-align:right; }

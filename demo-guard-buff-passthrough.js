@@ -97,7 +97,10 @@ SkillRegistry.register({
   guardingPlayer.isGuarding = true;
 
   const hpBefore = guardingPlayer.currentHp;
+  const originalRandom4 = Math.random;
+  Math.random = () => 0; // 명중 판정을 결정적으로 고정(물리 공격은 10% 확률로 빗나갈 수 있어 원래 미고정이면 이 테스트가 가끔 flaky했음)
   applyDamageAndEffects(king, SkillRegistry.get("Break Down"), makeCtx([guardingPlayer], [king]));
+  Math.random = originalRandom4;
   check("데미지가 막힘(HP 불변)", guardingPlayer.currentHp === hpBefore);
   check("디버프도 같이 막힘(bonusAtk/bonusDef 불변)", guardingPlayer.bonusAtk === 0 && guardingPlayer.bonusDef === 0);
   check("Guard가 소모됨(공격 전체를 한 번에 막고 소진)", guardingPlayer.isGuarding === false);
@@ -114,7 +117,10 @@ console.log("==================================================");
   player.realAtk = 30;
 
   const hpBefore = player.currentHp;
+  const originalRandom5 = Math.random;
+  Math.random = () => 0; // 명중 판정을 결정적으로 고정(위 시나리오 4와 동일한 이유)
   applyDamageAndEffects(king, SkillRegistry.get("Break Down"), makeCtx([player], [king]));
+  Math.random = originalRandom5;
   check("데미지가 들어감", player.currentHp < hpBefore);
   check("ATK 디버프가 들어감(bonusAtk < 0)", player.bonusAtk < 0);
   check("DEF 디버프가 들어감(bonusDef < 0)", player.bonusDef < 0);

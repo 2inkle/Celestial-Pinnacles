@@ -53,6 +53,16 @@
           snapshot[side].push({ name: downMatch[1], alive: false });
           i++; continue;
         }
+        // Boss(creatureTier:"boss")는 src/engine.js의 renderStatusBoard()가
+        // "{이름}   ???"만 찍음(HP/SP 수치 자체를 안 냄) — 위 unitMatch
+        // 정규식엔 안 걸리므로 여기서 별도로 잡아서 hidden 유닛으로 표시함
+        // (2026-08-21). hp/maxHp가 없으니 renderUnitRow가 게이지를 못
+        // 그리고, 그게 바로 목적 — "정확한 기준 수치를 숨긴다".
+        const hiddenMatch = lines[i].match(/^\s*(.+?)\s+\?\?\?\s*$/);
+        if (hiddenMatch && side) {
+          snapshot[side].push({ name: hiddenMatch[1], alive: true, hidden: true });
+          i++; continue;
+        }
         break;
       }
 
@@ -70,6 +80,10 @@
   function renderUnitRow(u) {
     if (!u.alive) {
       return `<div class="unit-row down"><span class="unit-name">${u.name}</span><span class="down-tag">💀 전투불능</span></div>`;
+    }
+    if (u.hidden) {
+      // Boss — HP/SP 수치 자체가 로그에 없으니 게이지를 그릴 수가 없음(의도됨).
+      return `<div class="unit-row"><span class="unit-name">${u.name}</span><span class="hidden-tag">❓ 비공개</span></div>`;
     }
     const hpPct = Math.max(0, Math.min(100, (u.hp / u.maxHp) * 100));
     const spPct = u.maxSp > 0 ? Math.max(0, Math.min(100, (u.sp / u.maxSp) * 100)) : 0;
