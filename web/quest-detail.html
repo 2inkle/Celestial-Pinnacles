@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>임무 상세</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; background:var(--ink); color:var(--mist); font-family:'Inter',sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+
+  header { max-width:700px; width:100%; margin:0 auto; padding:26px 20px 0; }
+  .back-link { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mist-dim); text-decoration:none; }
+  .back-link:hover { color:var(--gold); }
+  .eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.18em; color:var(--cyan); text-transform:uppercase; margin-top:14px; }
+
+  main { max-width:700px; width:100%; margin:0 auto; padding:14px 20px 60px; flex:1; }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--mist-dim); font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.8; }
+  .empty-state a { color:var(--gold); }
+
+  .quest-block { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; }
+  .quest-head { display:flex; align-items:center; gap:10px; }
+  .quest-icon { font-size:28px; }
+  .quest-name { font-family:'Cinzel',serif; font-weight:700; font-size:22px; color:#f2efe8; flex:1; }
+  .quest-status { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; padding:4px 10px; border-radius:5px; border:1px solid var(--line); color:var(--mist-dim); white-space:nowrap; }
+  .quest-status-ready { color:var(--gold); border-color:var(--gold-dim); }
+  .quest-status-waiting { color:var(--ember); border-color:var(--ember-dim); }
+  .quest-status-done { color:var(--cyan); border-color:var(--cyan); }
+  .quest-desc { font-size:13.5px; color:var(--mist-dim); line-height:1.7; margin-top:14px; }
+
+  .quest-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:18px; }
+  .quest-info-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .quest-info-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; color:var(--mist-dim); text-transform:uppercase; }
+  .quest-info-value { font-family:'JetBrains Mono',monospace; font-size:13.5px; color:#f2efe8; margin-top:5px; }
+  .quest-info-value.gold { color:var(--gold); }
+
+  .quest-action { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+  button.quest-complete-btn { font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--gold); border:1px solid var(--gold-dim); border-radius:8px; padding:11px 26px; cursor:pointer; }
+  button.quest-complete-btn:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
+  button.quest-complete-btn:disabled { opacity:0.35; cursor:not-allowed; color:var(--mist-dim); border-color:var(--line); }
+
+  .batch-row { display:flex; gap:10px; flex-wrap:wrap; }
+  button.quest-batch-btn {
+    font-family:'JetBrains Mono',monospace; font-size:13px; background:var(--panel-raised); color:var(--mist);
+    border:1px solid var(--line); border-radius:8px; padding:10px 16px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
+  }
+  button.quest-batch-btn .batch-need { font-size:10px; color:var(--mist-dim); }
+  button.quest-batch-btn:hover:not(:disabled) { border-color:var(--gold-dim); }
+  button.quest-batch-btn.selected { border-color:var(--gold); background:#d9b45c14; color:var(--gold); }
+  button.quest-batch-btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+  .batch-preview { margin-top:14px; font-size:12.5px; color:var(--mist); line-height:1.7; display:none; }
+  .batch-preview.show { display:block; }
+  .batch-preview b { color:var(--gold); }
+
+  .quest-warn { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist-dim); margin-top:10px; }
+</style>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <script src="nav.js"></script>
+
+<header>
+  <a class="back-link" href="guild.html">← 임무 게시판으로</a>
+  <div class="eyebrow">Quest</div>
+</header>
+
+<main id="main"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
+<script src="battle-themes.js"></script>
+<script src="quest-table.js"></script>
+<script src="quest-logic.js"></script>
+<script>
+// ============================================================================
+// 임무 상세 — ?id=<questId> 하나를 조회해서 전체 내용(설명/조건/보상)과
+// 완료 액션을 보여줌. guild.html의 임무 게시판이 목록을 간단하게 유지하는
+// 대신(2026-08-21) 실제 완료 액션은 전부 이 페이지로 옮겨왔음.
+//
+// itemTurnIn && repeatable:true인 임무는 ×1/×10/×100 배치 납품을 지원함
+// (사용자 요청 — "완료 제한이 없는 퀘스트는 동시에 여러 차례 납품").
+// battleClear나 repeatable:false인 itemTurnIn은 배치 개념이 없어 단일
+// 완료 버튼만 보여줌.
+// ============================================================================
+(async function () {
+  const main = document.getElementById("main");
+  const { loadState, evaluateQuest, STATUS_LABEL, rewardText, conditionText, completeQuest } = window.QuestLogic;
+
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const quest = window.QuestTable.QUEST_TABLE.find((q) => q.id === id);
+
+  // id가 없거나(직접 guild.html에서 링크를 안 타고 온 경우), 오타거나,
+  // 그 임무가 QUEST_TABLE에서 제거됐는데 옛 quest_progress 행만 남아있는
+  // 경우 — 전부 "그 id로 QUEST_TABLE에서 못 찾음"이라는 같은 상황이라
+  // 동일하게 처리함.
+  if (!quest) {
+    main.innerHTML = `<div class="empty-state">임무를 찾을 수 없습니다.<br/><a href="guild.html">← 임무 게시판으로</a></div>`;
+    return;
+  }
+  document.title = `${quest.name} · 임무 상세`;
+
+  const session = await window.AuthGuard.requireSession();
+
+  // 배치 납품 대상: itemTurnIn이면서 repeatable인 경우만. 선택된 배수(없으면
+  // null = 아직 아무 것도 안 고른 상태)를 모듈 스코프에 들고 있다가 render()가
+  // 다시 그릴 때도 유지되게 함(re-render마다 선택이 풀리면 2단계 확인 흐름이
+  // 매번 끊김).
+  const isBatchable = quest.type === "itemTurnIn" && quest.repeatable === true;
+  let selectedMultiplier = null;
+
+  function renderAction(evalResult) {
+    if (!isBatchable) {
+      const ready = evalResult.status === "ready";
+      return `
+        <div class="quest-action">
+          <button class="quest-complete-btn" id="completeBtn" ${ready ? "" : "disabled"}>완료</button>
+        </div>
+      `;
+    }
+
+    const owned = evalResult.owned || 0;
+    const multipliers = [1, 10, 100];
+    const buttonsHtml = multipliers.map((m) => {
+      const need = quest.target.quantity * m;
+      const affordable = owned >= need;
+      const isSelected = selectedMultiplier === m;
+      return `<button class="quest-batch-btn ${isSelected ? "selected" : ""}" data-multiplier="${m}" ${affordable ? "" : "disabled"}>
+        ×${m}<span class="batch-need">(${need}개 필요)</span>
+      </button>`;
+    }).join("");
+
+    let previewHtml = "";
+    if (selectedMultiplier != null) {
+      const m = selectedMultiplier;
+      const consume = quest.target.quantity * m;
+      const rewardsScaled = quest.rewards.map((r) => r.type === "gold" ? { ...r, amount: r.amount * m } : { ...r, quantity: (r.quantity || 1) * m });
+      previewHtml = `
+        <div class="batch-preview show">
+          소모: <b>${quest.target.itemName} ${consume}개</b> → 보상: <b>${rewardText(rewardsScaled)}</b>
+        </div>
+        <div class="quest-action">
+          <button class="quest-complete-btn" id="confirmBatchBtn">×${m} 확정 납품</button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="quest-action">
+        <div class="batch-row">${buttonsHtml}</div>
+        ${previewHtml}
+      </div>
+    `;
+  }
+
+  async function render() {
+    const state = await loadState(session, [quest.id]);
+    const evalResult = evaluateQuest(quest, state);
+
+    main.innerHTML = `
+      <div class="quest-block">
+        <div class="quest-head">
+          <span class="quest-icon">${quest.icon}</span>
+          <span class="quest-name">${quest.name}</span>
+          <span class="quest-status quest-status-${evalResult.status}">${STATUS_LABEL[evalResult.status]}</span>
+        </div>
+        <div class="quest-desc">${quest.description}</div>
+        <div class="quest-info-grid">
+          <div class="quest-info-card">
+            <div class="quest-info-label">조건</div>
+            <div class="quest-info-value">${conditionText(quest, evalResult)}</div>
+          </div>
+          <div class="quest-info-card">
+            <div class="quest-info-label">보상</div>
+            <div class="quest-info-value gold">${rewardText(quest.rewards)}</div>
+          </div>
+        </div>
+        ${renderAction(evalResult)}
+        ${evalResult.status === "waiting" ? `<div class="quest-warn">⚠ 예전에 조건을 채운 적은 있지만, 마지막으로 받은 이후 다시 조건을 채우지 않았어요.</div>` : ""}
+      </div>
+    `;
+
+    if (!isBatchable) {
+      const btn = document.getElementById("completeBtn");
+      btn?.addEventListener("click", async () => {
+        btn.disabled = true;
+        const freshState = await loadState(session, [quest.id]);
+        const freshEval = evaluateQuest(quest, freshState);
+        if (freshEval.status !== "ready") { render(); return; }
+        const ok = await completeQuest(session, quest, freshState, 1);
+        if (ok) alert(`"${quest.name}" 완료! ${rewardText(quest.rewards)}을(를) 받았습니다.`);
+        render();
+      });
+      return;
+    }
+
+    main.querySelectorAll(".quest-batch-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedMultiplier = Number(btn.dataset.multiplier);
+        render();
+      });
+    });
+    const confirmBtn = document.getElementById("confirmBatchBtn");
+    confirmBtn?.addEventListener("click", async () => {
+      confirmBtn.disabled = true;
+      const m = selectedMultiplier;
+      // 확정 직전에 반드시 최신 보유량을 다시 확인 — 페이지를 띄워둔 사이
+      // 재료가 줄었을 수 있고, consumeItem()은 부분 소모 후 실패해도
+      // 롤백을 안 하므로 여기서 다시 거르는 게 유일한 방어선.
+      const freshState = await loadState(session, [quest.id]);
+      const freshEval = evaluateQuest(quest, freshState);
+      const need = quest.target.quantity * m;
+      if ((freshEval.owned || 0) < need) {
+        alert("그 사이 아이템이 부족해졌습니다. 다시 확인해 주세요.");
+        selectedMultiplier = null;
+        render();
+        return;
+      }
+      const ok = await completeQuest(session, quest, freshState, m);
+      selectedMultiplier = null;
+      if (ok) {
+        const rewardsScaled = quest.rewards.map((r) => r.type === "gold" ? { ...r, amount: r.amount * m } : { ...r, quantity: (r.quantity || 1) * m });
+        alert(`"${quest.name}" ×${m} 완료! ${rewardText(rewardsScaled)}을(를) 받았습니다.`);
+      }
+      render();
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

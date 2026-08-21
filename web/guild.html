@@ -48,21 +48,16 @@
   .rule { font-size:12px; color:var(--mist-dim); line-height:1.8; }
   .rule b { color:var(--mist); }
 
-  .quest-list { display:grid; gap:12px; }
-  .quest-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
-  .quest-head { display:flex; align-items:center; gap:8px; }
+  .quest-list { display:grid; gap:10px; }
+  .quest-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:8px; padding:12px 16px; }
+  .quest-card-link { display:flex; align-items:center; gap:8px; text-decoration:none; transition:border-color 0.12s ease; }
+  .quest-card-link:hover { border-color:var(--gold-dim); }
   .quest-icon { font-size:16px; }
   .quest-name { font-family:'Cinzel',serif; font-size:14.5px; color:#f2efe8; flex:1; }
   .quest-status { font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.06em; padding:3px 8px; border-radius:5px; border:1px solid var(--line); color:var(--mist-dim); white-space:nowrap; }
   .quest-status-ready { color:var(--gold); border-color:var(--gold-dim); }
+  .quest-status-waiting { color:var(--ember); border-color:var(--ember-dim); }
   .quest-status-done { color:var(--cyan); border-color:var(--cyan); }
-  .quest-desc { font-size:12.5px; color:var(--mist-dim); line-height:1.6; margin-top:6px; }
-  .quest-condition { font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--mist); margin-top:8px; }
-  .quest-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; flex-wrap:wrap; }
-  .quest-reward { font-size:12px; color:var(--gold); }
-  .quest-complete-btn { font-family:'JetBrains Mono',monospace; font-size:12.5px; background:var(--panel); color:var(--gold); border:1px solid var(--gold-dim); border-radius:7px; padding:8px 18px; cursor:pointer; white-space:nowrap; }
-  .quest-complete-btn:hover:not(:disabled) { background:var(--gold-dim); color:#f2efe8; }
-  .quest-complete-btn:disabled { opacity:0.35; cursor:not-allowed; color:var(--mist-dim); border-color:var(--line); }
   .quest-empty { font-size:12.5px; color:var(--mist-dim); padding:8px 0; }
 </style>
   <link rel="stylesheet" href="common.css">
@@ -115,8 +110,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
-<script src="battle-themes.js"></script>
 <script src="quest-table.js"></script>
+<script src="quest-logic.js"></script>
 <script>
 // ============================================================================
 // 모험가 길드 — 파견 의뢰권 발행/수주
@@ -293,169 +288,38 @@
 // ============================================================================
 (async function () {
   const QUESTS = window.QuestTable.QUEST_TABLE;
+  const { loadState, evaluateQuest, STATUS_LABEL } = window.QuestLogic;
   const $ = (s) => document.querySelector(s);
   const session = await window.AuthGuard.requireSession();
 
-  const battleIds = [...new Set(QUESTS.filter((q) => q.type === "battleClear").map((q) => q.target.battleId))];
-  const itemNames = [...new Set(QUESTS.filter((q) => q.type === "itemTurnIn").map((q) => q.target.itemName))];
-
-  async function loadState() {
-    const [{ data: progressRows }, { data: battleRows }, { data: itemRows }] = await Promise.all([
-      window.sbClient.from("quest_progress").select("quest_id,completed_count,last_completed_at").eq("user_id", session.user.id),
-      battleIds.length
-        ? window.sbClient.from("battle_progress").select("battle_id,cleared,cleared_at").eq("user_id", session.user.id).in("battle_id", battleIds)
-        : Promise.resolve({ data: [] }),
-      itemNames.length
-        ? window.sbClient.from("warehouse_items").select("id,name,quantity").eq("user_id", session.user.id).in("name", itemNames)
-        : Promise.resolve({ data: [] }),
-    ]);
-    const progressById = {};
-    (progressRows || []).forEach((r) => { progressById[r.quest_id] = r; });
-    const battleById = {};
-    (battleRows || []).forEach((r) => { battleById[r.battle_id] = r; });
-    const itemQtyByName = {};
-    (itemRows || []).forEach((r) => { itemQtyByName[r.name] = (itemQtyByName[r.name] || 0) + r.quantity; });
-    return { progressById, battleById, itemQtyByName };
-  }
-
-  // status: "ready"(완료 가능) / "locked"(조건 미충족) / "waiting"(반복형,
-  // 마지막 완료 이후 조건을 다시 채운 적 없음) / "done"(일회성, 이미 완료함)
-  function evaluateQuest(quest, state) {
-    const progress = state.progressById[quest.id];
-    const done = !!(progress && progress.completed_count > 0);
-    if (!quest.repeatable && done) return { status: "done" };
-
-    if (quest.type === "battleClear") {
-      const battle = state.battleById[quest.target.battleId];
-      if (!battle || !battle.cleared) return { status: "locked" };
-      if (progress && progress.last_completed_at && battle.cleared_at &&
-          new Date(battle.cleared_at) <= new Date(progress.last_completed_at)) {
-        return { status: "waiting" };
-      }
-      return { status: "ready" };
-    }
-
-    if (quest.type === "itemTurnIn") {
-      const owned = state.itemQtyByName[quest.target.itemName] || 0;
-      if (owned < quest.target.quantity) return { status: "locked", owned };
-      return { status: "ready", owned };
-    }
-
-    return { status: "locked" };
-  }
-
-  const STATUS_LABEL = { ready: "완료 가능", locked: "진행 중", waiting: "재도전 필요", done: "완료됨" };
-
-  function rewardText(rewards) {
-    return rewards.map((r) => r.type === "gold" ? `골드 ${r.amount}` : `${r.name} ${r.quantity || 1}개`).join(" · ");
-  }
-
-  function conditionText(quest, evalResult) {
-    if (quest.type === "battleClear") {
-      const battleName = window.BattleThemes.battleNameById(quest.target.battleId);
-      return `"${battleName}" 클리어`;
-    }
-    if (quest.type === "itemTurnIn") {
-      const owned = evalResult.owned || 0;
-      return `${quest.target.itemName} ${owned}/${quest.target.quantity}개 납품`;
-    }
-    return "";
-  }
-
-  // 아이템 납품 임무 완료 시 필요한 만큼 소모(여러 행에 나뉘어 있을 수 있으므로
-  // 순회하며 차감 — workshop.html의 consumeMaterial과 같은 패턴).
-  async function consumeItem(itemName, amount) {
-    let remaining = amount;
-    const { data: rows } = await window.sbClient.from("warehouse_items")
-      .select("id,quantity").eq("user_id", session.user.id).eq("name", itemName).order("quantity", { ascending: true });
-    for (const row of rows || []) {
-      if (remaining <= 0) break;
-      const take = Math.min(row.quantity, remaining);
-      remaining -= take;
-      if (take >= row.quantity) {
-        await window.sbClient.from("warehouse_items").delete().eq("id", row.id);
-      } else {
-        await window.sbClient.from("warehouse_items").update({ quantity: row.quantity - take }).eq("id", row.id);
-      }
-    }
-    return remaining <= 0;
-  }
-
-  async function grantRewards(rewards) {
-    for (const reward of rewards) {
-      if (reward.type === "gold") {
-        const { data: profile } = await window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single();
-        await window.sbClient.from("profiles").update({ gold: (profile.gold || 0) + reward.amount }).eq("user_id", session.user.id);
-      } else if (reward.type === "item") {
-        const { name, category, quantity, ...spec } = reward;
-        const { data: existing } = category !== "equipment"
-          ? await window.sbClient.from("warehouse_items").select("id,quantity").eq("user_id", session.user.id).eq("name", name).is("held_by", null).maybeSingle()
-          : { data: null };
-        if (existing) {
-          await window.sbClient.from("warehouse_items").update({ quantity: existing.quantity + (quantity || 1) }).eq("id", existing.id);
-        } else {
-          await window.sbClient.from("warehouse_items").insert({ user_id: session.user.id, name, category, quantity: quantity || 1, ...spec });
-        }
-      }
-    }
-  }
-
-  async function completeQuest(quest, state) {
-    if (quest.type === "itemTurnIn") {
-      const ok = await consumeItem(quest.target.itemName, quest.target.quantity);
-      if (!ok) { alert("아이템이 부족합니다."); return false; }
-    }
-
-    await grantRewards(quest.rewards);
-
-    const progress = state.progressById[quest.id];
-    if (progress) {
-      await window.sbClient.from("quest_progress")
-        .update({ completed_count: progress.completed_count + 1, last_completed_at: new Date().toISOString() })
-        .eq("user_id", session.user.id).eq("quest_id", quest.id);
-    } else {
-      await window.sbClient.from("quest_progress")
-        .insert({ user_id: session.user.id, quest_id: quest.id, completed_count: 1, last_completed_at: new Date().toISOString() });
-    }
-    return true;
-  }
-
+  // 2026-08-21: 목록은 "수주 가능한"(조건을 만족한) 임무만 간단히 보여주고,
+  // 실제 완료(및 itemTurnIn 배치 납품) 액션은 quest-detail.html로 옮김 —
+  // 임무가 늘어나도 목록이 무거워지지 않게 하려는 목적. "조건 만족"은
+  // ready(지금 바로 완료 가능)/waiting(반복형, 예전에 조건을 채운 적은
+  // 있음) 둘 다 포함하고, locked(조건 미충족)와 done(반복 불가+이미 완료)은
+  // 숨김 — 이 필터가 나중에 "연계 퀘스트"(선행 임무를 깨야 다음 임무가
+  // 보이는 구조)의 기반으로도 쓰일 수 있음(사용자 의도).
   async function render() {
-    const state = await loadState();
+    const state = await loadState(session);
     const el = $("#questList");
     if (QUESTS.length === 0) {
       el.innerHTML = `<div class="quest-empty">현재 등록된 임무가 없습니다.</div>`;
       return;
     }
-    el.innerHTML = QUESTS.map((quest) => {
-      const evalResult = evaluateQuest(quest, state);
-      return `<div class="quest-card">
-        <div class="quest-head">
-          <span class="quest-icon">${quest.icon}</span>
-          <span class="quest-name">${quest.name}</span>
-          <span class="quest-status quest-status-${evalResult.status}">${STATUS_LABEL[evalResult.status]}</span>
-        </div>
-        <div class="quest-desc">${quest.description}</div>
-        <div class="quest-condition">${conditionText(quest, evalResult)}</div>
-        <div class="quest-foot">
-          <span class="quest-reward">보상: ${rewardText(quest.rewards)}</span>
-          <button class="quest-complete-btn" data-id="${quest.id}" ${evalResult.status === "ready" ? "" : "disabled"}>완료</button>
-        </div>
-      </div>`;
-    }).join("");
-
-    el.querySelectorAll(".quest-complete-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        const quest = QUESTS.find((q) => q.id === btn.dataset.id);
-        const currentState = await loadState();
-        const evalResult = evaluateQuest(quest, currentState);
-        if (evalResult.status !== "ready") { render(); return; }
-        const ok = await completeQuest(quest, currentState);
-        if (ok) alert(`"${quest.name}" 완료! ${rewardText(quest.rewards)}을(를) 받았습니다.`);
-        render();
-      });
-    });
+    const visible = QUESTS
+      .map((quest) => ({ quest, evalResult: evaluateQuest(quest, state) }))
+      .filter(({ evalResult }) => evalResult.status === "ready" || evalResult.status === "waiting");
+    if (visible.length === 0) {
+      el.innerHTML = `<div class="quest-empty">지금 수행할 수 있는 임무가 없습니다. 조건을 채우면 여기에 다시 나타납니다.</div>`;
+      return;
+    }
+    el.innerHTML = visible.map(({ quest, evalResult }) => `
+      <a class="quest-card quest-card-link" href="quest-detail.html?id=${encodeURIComponent(quest.id)}">
+        <span class="quest-icon">${quest.icon}</span>
+        <span class="quest-name">${quest.name}</span>
+        <span class="quest-status quest-status-${evalResult.status}">${STATUS_LABEL[evalResult.status]}</span>
+      </a>
+    `).join("");
   }
 
   render();
