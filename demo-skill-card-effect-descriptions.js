@@ -68,12 +68,16 @@ const realEffects = [
   { type: "setRow", value: "back" },
   { type: "shield", charges: 2, shieldType: "physical" },
   { type: "spUp", value: 50 },
+  // spDamage — 2026-08-22 "27종 등록" 나열에서 통째로 빠졌던 타입(2026-08-24
+  // 전수 재검증으로 발견). Mana Break/Soul Break/EnergyRob/EnergyCollect/
+  // Soul Storm/Mana Burn/Banishment 7개 실사용 스킬이 이 타입을 씀.
+  { type: "spDamage", value: 15 },
   { type: "statUp", stat: "dex", value: 100 },
   { type: "statUpPercent", stat: "int", value: -40 },
   { type: "stealTeamResource", resource: "magicCircle", eraseAmount: 1, gainAmount: 1 },
   { type: "teamResourceGain", resource: "magicCircle", value: 1 },
 ];
-check(`실제 데이터에 쓰이는 26종을 전부 나열함(문서화된 27종 중 guard는 별도 검증)`, realEffects.length === 26);
+check(`실제 데이터에 쓰이는 27종을 전부 나열함(문서화된 27종 중 guard는 별도 검증)`, realEffects.length === 27);
 realEffects.forEach((e) => {
   const { text, polarity } = describeEffect(e);
   check(`${e.type}: 빈 문자열 아님("${text}", ${polarity})`, !!text && text.trim().length > 0);
@@ -106,15 +110,37 @@ console.log("==================================================");
 }
 
 console.log("\n==================================================");
-console.log("4) 알 수 없는 타입(EFFECT_TYPES에 없는 완전히 새로운 타입) — 폴백으로 존재를 알림, 빈 문자열 아님");
+console.log("4) spDamage 상세 — 값과 casterSpRestorePct(SP 흡수) 둘 다 텍스트에 반영되는지");
+console.log("==================================================");
+{
+  const noRestore = describeEffect({ type: "spDamage", value: 20 });
+  check(`값만 있을 때 "20%" 포함, 흡수 문구 없음: "${noRestore.text}"`, noRestore.text.includes("20%") && !noRestore.text.includes("흡수"));
+
+  const withRestore = describeEffect({ type: "spDamage", value: 15, casterSpRestorePct: 100 });
+  check(`casterSpRestorePct 있으면 "15%"와 "흡수" 둘 다 포함(EnergyRob/EnergyCollect 실데이터 형태): "${withRestore.text}"`,
+    withRestore.text.includes("15%") && withRestore.text.includes("흡수") && withRestore.text.includes("100%"));
+  check("spDamage는 항상 debuff", withRestore.polarity === "debuff");
+}
+
+console.log("\n==================================================");
+console.log("5) 알 수 없는 타입(EFFECT_TYPES에 없는 완전히 새로운 타입) — 폴백으로 존재+수치를 알림, 빈 문자열 아님");
 console.log("==================================================");
 {
   const r = describeEffect({ type: "totallyMadeUpEffectType", value: 1 });
   check(`폴백 텍스트가 비어있지 않고 타입명을 포함함: "${r.text}"`, !!r.text && r.text.includes("totallyMadeUpEffectType"));
+
+  // 2026-08-24 재발 방지 수정 검증 — spDamage가 실제로 걸렸던 구멍(값이
+  // 있어도 폴백이 그 값을 숨겼던 문제)이 다시 생기지 않는지 확인.
+  const rv = describeEffect({ type: "yetAnotherUnregisteredType", value: 42 });
+  check(`값(value)이 있으면 폴백 텍스트에도 그 값이 그대로 보임: "${rv.text}"`, rv.text.includes("42"));
+  const rs = describeEffect({ type: "yetAnotherUnregisteredType", stat: "luk", value: 7 });
+  check(`stat이 있으면 폴백 텍스트에도 그대로 보임: "${rs.text}"`, rs.text.includes("luk") && rs.text.includes("7"));
+  const rr = describeEffect({ type: "yetAnotherUnregisteredType", resource: "arrow" });
+  check(`resource가 있으면 폴백 텍스트에도 그대로 보임: "${rr.text}"`, rr.text.includes("arrow"));
 }
 
 console.log("\n==================================================");
-console.log("5) 패시브 전용 필드(effects 없이 statBonus 등으로만 존재하는 스킬) — 전부 칩으로 나옴");
+console.log("6) 패시브 전용 필드(effects 없이 statBonus 등으로만 존재하는 스킬) — 전부 칩으로 나옴");
 console.log("==================================================");
 {
   const passiveSkill = {
@@ -123,16 +149,31 @@ console.log("==================================================");
     maxSpBonus: 50,
     combatBonus: { def: 15 },
     patternSlotBonus: 1,
+    critMultiplier: 2,
     passiveMods: { accuracyBonusPct: 10, physicalDamageDealtPct: -5 },
     conditionalPassiveMods: [{ key: "physicalDamageDealtPct", value: 100, condition: { type: "isGuarding" } }],
   };
   const chips = describePassiveFields(passiveSkill);
-  check("statBonus/maxHpBonus/maxSpBonus/combatBonus/patternSlotBonus/passiveMods(2개)/conditionalPassiveMods 전부 합쳐 8개 칩", chips.length === 8);
+  check("statBonus/maxHpBonus/maxSpBonus/combatBonus/patternSlotBonus/critMultiplier/passiveMods(2개)/conditionalPassiveMods 전부 합쳐 9개 칩", chips.length === 9);
   check("conditionalPassiveMods의 조건 라벨이 정확히 표시됨(Guard 중일 때)", chips.some((c) => c.text.includes("Guard 중일 때")));
   check("음수 passiveMods는 debuff로 분류됨", chips.some((c) => c.polarity === "debuff"));
+  check("critMultiplier가 배율 칩으로 표시됨(×2)", chips.some((c) => c.text.includes("치명타 배율") && c.text.includes("×2")));
 
   const emptySkill = {};
   check("아무 패시브 필드도 없는 스킬은 빈 배열(회귀 없음)", describePassiveFields(emptySkill).length === 0);
+}
+
+console.log("\n==================================================");
+console.log("7) Job Master: Arcane Archer 실제 데이터(dexDamageDealtPct) — 한글 라벨로 표시되는지");
+console.log("==================================================");
+{
+  // 2026-08-24 재검증에서 발견: PASSIVE_MOD_LABELS에 dexDamageDealtPct가
+  // 없어서 원문 필드명이 그대로 "dexDamageDealtPct +8"로 노출되고 있었음.
+  // skill-table.json:3534-3538의 실제 데이터 그대로 재현.
+  const jobMaster = { passiveMods: { dexDamageDealtPct: 8 } };
+  const chips = describePassiveFields(jobMaster);
+  check(`원문 필드명("dexDamageDealtPct")이 그대로 노출되지 않음: "${chips[0].text}"`, !chips[0].text.startsWith("dexDamageDealtPct"));
+  check(`한글 라벨("DEX")과 값("+8")이 포함됨: "${chips[0].text}"`, chips[0].text.includes("DEX") && chips[0].text.includes("+8"));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

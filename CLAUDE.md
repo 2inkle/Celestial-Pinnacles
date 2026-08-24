@@ -6,6 +6,102 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## Sheet 스킬 카드 효과 표시 — "27종 전수 등록"(2026-08-22) 이후에도 남아있던 누락 2건 수정 (2026-08-24)
+
+바로 아래(2026-08-22) "실전투 신고 4건 일괄 수정"의 4번 항목("Sheet 화면
+스킬 카드가 효과의 74%를 설명 안 하고 있던 문제")이 27종 effects[].type을
+전수 등록했다고 마무리됐었는데, 사용자가 "Sheet에서 보여주는 스킬 효과가
+실제로 해당 스킬에 대한 모든 걸 알려주고 있는지 확인해보겠다"며 재검증을
+요청 → 실제로 2건이 더 있었음을 발견.
+
+**핵심 원인**: 그 "27종" 목록은 실제 스킬 데이터에서 뽑아낸 게 아니라
+`demo-skill-card-effect-descriptions.js`에 사람이 직접 나열한 목록이었고,
+그 나열 작업 자체에서 실사용 타입 하나가 빠졌던 것 — "전수 등록했다"는
+검증이 스스로가 만든 목록만 검증하고 있어서, 목록 자체의 누락은 못 잡는
+구조였다.
+
+### 1. `spDamage`(SP 직접 피해) 타입이 통째로 등록 누락
+
+`EFFECT_TYPES`/`describeEffect()`(`web/character-sheet.html`) 어디에도
+`spDamage` case가 없어서, 이 타입을 쓰는 실사용 스킬 7개(Mana Break/Soul
+Break/EnergyRob/EnergyCollect/Soul Storm/Mana Burn/Banishment)가 값(SP
+피해%)도 `casterSpRestorePct`(EnergyRob/EnergyCollect류 "SP 흡수" 핵심
+메커니즘)도 하나도 안 보이고 `"spDamage(설명 미등록)"`이라는 빈 폴백만
+뜨고 있었음.
+
+**폴백 구조 자체의 근본 결함도 같이 발견**: `describeEffect()`의 `default`
+분기가 `!meta`(카탈로그에 없는 타입)일 때 `e.value`/`e.stat`/`e.resource`
+등 원본 필드를 아예 안 보고 `"{type}(설명 미등록)"`만 반환하고 있었음 —
+"타입의 존재는 알린다"는 8/22 설계 의도는 지켜졌지만 "수치까지는 여전히
+숨겨진다"는 구멍이 구조적으로 남아있었고, `spDamage`가 정확히 이 구멍에
+걸렸던 것. 앞으로 또 등록을 깜빡해도 재발하는 구조였음.
+
+### 2. `dexDamageDealtPct` 패시브 라벨 누락(Job Master: Arcane Archer)
+
+16개 패시브 스킬(`passive:true`) 전부를 하나하나 필드 단위로 대조하는
+과정에서 발견 — Job Master: Arcane Archer의
+`passiveMods.dexDamageDealtPct:8`이 `PASSIVE_MOD_LABELS`에 없어서 한글
+라벨 없이 `"dexDamageDealtPct +8"`로 **내부 필드명이 그대로 카드에
+노출**되고 있었음. 나머지 8개 `passiveMods` 키는 전부 정상이었고 이
+하나만 빠져 있었음.
+
+### 검증 방법론 — 필드 존재 확인이 아니라 실제 렌더 텍스트를 계산해서 대조
+
+이번 재검증의 핵심은 "그 필드가 표시 코드에 언급돼 있는가"가 아니라
+**"그 필드를 넣었을 때 실제로 어떤 텍스트가 나오는가"를 코드 로직 그대로
+손으로 계산해서 스킬 하나하나 대조**한 것 — `dexDamageDealtPct` 누락은
+필드 존재 여부만 봤으면 못 잡았을 것("passiveMods가 있다"는 사실 자체는
+맞았으므로). 16개 패시브 스킬 전부의 예상 카드 텍스트를 표로 만들어
+사용자에게 직접 보여주고 나서야 이 gap이 드러남.
+
+**수정 범위**: `web/character-sheet.html` 한 파일, `EFFECT_TYPES`/
+`describeEffect()`/`PASSIVE_MOD_LABELS`/`describePassiveFields()` 네
+곳(엔진 `src/skillResolution.js`는 전혀 안 건드림 — 순수 표시 계층 수정):
+1. `describeEffect()`에 `spDamage` case 신설(값 + `casterSpRestorePct`
+   흡수 정보 반영).
+2. `default` 폴백 자체를 구조적으로 강화 — `!meta`여도 `value`/`stat`/
+   `resource` 중 존재하는 필드는 텍스트에 최소한 보이게 함(같은 종류의
+   재발을 원천 차단).
+3. `PASSIVE_MOD_LABELS`에 `dexDamageDealtPct` 한글 라벨 추가.
+4. `EFFECT_TYPES`에 실사용 0건이지만 엔진이 지원하는 유휴 타입 4종
+   (`mdefUp`/`mdefDown`/`maxSpDown`/`statDownPercent`) 선등록 — 나중에
+   이 타입을 쓰는 스킬이 추가되는 순간 자동으로 라벨이 붙게 미리 채움.
+5. `describePassiveFields()`에 `critMultiplier` 필드 지원 추가 — 실사용
+   0건이지만 `battle-adapter.js`가 이미 이 필드를 소비하도록 배선돼
+   있어서(학습한 패시브 스킬들의 `critMultiplier` 최댓값을 크리티컬
+   배율에 반영) 같은 이유로 선반영.
+
+**부수 발견(수정 안 함, 참고만)**: `CircleErase` 스킬의 `effects`가
+`skill-table.json`(빈 배열)과 `web/skill-table-editor.html`(실제
+`stealTeamResource` 효과 있음) 사이에 데이터 드리프트가 있음. 다만 둘 다
+이제 라이브 데이터가 아니라(라이브는 Supabase `game_content.skillTable`
+DB에만 있음) 죽은 참고용 사본이라 로컬 파일 수정으로 게임에 영향을 줄
+수 없고 DB 접근 권한도 없어서 손대지 않음.
+
+**"치유숙련" 관련 후속 논의(이번 수정 범위 밖, 다음 세션에서 별도 진행)**:
+재검증 도중 사용자가 "치유숙련"(healing mastery)이 회복량 관련 필드와
+구분되는지 질문 → 조사 결과 코드베이스에 딱 한 곳(`FullAssist` 스킬의
+`note`)에만 "미구현" 상태로 언급될 뿐, 실제 스탯/필드로는 존재하지 않음이
+확인됨. 유일하게 구현된 회복 배율은 `healingDealtPct`/`healingDealtFlat`
+뿐. 사용자는 "치유숙련"을 이 `healingDealtPct`로 치환하고, 앞으로도
+재사용 가능한 **범용 "버프 효과가 시전자 특정 passiveMod 값에 비례해
+커지고 상한도 계산되는" 엔진 메커니즘**을 신설하길 원함(FullAssist
+하나에 하드코딩하지 않음) — 다만 "분리해서 순서대로" 진행하기로 확정해
+이번 계획 범위에서는 제외하고 사실 관계만 기록해둠. 정확한 배율/상한
+공식은 다음 세션에서 사용자와 함께 확정 필요.
+
+**검증**: `demo-skill-card-effect-descriptions.js`에 시나리오 확장(섹션
+4~7 신설 — spDamage 상세, 강화된 폴백이 실제로 값을 보여주는지, 패시브
+필드 9개 칩, dexDamageDealtPct 한글 라벨 확인). ⚠ **이 세션 환경에
+Node.js가 설치돼 있지 않아 `node --check`/`node demo-*.js`/전체 회귀
+스위트를 직접 실행하지 못함** — 대신 전체 코드를 라인 단위로 재검토하고
+브레이스/괄호 균형을 기계적으로 대조해 구문 오류가 없음을 최대한
+확인했으나(코멘트 안의 한글 텍스트·번호 매김 문자열 때문에 나이브한
+괄호 카운트는 여러 차례 오탐이 있었고, 원인을 각각 추적해 전부 무해함을
+확인함), **사용자가 실제 환경에서 `node index.js` + 전체 `demo-*.js`
+회귀와 `node demo-skill-card-effect-descriptions.js`를 직접 실행해
+최종 확인 필요**.
+
 ## 개조된 장비가 상점 구매/전리품과 잘못 합쳐지던 버그 — 3곳에 동일 패턴 (2026-08-22)
 
 **증상(사용자 신고)**: "왕관 조각 개조가 된 모자를 하나 가지고 있었다.
