@@ -102,6 +102,100 @@ Node.js가 설치돼 있지 않아 `node --check`/`node demo-*.js`/전체 회귀
 회귀와 `node demo-skill-card-effect-descriptions.js`를 직접 실행해
 최종 확인 필요**.
 
+## "치유숙련" 미구현 해소 — FullAssist + 범용 "패시브 비례 %버프 증폭" 메커니즘 신설 (2026-08-24)
+
+**배경**: `FullAssist`(하이드루이드) 스킬의 `note`에 "'치유숙련에 비례하여
+효과 증가, 초기 INT와 치유숙련에 비례하여 한계 증가'는 미구현(스탯 기반
+버프 배율 스케일링 + 상한 시스템 필요) - 고정 40%만 반영"이라고 적혀
+있었음. 전수 조사 결과 "치유숙련"은 이 note 한 곳에만 등장할 뿐 코드베이스
+어디에도 실제 스탯/필드로 존재한 적이 없었음 — 유일하게 구현된 회복
+관련 배율은 `healingDealtPct`(%)/`healingDealtFlat`(고정치)뿐. 사용자
+확인 후 "치유숙련" = `healingDealtPct`로 치환, FullAssist 하나에
+하드코딩하지 않고 재사용 가능한 범용 엔진 메커니즘으로 구현하기로 결정
+(`skill-table.json` 전수 검색 결과 같은 부류의 "OO에 비례하여" 미구현
+note가 FullAssist 포함 7곳 — 2131/2379/3059(FullAssist)/3380/3417/
+3430/3507행 — 있어서 나머지 6곳 구현에도 재사용 가능하도록 설계).
+
+**공식(사용자가 직접 제시한 예시 수치로 확정, 곱셈)**: 최종% = base% ×
+(1 + 시전자 `healingDealtPct`% / 100). 예: base 40%, `healingDealtPct`
+30% → 40 × 1.3 = **52%**. 단순 덧셈(40+30=70)이 아니라 "기존 %를
+증폭시키는" 곱셈 방식임에 유의 — 처음 덧셈으로 설계했다가 사용자가
+"FullAssist의 스탯 증가는 퍼센티지가 아니라 포인트 아닌가. 40+치유숙련
+30%면 52가 된다"고 정정해서 확정됨.
+
+**상한**: 별도 캡 시스템을 새로 안 만들고, 이미 있는 전역 캡
+(`src/character.js`의 `calculateEffectiveStat`, real×5=500%)에 그대로
+위임함 — 2026-08-15에 이미 "모든 스탯 보너스는 하나의 전역 공식으로
+통일한다"고 확정된 설계 원칙과 일치시키기 위해, 새 미검증 밸런스 공식을
+따로 안 만드는 쪽을 사용자가 선택함(`simulate.js`로 사전 검증할 Node
+환경이 없었던 것도 고려한 안전한 선택). 이 캡은 `bonusStr` 등에 값을
+"쓰는" 시점이 아니라 `effectiveStr` 같은 getter가 "읽는" 시점에
+적용되므로, `scaleByPassiveMod`로 아무리 큰 값을 넣어도 `bonusStr` 자체는
+그대로 커지지만 `effectiveStr`은 여전히 real×5를 못 넘음(데모로 확인).
+
+**엔진 구현**: `src/skillResolution.js`에 범용 헬퍼
+`resolveScaledPercentValue(caster, effect)` 신설(applyEffect 함수 바로
+위) — `effect.scaleByPassiveMod`(passiveMod 키 문자열)가 있으면 시전자의
+그 값(`caster.getPassiveModValue()`)을 `effect.scaleFactor`(숫자, 기본 1)
+만큼 곱해서 base %를 곱셈 증폭(`Math.round`로 정수 반올림 — 곱셈 부동소수점
+연산이 52 대신 52.00000000000001 같은 값을 만들어 로그 표시가 깨지는 걸
+방지). 필드명은 `grantPassiveMod` 케이스의 기존 `scaleByStat`(문자열)+
+`scaleFactor`(숫자, 기본 1) 관례를 그대로 재사용(`scaleFactor` 필드명도
+동일하게 공유) — 다만 grantPassiveMod는 "이펙트 대상 스탯"에 비례해
+고정값을 만드는 것이고 이건 "시전자 passiveMod"에 비례해 %버프 자체를
+증폭시키는 것이라 필드명을 구분함(`scaleByPassiveMod`). 발동 시점에
+`caster.getPassiveModValue()`를 1회만 조회하는 스냅샷 방식 — 이 게임의
+%버프 자체가 이미 "발동 시점 1회 계산 후 전투 끝까지 고정"되는 방식이라
+자연스럽게 일치함(`grantPassiveMod`의 `scaleByStat`와 동일한 스냅샷
+원칙). `statUpPercent`/`combatStatUpPercent`/`maxHpUpPercent` 세
+케이스(구조가 동일한 %버프 계열) 전부에 적용 — FullAssist는
+`statUpPercent`만 쓰지만, 위 6곳 후보 재사용을 위해 나머지 두 타입도
+같이 확장함. `scaleByPassiveMod`가 없는 기존 스킬은 이 함수가
+`effect.value`를 그대로 반환하므로 완전히 회귀 없음.
+
+**Sheet 표시**: `web/character-sheet.html`의 `describeEffect()`가
+`statUpPercent`/`combatStatUpPercent`/`maxHpUpPercent` 케이스에서
+`e.scaleByPassiveMod`가 있으면 `grantPassiveMod`의 `scaleByStat` 표시
+방식과 동일하게 ` ({한글라벨} 비례)` 접미사를 붙임. 카드는 시전자의
+실시간 스탯을 모르므로 실제 스케일된 값은 계산하지 않고 base %만
+보여주고 "비례 증폭됨"만 알림(기존 `grantPassiveMod` 표시 방식과 일관).
+
+**FullAssist 데이터**: `skill-table.json` + `web/skill-table-editor.html`
+양쪽의 `FullAssist`(하이드루이드) 4개 `statUpPercent` 이펙트(str/int/
+dex/spd) 전부에 `scaleByPassiveMod:"healingDealtPct"`,
+`scaleFactor:1` 추가, `note`를 미구현 문구에서 구현 요약으로 갱신.
+
+**⚠ DB 반영 필요**: `skill-table-editor.html`은 2026-08-16부터
+`game_content` DB를 그대로 보여주는 조회 전용 뷰어로 전환됐음 — 파일
+편집만으로는 라이브에 반영 안 됨(Vortex Overload 수정 때와 동일한 상황).
+`supabase/migrations/0024_fullassist_heal_mastery_scaling.sql`(0023과
+동일한 "정밀 patch" 패턴 — 전체 블롭 재삽입이 아니라 `jobSkills.하이드루이드`
+배열에서 이름으로 FullAssist를 찾아 그 `statUpPercent` 이펙트 4개에만
+필드 병합, 멱등하게 재실행 가능)을 **사용자가 Supabase Dashboard SQL
+Editor에서 직접 실행**해야 실제 게임에 반영됨 — 이 세션은 이 워크스페이스
+자체가 DB 접근 권한이 없어 실행 못 함, 실행 여부 아직 미확인.
+
+**남은 후보 6곳(이번 범위 밖)**: `skill-table.json`의 2131/2379/3380/
+3417/3430/3507행에 각각 다른 "OO에 비례하여" 미구현 note가 남아있음(HP%/
+SP% 비례 데미지, INT·Mdef 비례, INT·데미지 비례 방어막+MAXSP 상한, INT
+비례 추가데미지, INT 비례 개막 combatBonus 스냅샷, MAXHP/MAXSP 비례
+상승+방어막 등) — 이번에 만든 `scaleByPassiveMod`/`scaleFactor` 메커니즘이
+그중 일부(회복 계열 `statUpPercent`/`combatStatUpPercent`/
+`maxHpUpPercent` 형태)의 재사용 후보가 될 수 있지만, 각각 스탯 종류·정확한
+공식이 다 달라서 이번엔 FullAssist만 구현. 나중에 개별적으로 확정 필요.
+
+**검증**: `demo-scale-by-passive-mod.js` 신설(7개 시나리오) —
+①`scaleByPassiveMod` 없는 기존 스킬 회귀 없음, ②`healingDealtPct=0`이면
+기존과 동일한 40%(변경 없음 재확인), ③`healingDealtPct=30`이면 정확히
+52%로 스케일(사용자 제시 수치 재현), ④극단적으로 큰 `healingDealtPct`를
+줘도 `bonusStr`은 커지지만 `effectiveStr`은 전역 캡(real×5)을 못 넘음(새
+캡 로직이 없다는 것 자체를 확인), ⑤`combatStatUpPercent`에도 동일 메커니즘
+동작, ⑥`maxHpUpPercent`에도 `scaleFactor`까지 포함해 정확히 동작, ⑦Sheet
+`describeEffect()`가 " (가하는 회복량(%) 비례)" 접미사를 정확히 붙이고
+없을 때는 회귀 없음 — 전부 코드 직접 트레이싱으로 검증. **이 세션 환경에
+Node.js가 없어 실제 실행은 못 함** — 주 워크스페이스에서
+`node demo-scale-by-passive-mod.js` + 전체 `demo-*.js` 회귀 실행 필요.
+
 ## 개조된 장비가 상점 구매/전리품과 잘못 합쳐지던 버그 — 3곳에 동일 패턴 (2026-08-22)
 
 **증상(사용자 신고)**: "왕관 조각 개조가 된 모자를 하나 가지고 있었다.
