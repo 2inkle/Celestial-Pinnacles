@@ -165,15 +165,12 @@ note가 FullAssist 포함 7곳 — 2131/2379/3059(FullAssist)/3380/3417/
 dex/spd) 전부에 `scaleByPassiveMod:"healingDealtPct"`,
 `scaleFactor:1` 추가, `note`를 미구현 문구에서 구현 요약으로 갱신.
 
-**⚠ DB 반영 필요**: `skill-table-editor.html`은 2026-08-16부터
-`game_content` DB를 그대로 보여주는 조회 전용 뷰어로 전환됐음 — 파일
-편집만으로는 라이브에 반영 안 됨(Vortex Overload 수정 때와 동일한 상황).
-`supabase/migrations/0024_fullassist_heal_mastery_scaling.sql`(0023과
-동일한 "정밀 patch" 패턴 — 전체 블롭 재삽입이 아니라 `jobSkills.하이드루이드`
-배열에서 이름으로 FullAssist를 찾아 그 `statUpPercent` 이펙트 4개에만
-필드 병합, 멱등하게 재실행 가능)을 **사용자가 Supabase Dashboard SQL
-Editor에서 직접 실행**해야 실제 게임에 반영됨 — 이 세션은 이 워크스페이스
-자체가 DB 접근 권한이 없어 실행 못 함, 실행 여부 아직 미확인.
+**DB 반영 완료(2026-08-24)**: `supabase/migrations/0024_fullassist_heal_mastery_scaling.sql`
+(0023과 동일한 "정밀 patch" 패턴 — 전체 블롭 재삽입이 아니라
+`jobSkills.하이드루이드` 배열에서 이름으로 FullAssist를 찾아 그
+`statUpPercent` 이펙트 4개에만 필드 병합, 멱등하게 재실행 가능)을
+사용자가 Supabase Dashboard SQL Editor에서 직접 실행 완료 — 이제
+실제 게임에 반영됨.
 
 **남은 후보 6곳(이번 범위 밖)**: `skill-table.json`의 2131/2379/3380/
 3417/3430/3507행에 각각 다른 "OO에 비례하여" 미구현 note가 남아있음(HP%/
