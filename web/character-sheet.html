@@ -542,11 +542,23 @@ function describeEffect(e) {
     case "combatStatUpPercent":
     case "statUpPercent": {
       const sign = e.value >= 0 ? "+" : "";
-      return { text: `${stat} ${sign}${e.value}%`, polarity: e.value >= 0 ? "buff" : "debuff" };
+      // scaleByPassiveMod(2026-08-24, FullAssist 등) — 시전자의 특정
+      // passiveMod 값(예: healingDealtPct)에 비례해 이 base %가 발동 시점에
+      // 곱셈으로 증폭됨(src/skillResolution.js의 resolveScaledPercentValue
+      // 참고: base×(1+scalePct/100)). 카드는 시전자의 실시간 스탯을 몰라서
+      // 실제 스케일된 값은 계산 안 하고, base %에 "비례 증폭" 주석만 붙임
+      // — grantPassiveMod 케이스의 scaleByStat 표시 방식과 동일한 원칙.
+      const scaleSuffix = e.scaleByPassiveMod
+        ? ` (${PASSIVE_MOD_LABELS[e.scaleByPassiveMod] || e.scaleByPassiveMod} 비례)`
+        : "";
+      return { text: `${stat} ${sign}${e.value}%${scaleSuffix}`, polarity: e.value >= 0 ? "buff" : "debuff" };
     }
     case "maxHpUpPercent": {
       const sign = e.value >= 0 ? "+" : "";
-      return { text: `최대 HP ${sign}${e.value}%`, polarity: e.value >= 0 ? "buff" : "debuff" };
+      const scaleSuffix = e.scaleByPassiveMod
+        ? ` (${PASSIVE_MOD_LABELS[e.scaleByPassiveMod] || e.scaleByPassiveMod} 비례)`
+        : "";
+      return { text: `최대 HP ${sign}${e.value}%${scaleSuffix}`, polarity: e.value >= 0 ? "buff" : "debuff" };
     }
     case "maxSpUp": {
       const sign = e.value >= 0 ? "+" : "";

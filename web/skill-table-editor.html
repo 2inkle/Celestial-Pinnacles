@@ -3157,22 +3157,30 @@
           {
             "type": "statUpPercent",
             "stat": "str",
-            "value": 40
+            "value": 40,
+            "scaleByPassiveMod": "healingDealtPct",
+            "scaleFactor": 1
           },
           {
             "type": "statUpPercent",
             "stat": "int",
-            "value": 40
+            "value": 40,
+            "scaleByPassiveMod": "healingDealtPct",
+            "scaleFactor": 1
           },
           {
             "type": "statUpPercent",
             "stat": "dex",
-            "value": 40
+            "value": 40,
+            "scaleByPassiveMod": "healingDealtPct",
+            "scaleFactor": 1
           },
           {
             "type": "statUpPercent",
             "stat": "spd",
-            "value": 40
+            "value": 40,
+            "scaleByPassiveMod": "healingDealtPct",
+            "scaleFactor": 1
           }
         ],
         "requiredSkills": [
@@ -3181,7 +3189,7 @@
           "Speed Assist"
         ],
         "requiredSkillMode": "all",
-        "note": "'치유숙련에 비례하여 효과 증가, 초기 INT와 치유숙련에 비례하여 한계 증가'는 미구현(스탯 기반 버프 배율 스케일링 + 상한 시스템 필요) - 고정 40%만 반영"
+        "note": "'치유숙련에 비례하여 효과 증가'는 healingDealtPct(가하는 회복량%)로 치환해 구현함(2026-08-24) — 최종% = base 40% × (1 + 시전자 healingDealtPct% / 100), 예: healingDealtPct 30%면 40×1.3=52%. '초기 INT와 치유숙련에 비례하여 한계 증가'는 별도 캡을 새로 만들지 않고 기존 전역 캡(calculateEffectiveStat의 real×5=500%)에 그대로 위임함(2026-08-15 확정된 전역 캡 통일 원칙과 일치, 사용자 결정)."
       }
     ],
     "스나이퍼": [

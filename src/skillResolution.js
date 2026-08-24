@@ -243,6 +243,45 @@ function describeStatCap(target, capKey, statLabel, isIncrease, normalDesc) {
   return normalDesc;
 }
 
+// ============================================================================
+// %버프 효과(statUpPercent/combatStatUpPercent/maxHpUpPercent)의 base
+// effect.value를, 시전자의 특정 passiveMod 값에 비례해 곱셈으로 증폭하는
+// 범용 메커니즘(2026-08-24, "치유숙련" 미구현 note 해소 — FullAssist가
+// 최초 사용처). effect.scaleByPassiveMod(passiveMod 키 문자열)가 있으면
+// 시전자의 그 값(caster.getPassiveModValue)을 effect.scaleFactor(기본 1)
+// 만큼 곱한 뒤, "base × (1 + scalePct/100)"로 base % 자체를 증폭시킨다.
+// 예: base 40, 시전자 healingDealtPct 30 → 40 × (1+30/100) = 52.
+//
+// grantPassiveMod 케이스의 scaleByStat(문자열)+scaleFactor(숫자) 조합과
+// 정확히 같은 명명 관례를 따름(scaleFactor 필드명도 그대로 재사용) — 다만
+// grantPassiveMod는 "이펙트 스탯"에 비례해 고정값을 만드는 것이고, 이건
+// "시전자 passiveMod"에 비례해 %버프 자체의 배율을 증폭시키는 것이라
+// 별도 필드명(scaleByPassiveMod)으로 구분함.
+//
+// 발동 시점 caster.getPassiveModValue() 1회만 조회하는 스냅샷 방식 —
+// 이 게임의 %버프 자체가 이미 "발동 시점 1회 계산 후 전투 끝까지 고정"
+// 방식이라(각 case의 currentEffective × value/100 계산 참고) 스냅샷이
+// 자연스럽게 일치함. 새 상한(cap) 로직은 두지 않음 — 최종 증가량은
+// 기존과 동일하게 character.js의 calculateEffectiveStat(real×5=500%)
+// 전역 캡에 그대로 걸림(2026-08-15 확정된 "모든 스탯 보너스는 하나의
+// 전역 공식으로 통일" 원칙과 일치, 별도 미검증 캡 공식을 새로 안 만듦).
+//
+// effect.scaleByPassiveMod가 없는 기존 스킬은 이 함수가 effect.value를
+// 그대로 반환하므로 완전히 회귀 없음.
+//
+// ⚠ Math.round로 정수 %로 반올림함 — 이 게임의 모든 %효과 데이터는 항상
+// 정수(스킬 데이터 전수 조사로 확인)인데, 곱셈 부동소수점 연산(예: 40 ×
+// 1.3)은 이진 부동소수점 특성상 52가 아니라 52.00000000000001 같은 값이
+// 나올 수 있다 — 반올림 없이 그대로 로그 문자열에 넣으면
+// "STR +52.00000000000001%." 같은 깨진 표시가 될 위험이 있어서, 최종
+// 사용자 대면 수치는 여기서 한 번에 정수로 정리한다.
+// ============================================================================
+function resolveScaledPercentValue(caster, effect) {
+  if (!effect.scaleByPassiveMod) return effect.value;
+  const scalePct = caster.getPassiveModValue(effect.scaleByPassiveMod) * (effect.scaleFactor ?? 1);
+  return Math.round(effect.value * (1 + scalePct / 100));
+}
+
 function applyEffect(caster, target, effect, ctx) {
   // sideCondition — "same"이면 시전자와 같은 진영일 때만, "different"면 다른
   // 진영일 때만 이 효과가 적용됨(Purify류 "적에게는 피해, 아군에게는 회복"을
@@ -286,7 +325,8 @@ function applyEffect(caster, target, effect, ctx) {
     // maxHpUp(고정치)과 달리, 그 순간 maxHp의 %만큼 증감(OverLimit의
     // "MaxHP-20%"류). value가 음수면 감소.
     case "maxHpUpPercent": {
-      const delta = Math.floor(target.maxHp * (effect.value / 100));
+      const scaledValue = resolveScaledPercentValue(caster, effect);
+      const delta = Math.floor(target.maxHp * (scaledValue / 100));
       target.maxHpBonus = (target.maxHpBonus || 0) + delta;
       target.currentHp = Math.min(target.currentHp, target.maxHp);
       return `${target.name}의 Max HP ${delta >= 0 ? "+" : ""}${delta}.`;
@@ -464,7 +504,11 @@ function applyEffect(caster, target, effect, ctx) {
       const statKey = effect.stat;
       const capKey = statKey.charAt(0).toUpperCase() + statKey.slice(1);
       const currentEffective = target[`effective${capKey}`];
-      const increase = Math.floor(currentEffective * (effect.value / 100));
+      // scaleByPassiveMod(2026-08-24)가 있으면 base %를 시전자의 passiveMod
+      // 값에 비례해 곱셈 증폭 — 없으면 resolveScaledPercentValue가
+      // effect.value를 그대로 반환해 기존과 동일(회귀 없음).
+      const scaledValue = resolveScaledPercentValue(caster, effect);
+      const increase = Math.floor(currentEffective * (scaledValue / 100));
       target[`bonus${capKey}`] += increase;
       const label = { atk: "공격력", matk: "마법공격력", def: "방어력", mdef: "마법방어력" }[statKey] || statKey.toUpperCase();
       // 고정치(atkUp 등)와 달리 "그 순간 값의 %"라 실제 증가량이 매번 다름 —
@@ -475,10 +519,12 @@ function applyEffect(caster, target, effect, ctx) {
       // 부호에 따라 "+" 유무와 캡 판정 방향(증가 상한/감소 하한)을 갈라야
       // 함. 2026-08-21 수정 전에는 항상 "+"를 붙이고 항상 증가 캡으로만
       // 판정해서, 디버프인데 "+-30%"로 표시되고 캡 메시지도 "더 이상
-      // 증가할 수 없다"로 거꾸로 나왔음(실전투 로그로 발견).
-      const sign = effect.value >= 0 ? "+" : "";
-      const normal = `${target.name}의 ${label} ${sign}${effect.value}%.`;
-      return describeStatCap(target, capKey, label, effect.value >= 0, normal);
+      // 증가할 수 없다"로 거꾸로 나왔음(실전투 로그로 발견). 부호/캡 판정도
+      // scaledValue 기준으로 통일(증폭 후 부호가 뒤집힐 극단적 음수
+      // scaleByPassiveMod 케이스까지 대비 — 지금 데이터엔 없음).
+      const sign = scaledValue >= 0 ? "+" : "";
+      const normal = `${target.name}의 ${label} ${sign}${scaledValue}%.`;
+      return describeStatCap(target, capKey, label, scaledValue >= 0, normal);
     }
 
     // STR/INT/DEX/SPD/LUK 중 하나를 그 순간 effective 값의 %만큼 올림 —
@@ -491,14 +537,18 @@ function applyEffect(caster, target, effect, ctx) {
       const statKey = effect.stat;
       const capKey = statKey.charAt(0).toUpperCase() + statKey.slice(1);
       const currentEffective = target[`effective${capKey}`];
-      const increase = Math.floor(currentEffective * (effect.value / 100));
+      // scaleByPassiveMod(2026-08-24, FullAssist 최초 사용) — 시전자의
+      // healingDealtPct 등 passiveMod 값에 비례해 base %를 곱셈 증폭.
+      // 없으면 기존과 동일(resolveScaledPercentValue가 effect.value 그대로 반환).
+      const scaledValue = resolveScaledPercentValue(caster, effect);
+      const increase = Math.floor(currentEffective * (scaledValue / 100));
       target[`bonus${capKey}`] += increase;
       // combatStatUpPercent와 동일한 이유로 부호에 따라 "+"·캡 판정 방향을
       // 가름(음수 = MindBreak/Exorcism 등 디버프 — statDownPercent 타입은
-      // 데이터상 안 쓰임). 2026-08-21 수정.
-      const sign = effect.value >= 0 ? "+" : "";
-      const normal = `${target.name}의 ${statKey.toUpperCase()} ${sign}${effect.value}%.`;
-      return describeStatCap(target, capKey, statKey.toUpperCase(), effect.value >= 0, normal);
+      // 데이터상 안 쓰임). 2026-08-21 수정. 부호/캡 판정도 scaledValue 기준.
+      const sign = scaledValue >= 0 ? "+" : "";
+      const normal = `${target.name}의 ${statKey.toUpperCase()} ${sign}${scaledValue}%.`;
+      return describeStatCap(target, capKey, statKey.toUpperCase(), scaledValue >= 0, normal);
     }
 
     // value(%)만큼 대상의 현재 effective 스탯을 깎음(고정치가 아니라 그 순간의
