@@ -228,13 +228,15 @@ ConditionRegistry.register("SLOT_USE_COUNT_LESS_THAN", (actor, ctx, value, slotI
   return used < value;
 });
 
-// 자기 진영에서 자신을 제외한 생존 팀원 수가 value 이하면 true. "동료가
-// 전멸해서 혼자 남았을 때"류 패턴 조건(2026-08-25, 동굴 보스의 "H 소환
-// 안전장치" 설계용 — value:0으로 "완전히 혼자"를 표현).
-ConditionRegistry.register("TEAMMATES_ALIVE_LTE", (actor, ctx, value) => {
+// 자기 진영에서 살아있는 인원 수(자신 포함)가 value 이하면 true. "자신을
+// 제외한 인원 수"가 아니라 "자신 포함 총 몇 명 남았는지"로 셈 — 패턴을
+// 짜는 입장에서 "혼자 남음 = 1명"처럼 더 직관적이라는 사용자 피드백으로
+// 자신 제외 카운트 방식에서 변경함(2026-08-25, 동굴 보스의 "H 소환
+// 안전장치" 설계용 — value:1이면 "정말로 혼자"를 표현).
+ConditionRegistry.register("MY_SIDE_ALIVE_COUNT_LTE", (actor, ctx, value) => {
   const sideUnits = actor.side === "ally" ? ctx.allies : ctx.enemies;
-  const aliveTeammates = sideUnits.filter((u) => u !== actor && u.isAlive).length;
-  return aliveTeammates <= value;
+  const aliveCount = sideUnits.filter((u) => u.isAlive).length;
+  return aliveCount <= value;
 });
 
 // value(%) 확률로 true — 평가할 때마다 새로 굴림. "N% 확률로만 발동" 패턴

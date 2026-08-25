@@ -54,9 +54,12 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
   몬스터 경로에도 추가함.
 - "혼자뿐" 헤드카운트 조건과 "N% 확률" 조건은 기존 `ConditionRegistry`
   (`src/registries.js`)에 전혀 없어서(기존 15종 전수 확인 — 전부
-  결정론적, 확률 게이트 없음) 신규 등록: `TEAMMATES_ALIVE_LTE`,
-  `RANDOM_CHANCE_PCT`. 둘 다 범용 leaf 조건이라 이번 용도 외에도 재사용
-  가능. 두 조건의 결합은 이미 있는 `AND` 콤비네이터 + `web/battle-
+  결정론적, 확률 게이트 없음) 신규 등록: `MY_SIDE_ALIVE_COUNT_LTE`,
+  `RANDOM_CHANCE_PCT`. `MY_SIDE_ALIVE_COUNT_LTE`는 처음엔 "자신을 제외한
+  생존 팀원 수"로 만들었는데, 패턴을 짜는 입장에서는 "자신 포함 총 몇 명
+  남았는지"가 더 직관적이라는 사용자 피드백으로 카운트 방식을 자신 포함
+  으로 바꿈(혼자 남음 = 1명, `val:1`). 둘 다 범용 leaf 조건이라 이번
+  용도 외에도 재사용 가능. 두 조건의 결합은 이미 있는 `AND` 콤비네이터 + `web/battle-
   adapter.js`의 `andNext` 체이닝(기존 `maxUses`가 쓰던 것과 동일 패턴)이
   그대로 처리 — `translateCondition()`에 `metric:"teamAlone"`/
   `metric:"randomChancePct"` 번역 분기 2개만 추가함.

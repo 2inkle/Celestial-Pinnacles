@@ -157,10 +157,11 @@
     if (row.metric === "preparingType") {
       return { cond: "ENEMY_PREPARING_TYPE", val: row.value };
     }
-    // 자기 진영에 자신을 제외한 생존 팀원이 없을 때만 true("혼자 남았을
-    // 때"). 2026-08-25, 동굴 보스의 "H 소환 안전장치" 설계용.
+    // 자기 진영에서 살아있는 인원이 자신 하나뿐일 때만 true("혼자 남았을
+    // 때"). 2026-08-25, 동굴 보스의 "H 소환 안전장치" 설계용 — 카운트는
+    // 자신 포함으로 세므로(MY_SIDE_ALIVE_COUNT_LTE 참고) val:1이 "혼자".
     if (row.metric === "teamAlone") {
-      return { cond: "TEAMMATES_ALIVE_LTE", val: 0 };
+      return { cond: "MY_SIDE_ALIVE_COUNT_LTE", val: 1 };
     }
     // row.value(%) 확률로 true — "N% 확률로만 발동"류 조건. andNext로 다른
     // 조건과 체이닝하면 "○일 때 N% 확률로"를 표현할 수 있음(2026-08-25).
