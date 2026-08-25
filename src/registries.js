@@ -228,6 +228,22 @@ ConditionRegistry.register("SLOT_USE_COUNT_LESS_THAN", (actor, ctx, value, slotI
   return used < value;
 });
 
+// 자기 진영에서 자신을 제외한 생존 팀원 수가 value 이하면 true. "동료가
+// 전멸해서 혼자 남았을 때"류 패턴 조건(2026-08-25, 동굴 보스의 "H 소환
+// 안전장치" 설계용 — value:0으로 "완전히 혼자"를 표현).
+ConditionRegistry.register("TEAMMATES_ALIVE_LTE", (actor, ctx, value) => {
+  const sideUnits = actor.side === "ally" ? ctx.allies : ctx.enemies;
+  const aliveTeammates = sideUnits.filter((u) => u !== actor && u.isAlive).length;
+  return aliveTeammates <= value;
+});
+
+// value(%) 확률로 true — 평가할 때마다 새로 굴림. "N% 확률로만 발동" 패턴
+// 조건(2026-08-25 신설 — 확률 게이트가 이전엔 전혀 없어서, 결정론적
+// 조건뿐이던 패턴 시스템에 처음 추가되는 축).
+ConditionRegistry.register("RANDOM_CHANCE_PCT", (actor, ctx, value) => {
+  return Math.random() * 100 < value;
+});
+
 // value: [{cond, val}, ...] — 배열 안의 조건을 전부 만족해야 true("○이면서 ○").
 // 단순히 여러 조건의 동시 충족 판정을 위한 조합기. 예: "HP 50% 미만이면서 아직
 // 이 슬롯을 1번도 안 썼을 때"만 발동하고 싶으면:

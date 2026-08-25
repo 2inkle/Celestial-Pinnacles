@@ -157,6 +157,16 @@
     if (row.metric === "preparingType") {
       return { cond: "ENEMY_PREPARING_TYPE", val: row.value };
     }
+    // 자기 진영에 자신을 제외한 생존 팀원이 없을 때만 true("혼자 남았을
+    // 때"). 2026-08-25, 동굴 보스의 "H 소환 안전장치" 설계용.
+    if (row.metric === "teamAlone") {
+      return { cond: "TEAMMATES_ALIVE_LTE", val: 0 };
+    }
+    // row.value(%) 확률로 true — "N% 확률로만 발동"류 조건. andNext로 다른
+    // 조건과 체이닝하면 "○일 때 N% 확률로"를 표현할 수 있음(2026-08-25).
+    if (row.metric === "randomChancePct") {
+      return { cond: "RANDOM_CHANCE_PCT", val: row.value };
+    }
     console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
     return { cond: "ALWAYS", val: 0 };
   }
@@ -501,6 +511,12 @@
     character.realMatk = monsterDef.combatReal?.matk || 0;
     character.realMdef = monsterDef.combatReal?.mdef || 0;
     character.realSummonEff = monsterDef.combatReal?.summonEff || 0; // 소환 능력이 있는 몬스터는 여기 값을 채워둬야 실제로 유의미한 소환이 됨
+    // 아군(플레이어) 빌드 경로(위쪽 buildAllyFromRoster)는 이미
+    // guardAllies를 옮겨 심는데 몬스터 경로엔 대응하는 줄이 없었음
+    // (2026-08-25 발견 — 동굴 보스가 소환한 아군을 "전열에서 지키는"
+    // 패턴을 만들려면 몬스터도 guardAllies를 켤 수 있어야 함). row는
+    // BattleCharacter 생성자 기본값이 이미 "front"라 별도 지정 불필요.
+    character.guardAllies = !!monsterDef.guardAllies;
     character.expReward = monsterDef.expReward || 0;
     character.goldReward = monsterDef.goldReward || 0;
     character.dropTable = monsterDef.dropTable || [];
