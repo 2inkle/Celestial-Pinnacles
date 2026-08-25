@@ -4,7 +4,8 @@
 `git rm diff-boss-summon-safety-mechanism-2026-08-25.md`로 제거 권장.
 
 - **기준 브랜치**: `main`(커밋 `678b90c`, 드리프트 없음)
-- **작업 브랜치**: `boss-summon-safety-mechanism-2026-08-25`(1개 커밋)
+- **작업 브랜치**: `boss-summon-safety-mechanism-2026-08-25`(2개 커밋 —
+  기능 구현 + 조건 이름/카운트 방식 수정)
 - **변경 파일**: `CLAUDE.md`(설계 기록), `src/registries.js`(실제 코드
   — 신규 조건 2개), `web/battle-adapter.js`(실제 코드 — 조건 번역 분기
   2개 + `guardAllies` 몬스터 와이어링 누락분 보완)
@@ -30,6 +31,13 @@
   leaf 조건이고, 결합은 이미 있는 `AND`/`andNext` 체이닝을 그대로 재사용
   (새 조합 로직 없음).
 
+**2차 커밋(같은 브랜치)**: 헤드카운트 조건을 처음엔 "자신을 제외한
+생존 팀원 수"(`TEAMMATES_ALIVE_LTE`)로 만들었는데, 패턴을 짜는 입장에서
+"자신 포함 총 몇 명 남았는지"가 더 직관적이라는 사용자 피드백을 받아
+`MY_SIDE_ALIVE_COUNT_LTE`(카운트에 자신 포함, `val:1`이 "혼자")로
+이름과 계산 방식을 바꿈. 편집기 shorthand(`metric:"teamAlone"`)는
+그대로 유지, 내부에서 넘기는 `val`만 0→1로 조정.
+
 전체 배경/근거는 `CLAUDE.md`의 새 섹션 "동굴 5층 보스 재설계 확정 —
 '단순하지만 강력한 단일강타' + H 소환 안전장치"에 그대로 있음(아래 diff
 참고).
@@ -43,7 +51,7 @@
 3. (가능하면) 임시 몬스터 정의로 `patterns: [{subject:"self",
    metric:"teamAlone", andNext:true}, {subject:"self",
    metric:"randomChancePct", value:33, action:"SUMMON"}]`를 만들어
-   `translatePatternSlots`가 예상대로 `AND(TEAMMATES_ALIVE_LTE=0,
+   `translatePatternSlots`가 예상대로 `AND(MY_SIDE_ALIVE_COUNT_LTE=1,
    RANDOM_CHANCE_PCT=33) -> SUMMON`으로 번역되는지, 그리고
    `ConditionRegistry.check`가 정상 동작하는지 간단히 확인.
 
@@ -67,10 +75,10 @@ git commit
 
 ```diff
 diff --git a/CLAUDE.md b/CLAUDE.md
-index 915e80a..603f704 100644
+index 915e80a..7e4be06 100644
 --- a/CLAUDE.md
 +++ b/CLAUDE.md
-@@ -6,6 +6,78 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
+@@ -6,6 +6,81 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
  테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
  유효한지 검증하는 게 목표.
  
@@ -122,9 +130,12 @@ index 915e80a..603f704 100644
 +  몬스터 경로에도 추가함.
 +- "혼자뿐" 헤드카운트 조건과 "N% 확률" 조건은 기존 `ConditionRegistry`
 +  (`src/registries.js`)에 전혀 없어서(기존 15종 전수 확인 — 전부
-+  결정론적, 확률 게이트 없음) 신규 등록: `TEAMMATES_ALIVE_LTE`,
-+  `RANDOM_CHANCE_PCT`. 둘 다 범용 leaf 조건이라 이번 용도 외에도 재사용
-+  가능. 두 조건의 결합은 이미 있는 `AND` 콤비네이터 + `web/battle-
++  결정론적, 확률 게이트 없음) 신규 등록: `MY_SIDE_ALIVE_COUNT_LTE`,
++  `RANDOM_CHANCE_PCT`. `MY_SIDE_ALIVE_COUNT_LTE`는 처음엔 "자신을 제외한
++  생존 팀원 수"로 만들었는데, 패턴을 짜는 입장에서는 "자신 포함 총 몇 명
++  남았는지"가 더 직관적이라는 사용자 피드백으로 카운트 방식을 자신 포함
++  으로 바꿈(혼자 남음 = 1명, `val:1`). 둘 다 범용 leaf 조건이라 이번
++  용도 외에도 재사용 가능. 두 조건의 결합은 이미 있는 `AND` 콤비네이터 + `web/battle-
 +  adapter.js`의 `andNext` 체이닝(기존 `maxUses`가 쓰던 것과 동일 패턴)이
 +  그대로 처리 — `translateCondition()`에 `metric:"teamAlone"`/
 +  `metric:"randomChancePct"` 번역 분기 2개만 추가함.
@@ -150,20 +161,22 @@ index 915e80a..603f704 100644
  
  바로 아래(2026-08-22) "실전투 신고 4건 일괄 수정"의 4번 항목("Sheet 화면
 diff --git a/src/registries.js b/src/registries.js
-index 926348a..735a047 100644
+index 926348a..ac94466 100644
 --- a/src/registries.js
 +++ b/src/registries.js
-@@ -228,6 +228,22 @@ ConditionRegistry.register("SLOT_USE_COUNT_LESS_THAN", (actor, ctx, value, slotI
+@@ -228,6 +228,24 @@ ConditionRegistry.register("SLOT_USE_COUNT_LESS_THAN", (actor, ctx, value, slotI
    return used < value;
  });
  
-+// 자기 진영에서 자신을 제외한 생존 팀원 수가 value 이하면 true. "동료가
-+// 전멸해서 혼자 남았을 때"류 패턴 조건(2026-08-25, 동굴 보스의 "H 소환
-+// 안전장치" 설계용 — value:0으로 "완전히 혼자"를 표현).
-+ConditionRegistry.register("TEAMMATES_ALIVE_LTE", (actor, ctx, value) => {
++// 자기 진영에서 살아있는 인원 수(자신 포함)가 value 이하면 true. "자신을
++// 제외한 인원 수"가 아니라 "자신 포함 총 몇 명 남았는지"로 셈 — 패턴을
++// 짜는 입장에서 "혼자 남음 = 1명"처럼 더 직관적이라는 사용자 피드백으로
++// 자신 제외 카운트 방식에서 변경함(2026-08-25, 동굴 보스의 "H 소환
++// 안전장치" 설계용 — value:1이면 "정말로 혼자"를 표현).
++ConditionRegistry.register("MY_SIDE_ALIVE_COUNT_LTE", (actor, ctx, value) => {
 +  const sideUnits = actor.side === "ally" ? ctx.allies : ctx.enemies;
-+  const aliveTeammates = sideUnits.filter((u) => u !== actor && u.isAlive).length;
-+  return aliveTeammates <= value;
++  const aliveCount = sideUnits.filter((u) => u.isAlive).length;
++  return aliveCount <= value;
 +});
 +
 +// value(%) 확률로 true — 평가할 때마다 새로 굴림. "N% 확률로만 발동" 패턴
@@ -177,17 +190,18 @@ index 926348a..735a047 100644
  // 단순히 여러 조건의 동시 충족 판정을 위한 조합기. 예: "HP 50% 미만이면서 아직
  // 이 슬롯을 1번도 안 썼을 때"만 발동하고 싶으면:
 diff --git a/web/battle-adapter.js b/web/battle-adapter.js
-index 77f5150..9c96621 100644
+index 77f5150..593e63f 100644
 --- a/web/battle-adapter.js
 +++ b/web/battle-adapter.js
-@@ -157,6 +157,16 @@
+@@ -157,6 +157,17 @@
      if (row.metric === "preparingType") {
        return { cond: "ENEMY_PREPARING_TYPE", val: row.value };
      }
-+    // 자기 진영에 자신을 제외한 생존 팀원이 없을 때만 true("혼자 남았을
-+    // 때"). 2026-08-25, 동굴 보스의 "H 소환 안전장치" 설계용.
++    // 자기 진영에서 살아있는 인원이 자신 하나뿐일 때만 true("혼자 남았을
++    // 때"). 2026-08-25, 동굴 보스의 "H 소환 안전장치" 설계용 — 카운트는
++    // 자신 포함으로 세므로(MY_SIDE_ALIVE_COUNT_LTE 참고) val:1이 "혼자".
 +    if (row.metric === "teamAlone") {
-+      return { cond: "TEAMMATES_ALIVE_LTE", val: 0 };
++      return { cond: "MY_SIDE_ALIVE_COUNT_LTE", val: 1 };
 +    }
 +    // row.value(%) 확률로 true — "N% 확률로만 발동"류 조건. andNext로 다른
 +    // 조건과 체이닝하면 "○일 때 N% 확률로"를 표현할 수 있음(2026-08-25).
@@ -197,7 +211,7 @@ index 77f5150..9c96621 100644
      console.warn(`[battle-adapter] 아직 번역 못 하는 패턴 조건 — ALWAYS로 대체함:`, row);
      return { cond: "ALWAYS", val: 0 };
    }
-@@ -501,6 +511,12 @@
+@@ -501,6 +512,12 @@
      character.realMatk = monsterDef.combatReal?.matk || 0;
      character.realMdef = monsterDef.combatReal?.mdef || 0;
      character.realSummonEff = monsterDef.combatReal?.summonEff || 0; // 소환 능력이 있는 몬스터는 여기 값을 채워둬야 실제로 유의미한 소환이 됨
