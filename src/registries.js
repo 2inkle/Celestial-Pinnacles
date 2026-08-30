@@ -228,6 +228,24 @@ ConditionRegistry.register("SLOT_USE_COUNT_LESS_THAN", (actor, ctx, value, slotI
   return used < value;
 });
 
+// 자기 진영에서 살아있는 인원 수(자신 포함)가 value 이하면 true. "자신을
+// 제외한 인원 수"가 아니라 "자신 포함 총 몇 명 남았는지"로 셈 — 패턴을
+// 짜는 입장에서 "혼자 남음 = 1명"처럼 더 직관적이라는 사용자 피드백으로
+// 자신 제외 카운트 방식에서 변경함(2026-08-25, 동굴 보스의 "H 소환
+// 안전장치" 설계용 — value:1이면 "정말로 혼자"를 표현).
+ConditionRegistry.register("MY_SIDE_ALIVE_COUNT_LTE", (actor, ctx, value) => {
+  const sideUnits = actor.side === "ally" ? ctx.allies : ctx.enemies;
+  const aliveCount = sideUnits.filter((u) => u.isAlive).length;
+  return aliveCount <= value;
+});
+
+// value(%) 확률로 true — 평가할 때마다 새로 굴림. "N% 확률로만 발동" 패턴
+// 조건(2026-08-25 신설 — 확률 게이트가 이전엔 전혀 없어서, 결정론적
+// 조건뿐이던 패턴 시스템에 처음 추가되는 축).
+ConditionRegistry.register("RANDOM_CHANCE_PCT", (actor, ctx, value) => {
+  return Math.random() * 100 < value;
+});
+
 // value: [{cond, val}, ...] — 배열 안의 조건을 전부 만족해야 true("○이면서 ○").
 // 단순히 여러 조건의 동시 충족 판정을 위한 조합기. 예: "HP 50% 미만이면서 아직
 // 이 슬롯을 1번도 안 썼을 때"만 발동하고 싶으면:
