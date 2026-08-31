@@ -72,11 +72,14 @@
         ] },
       ],
     },
-    // 동굴(1티어 던전) 1~4층 — 사슬형 몬스터 체인 컨셉(2026-08-24 확정,
-    // CLAUDE.md 참고). 5층(보스/AFTERMATH)은 다음 단계에서 별도 추가 예정,
-    // 이번엔 1~4층만. 게이팅(랜덤 드랍 아이템으로 다음 계층 진입)은
-    // "아이디어만 있고 실제 아이템은 아직 안 만들었다"(2026-08-31, 사용자)
-    // — 차후 실행. 지금은 clearedBattle 순서 진행만 걸어둠.
+    // 동굴(1티어 던전) 1~5층 — 사슬형 몬스터 체인 컨셉(2026-08-24 확정,
+    // CLAUDE.md 참고). 게이팅(2026-08-31 확정): 각 층에서만 등장하는
+    // 필러 몬스터(C/E/G/I)가 저확률로 "동굴 N층 지도"를 드랍하고, 그
+    // 지도를 가지고 있어야 N+1층에 입장할 수 있음 — hasItem 조건만 남기고
+    // clearedBattle은 제거함(지도 자체가 이미 이전 층 공략 증거이므로
+    // 중복 검사 불필요, 사용자 확정). 5층(보스/AFTERMATH)은 몬스터
+    // 데이터·보스 스탯 반영이 아직이라 requirements만 미리 걸어두고
+    // 전투 실체(BATTLE_MONSTER_POOLS)는 다음 단계에서 채움.
     {
       id: "caveTier1",
       name: "축축한 동굴",
@@ -85,13 +88,16 @@
       battles: [
         { id: "cave-floor-1", name: "동굴 입구", requirements: [] },
         { id: "cave-floor-2", name: "무너진 통로", requirements: [
-          { type: "clearedBattle", value: "cave-floor-1" },
+          { type: "hasItem", value: "동굴 1층 지도" },
         ] },
         { id: "cave-floor-3", name: "갈라진 균열", requirements: [
-          { type: "clearedBattle", value: "cave-floor-2" },
+          { type: "hasItem", value: "동굴 2층 지도" },
         ] },
         { id: "cave-floor-4", name: "무너지는 천장", requirements: [
-          { type: "clearedBattle", value: "cave-floor-3" },
+          { type: "hasItem", value: "동굴 3층 지도" },
+        ] },
+        { id: "cave-floor-5", name: "동굴 심층(미정)", requirements: [
+          { type: "hasItem", value: "동굴 4층 지도" },
         ] },
       ],
     },
