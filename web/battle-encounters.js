@@ -102,6 +102,41 @@
         { monsterId: "unknown_entity", row: "front", weight: 0, maxAppearances: 1, guaranteed: true },
       ],
     },
+    // 동굴 1~4층 — 사슬형 몬스터 체인(2026-08-24 컨셉, 2026-08-31 데이터
+    // 작성). 매 층 3종 등장, 이전 층의 "축"이 되는 1종이 이월되고 신규
+    // 2종이 합류(CLAUDE.md "동굴 저층 실제 데이터 작성" 참고).
+    "cave-floor-1": {
+      maxCount: 3,
+      pool: [
+        { monsterId: "cave_boulder_beetle", row: "front", weight: 45, maxAppearances: 2 },
+        { monsterId: "cave_spiked_crab", row: "front", weight: 30, maxAppearances: 1 },
+        { monsterId: "cave_bat", row: "back", weight: 25, maxAppearances: 2 },
+      ],
+    },
+    "cave-floor-2": {
+      maxCount: 3,
+      pool: [
+        { monsterId: "cave_spiked_crab", row: "front", weight: 35, maxAppearances: 1 },
+        { monsterId: "cave_rockfall_wraith", row: "back", weight: 30, maxAppearances: 1 },
+        { monsterId: "cave_bear", row: "front", weight: 35, maxAppearances: 2 },
+      ],
+    },
+    "cave-floor-3": {
+      maxCount: 3,
+      pool: [
+        { monsterId: "cave_rockfall_wraith", row: "back", weight: 30, maxAppearances: 1 },
+        { monsterId: "cave_stalactite_crusher", row: "front", weight: 35, maxAppearances: 1 },
+        { monsterId: "cave_troll", row: "front", weight: 35, maxAppearances: 2 },
+      ],
+    },
+    "cave-floor-4": {
+      maxCount: 3,
+      pool: [
+        { monsterId: "cave_stalactite_crusher", row: "front", weight: 30, maxAppearances: 1 },
+        { monsterId: "cave_earth_spirit", row: "front", weight: 30, maxAppearances: 1 },
+        { monsterId: "cave_crystal_golem", row: "front", weight: 40, maxAppearances: 1 },
+      ],
+    },
     // 새 전투 예시: "forest-1": { maxCount:2, pool:[{monsterId:"forest_wolf", row:"front", weight:100, maxAppearances:2}] }
   };
 

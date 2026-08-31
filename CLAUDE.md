@@ -1269,6 +1269,143 @@ Node.js가 없어 실제 실행은 못 함** — 주 워크스페이스에서
 `web/material-table.js` 실제 데이터 작성. 방어력 공식 재검토
 아이디어도 `simulate.js` 있는 환경에서 검토 대상.
 
+## 동굴 1~4층(A~I) 실제 데이터 작성 — 내구력은 HP+realDef 임시 상향, initBonusDef 개편 후 재조정 예정 (2026-08-31)
+
+### 배경 — "가장 약한 공격" 기준 확정과 내구력 재계산
+위 "러프 스탯표"의 HP(1,800~5,000)/realDef(10~25)를 그대로 실제
+데이터로 옮기기 전에, 사용자가 "raw 데미지(몬스터가 내는 공격력)는
+이미 승인됐지만, 반대로 플레이어가 이 몬스터들에게 가하는 '가장 약한
+공격'한 방에 몬스터가 즉사하는 문제"를 지적함 — 층을 거치며 패턴을
+학습시키고 다음 층으로 넘어간다는 설계 의도 자체가 무너진다는 것.
+
+**"가장 약한 공격" 기준(사용자 확정)**: "1차 전직, 상점제 장비 +6,
+전직을 진행하자마자 배울 수 있는 낮은 수준의 스킬" — +6 강화는
+`successRate(6)=1.0`(`web/refinery.html`)이라 100% 안전하게 도달할 수
+있는 "초저자본 빌드의 기본"이라는 근거.
+
+**실제 계산**(스나이퍼, Lv15, "Power Shoot" — `requiredLevel:15`,
+`requiredSkills` 없어서 전직 즉시 배움, `coefficient:8.5`):
+- 장비: 합성궁(`combatReal.atk:48`)+화살통(`combatReal.atk:15`), +6
+  강화 시 `statMultiplier(6)=1.144`(레벨 8 미만이라 `statBonusPerStat`
+  추가분 없음) → realAtk = round(48×1.144)+round(15×1.144) =
+  55+17 = **72**(`web/battle-adapter.js`의 `sumEquipmentCombatStats`
+  확인 — `combatReal.atk`는 real.atk로 들어가고, `hasHandGear`면
+  맨주먹 보정 없이 그대로 realAtk가 됨).
+- DEX: Lv15까지 쌓은 스탯포인트 `(15-1)×5=70`(`character-sheet.html`
+  `STAT_POINTS_PER_LEVEL`) 중 절반(이전 세션 둠로드 예시와 같은 투자
+  비율)을 투자 → realDex=45.
+- `computeSkillPower`(`src/combatFormulas.js`) = effectiveAtk(72) ×
+  `dampDamageStat`(effectiveDex=45)(≈24.66) × coefficient(8.5) ≈
+  **raw 15,000**.
+
+### 방어력만으로 버티려던 첫 시도 — bonusDef 상한의 한계 발견
+사용자가 "HP를 무식하게 올리기보단 realDef/bonusDef를 올려서 '방어력
+높은 적' 자체와 디버프의 가치를 체감시키는 게 낫다"고 제안 → 재계산
+결과 이번 raw(15,000) 규모에서는 `bonusDef` 상한(`realDef×4`, 500%
+클램프)이 구조적으로 너무 작아(realDef 30~50에서 상한 120~200 —
+전체의 2~3%) 디버프로 벗겨낼 만한 "체감되는 방어력"이 안 생기고,
+realDef를 90 근처까지 올리면 이미 무조건 10% 관통 하한에 도달해
+`bonusDef`가 완전히 무의미해짐(자세한 계산은 위 "[고려 단계]
+`initBonusDef`" 섹션 참고). 사용자가 이 한계 자체를 "realDef에
+bonusDef 상한을 묶어두는 구조가 문제"로 재정의하고 `initBonusDef`
+엔진 개편 아이디어를 제안 → 그 섹션에 별도 기록, 이번 세션엔 엔진
+변경 미적용.
+
+### 이번 데이터 작성의 임시 조치(사용자 확정) — 이름/패턴/드랍은 확정, HP/realDef만 나중에 재조정
+"`initBonusDef` 반영을 기다리지 않고, 이름·패턴·드랍테이블 등 엔진
+개편과 무관한 부분부터 먼저 확정하고, HP/realDef 수치만 임시로 기존
+공식(realDef 상향 + 모대 HP 증량)을 써서 채워둔다"로 진행. 즉 raw
+데미지(ATK/계수/히트수)는 러프 스탯표의 승인된 값을 그대로 두고,
+HP는 기존 대비 약 4~9배, realDef는 약 3~4배 상향:
+
+| 슬롯 | 이름 | HP(기존→적용) | realDef(기존→적용) | ATK/계수/히트(불변) | 자강화 |
+|---|---|---|---|---|---|
+| A 바위딱정벌레 | 베이스라인 | 3000→18,000 | 15→70 | 20 / 1.2×1 | ✗ |
+| B 가시바위게 | 약한 자강화(DEF) | 3200→24,000 | 18→60 | 18 / 1.1×1 | ✓(2회, def+40%) |
+| C 동굴박쥐 | 필러(저HP) | 1800→22,000 | 10→50 | 15 / 1.0×1 | ✗ |
+| D 낙석귀 | Invalid 단일(약함) | 3400→21,000 | 18→65 | 16 / 1.0×1 | ✗ |
+| E 동굴곰 | 필러(2층) | 3600→17,000 | 20→72 | 24 / 1.3×1 | ✗ |
+| F 종유석파괴자 | 다단히트+자강화 | 4000→26,000 | 20→65 | 20 / 0.5×6, 명중≈20% | ✓(2회, def+50%) |
+| G 동굴트롤 | 필러(저층 최강) | 4200→16,500 | 22→78 | 30 / 1.4×1 | ✗ |
+| H 대지정령 | Enemy-All+잦은 자강화 | 5000→19,000 | 25→68 | 18 / 0.7×1(전체) | ✓(2턴마다, def+35%) |
+| I 수정골렘 | Invalid+가끔 자강화 | 4800→19,000 | 24→75 | 35 / 1.5×1, postDelay 60(2~3배) | ✓(HP≤60%, def+60%) |
+
+**이 표의 HP/realDef는 확정치가 아님** — `initBonusDef` 엔진 개편이
+반영되면 재조정 대상(위 "[고려 단계] `initBonusDef`" 섹션과 연동해
+다시 볼 것). 이름·패턴·드랍테이블·게이팅 구조는 이번에 확정.
+
+### 실제 반영 방법 — `web/monster-roster.html`/`skill-table.json`은 죽은 데이터, DB 마이그레이션으로만 반영
+조사 결과 두 파일 모두 **런타임에 전혀 참조되지 않는 읽기 전용
+뷰어/죽은 데이터**임이 확인됨:
+- `web/monster-roster.html`의 `LEGACY_MONSTER_SEED`: "더 이상 아무
+  코드에서도 참조하지 않음(런타임 죽은 데이터) — 새 몬스터/패턴을
+  설계할 때 참고용 초안으로만 남겨둠"이라고 파일 자체에 명시돼 있음.
+  실제로는 `sbClient.from("game_content").select(...).eq("key",
+  "monsterRoster")`로 Supabase에서 직접 읽어옴(관리자 전용 읽기 전용
+  뷰어). 사용자가 "라이브 보스 스탯 누락 사고"를 직접 겪은 뒤 "실
+  데이터 반영은 SQL 마이그레이션으로만 하는 게 안전"이라고 결정해둔
+  상태(주석에 남아있음).
+- `skill-table.json`도 이전 세션에 이미 "라이브는 Supabase
+  `game_content.skillTable` DB에만 있고 이 파일은 죽은 참고용 사본"
+  으로 확인된 바 있음(같은 결론 재확인).
+
+그래서 이번 데이터는 **`supabase/migrations/0025_add_cave_floor_
+monsters.sql`** 신규 마이그레이션으로 작성함(아직 미실행 — 다음에
+Supabase에 직접 적용해야 실제 게임에 반영됨, "0024" 때와 같은
+패턴). 기존 데이터를 안 건드리기 위해 전체 교체가 아니라:
+- `skillTable`: `jsonb_set(data, '{jobSkills,"동굴 몬스터"}', ..., true)`
+  로 **새 job 버킷 하나만 추가**(기존 job은 전혀 안 건드림). "동굴
+  몬스터"는 실제 PC 직업이 아니라서(`job-table-editor.html`의
+  advancement 트리에 없음) 어떤 플레이어의 스킬 목록에도 노출되지
+  않음(`character-sheet.html`이 `SKILL_TABLE[캐릭터.job]`으로 자기
+  직업만 봄) — 그런데도 `allSkillsFromTable()`(jobSkills 전체 평탄화)
+  이 이름으로 찾아주므로 몬스터 패턴 액션으로는 정상 작동.
+- `monsterRoster`: `data || '[...]'::jsonb` 배열 연결로 **9종을 뒤에
+  이어붙임**(기존 몬스터는 전혀 안 건드림). 재실행하면 중복 추가되니
+  한 번만 실행할 것.
+
+새로 추가한 스킬 12종(무거운 강타/가시 강화/가시 찌르기/할퀴기/
+돌팔매/몸통 박치기/무너지는 종유석/굳은 돌가죽/짓밟기/지진/대지의
+축복/수정 낙하/결정화 — 자강화는 전부 `combatStatUpPercent` stat
+"def"로 boss 재설계와 같은 메커니즘), F의 "무너지는 종유석"(다단히트
++초저명중)은 스킬이 아니라 F 몬스터의
+`passiveMods.accuracyBonusPct:-70`으로 구현(2026-08-24 컨셉 확정 시
+검토된 방식 그대로).
+
+### 게이팅 + 신규 재료 — `web/battle-themes.js`/`web/battle-encounters.js`/`web/material-table.js`(실제 코드, 직접 반영됨)
+이 세 파일은 (skillTable/monsterRoster와 달리) **DB가 아니라 저장소의
+정적 JS 파일 자체가 런타임 소스**라서 이번에 직접 수정·커밋함(마이그레이션
+아님):
+- `web/battle-themes.js`: 새 테마 `caveTier1`("축축한 동굴") + 전투
+  4개(`cave-floor-1`~`cave-floor-4`) 추가. 2~4층은 `goblin-fortress`의
+  `clearedBattle`+`hasItem` 조합 패턴을 그대로 재사용해 게이팅
+  (이월 축 몬스터가 드랍하는 열쇠 아이템 필요) — 5층(보스/AFTERMATH)은
+  이번 범위 밖, 다음 단계에서 추가.
+- `web/battle-encounters.js`: `BATTLE_MONSTER_POOLS`에 4개 층 몬스터
+  풀 추가(매 층 3종, 이전 층 이월 축 재사용 — 컨셉 표 그대로).
+- `web/material-table.js`: `MATERIAL_TABLE`에 "철광석"/"정동석" 플레이버
+  등록(제작 레시피(`RECIPE_TABLE`)는 "다음 파밍 단계로 이어지는
+  떡밥"이라 이번엔 등록 안 함 — 컨셉 확정 때부터 다음 단계로 남겨둔
+  항목).
+
+열쇠 아이템(전부 `category:"keyItem"`): "무너진 통로의 흔적"(B 드랍,
+1→2층), "갈라진 균열의 표식"(D 드랍, 2→3층), "무너지는 천장의
+파편"(F 드랍, 3→4층), "지진의 전조"(H 드랍, 4→5층 — 5층 자체는 아직
+없어서 당장은 못 씀, 다음 단계 대비 미리 심어둠).
+
+### 다음 세션에서 이어갈 것
+1. **`supabase/migrations/0025_add_cave_floor_monsters.sql` 실제 실행**
+   (주 워크스테이션 또는 Supabase 콘솔에서) — 실행 전까지는 라이브
+   게임에 전혀 반영 안 된 상태.
+2. `simulate.js`로 이번 HP/realDef 수치의 실제 승률/체감 검증.
+3. `initBonusDef` 엔진 개편(위 섹션)이 반영되면 이 9종의 HP/realDef를
+   그에 맞춰 재조정 — bonusDef 기반으로 옮겨가면 HP는 오히려 지금보다
+   낮춰도 될 가능성이 큼.
+4. 5층(보스/AFTERMATH) `battle-themes.js`/`battle-encounters.js` 항목
+   추가 — 보스 자체 스탯(HP52,000/DEF35)은 이미 확정돼 있으니
+   (`cave-boss-balance-risk-p0-2026-08-25`) 몬스터 데이터 마이그레이션과
+   게이팅 연결만 남음.
+
 ## 개조된 장비가 상점 구매/전리품과 잘못 합쳐지던 버그 — 3곳에 동일 패턴 (2026-08-22)
 
 **증상(사용자 신고)**: "왕관 조각 개조가 된 모자를 하나 가지고 있었다.
