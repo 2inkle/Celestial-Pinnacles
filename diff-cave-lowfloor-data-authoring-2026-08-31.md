@@ -4,9 +4,10 @@
 `git rm diff-cave-lowfloor-data-authoring-2026-08-31.md`로 제거 권장.
 
 - **기준 브랜치**: `main`(커밋 `5fb5d37`, 드리프트 없음)
-- **작업 브랜치**: `cave-lowfloor-data-authoring-2026-08-31`(2개 커밋:
+- **작업 브랜치**: `cave-lowfloor-data-authoring-2026-08-31`(4개 커밋:
   `0f0a739` initBonusDef 엔진 개편 아이디어 기록, `1bccdce` 동굴 1~4층
-  실제 데이터 작성 본체)
+  실제 데이터 작성 본체, `00fe39b` 본 companion 문서, `d4d14fa` 게이팅
+  되돌림 — 아래 "게이팅 되돌림" 항목 참고)
 - **변경 파일**: `CLAUDE.md`, `supabase/migrations/0025_add_cave_floor_
   monsters.sql`(신규, **아직 미실행**), `web/battle-themes.js`,
   `web/battle-encounters.js`, `web/material-table.js`
@@ -47,10 +48,30 @@ HP/realDef만 임시로 기존 공식(HP 4~9배, realDef 3~4배 상향)을 써�
   완료). 자기강화 4종은 boss 재설계와 같은 메커니즘
   (`combatStatUpPercent`, stat `def`) 재사용.
 - **게이팅**: `caveTier1` 테마 + `cave-floor-1`~`cave-floor-4` 전투,
-  `goblin-fortress`의 `clearedBattle`+`hasItem` 패턴 재사용. 열쇠
-  아이템 4종(무너진 통로의 흔적/갈라진 균열의 표식/무너지는 천장의
-  파편/지진의 전조 — 마지막 건 5층이 아직 없어 미리 심어두기만 함).
+  `clearedBattle`(이전 층 클리어)로만 순서 진행. **아이템 게이팅은
+  차후로 미룸**(아래 "게이팅 되돌림" 참고 — 처음엔 `hasItem` 조합과
+  열쇠 아이템 4종까지 만들었다가 사용자 정정으로 되돌림).
 - **신규 재료**: "철광석"/"정동석" (`web/material-table.js`).
+
+## 게이팅 되돌림 (4번째 커밋, `d4d14fa`)
+
+3번째 커밋(companion 문서 최초 작성)까지는 `cave-floor-2`~`4`에
+`hasItem`(열쇠 아이템 소지) 요구조건을 걸고, B/D/F/H 몬스터
+드랍테이블에 "무너진 통로의 흔적"/"갈라진 균열의 표식"/"무너지는
+천장의 파편"/"지진의 전조" 4종을 임의로 만들어 넣었었음. 사용자가
+정정: **"게이팅은 차후 실행한다. 어차피 1층부터 5층까지 랜덤하게
+드랍되는 아이템을 통해 다음 계층으로 진입한다는 아이디어만 있고,
+거기까지 가는 데에 필요한 아이템은 만들지 않았으니."** — 즉 최초
+컨셉(2026-08-17, "동굴 — 다단계 + 저확률 열쇠 게이팅")에 아이디어만
+있었을 뿐 실제 아이템은 확정된 적이 없었는데, 이번에 그 확정 안 된
+부분을 임의로 채워 넣은 것이었음. 전부 되돌림:
+- `web/battle-themes.js`: `hasItem` 요구조건 제거, `clearedBattle`만
+  남김.
+- `supabase/migrations/0025_...sql`: 드랍테이블에서 열쇠 아이템 4종
+  전부 제거.
+- `CLAUDE.md`: "게이팅은 이번 범위 밖 — 열쇠 아이템은 아직 '만들지
+  않음'" 섹션으로 경위를 기록, 다음 세션 TODO에 "열쇠 게이팅 실제
+  설계"를 별도 항목으로 추가.
 
 ## ⚠ 중요 — 마이그레이션 파일은 아직 실행 안 됨
 
@@ -102,6 +123,12 @@ git commit
 ```
 
 ## 전체 diff
+
+⚠ 아래 diff는 3번째 커밋(`00fe39b`) 시점 기준이라, 4번째 커밋
+(`d4d14fa`, "게이팅 되돌림")의 `hasItem`/열쇠 아이템 4종 제거분은
+반영돼 있지 않음 — 병합 전에 반드시 저장소의 `web/battle-themes.js`
+`cave-floor-2`~`4`와 `supabase/migrations/0025_...sql`의 B/D/F/H
+드랍테이블을 직접 열어 최신 상태(열쇠 아이템 없음)를 확인할 것.
 
 ```diff
 diff --git a/CLAUDE.md b/CLAUDE.md
