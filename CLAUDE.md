@@ -1372,14 +1372,31 @@ Supabase에 직접 적용해야 실제 게임에 반영됨, "0024" 때와 같은
 `passiveMods.accuracyBonusPct:-70`으로 구현(2026-08-24 컨셉 확정 시
 검토된 방식 그대로).
 
-### 게이팅 + 신규 재료 — `web/battle-themes.js`/`web/battle-encounters.js`/`web/material-table.js`(실제 코드, 직접 반영됨)
+### 게이팅은 이번 범위 밖 — 열쇠 아이템은 아직 "만들지 않음"
+최초 컨셉("동굴 — 다단계 + 저확률 열쇠 게이팅", 2026-08-17)에 "계층
+몬스터가 저확률로 열쇠를 드랍해야 다음 계층으로 넘어간다"는 **아이디어만
+있고, 실제 열쇠 아이템은 만들어둔 적이 없었음** — 처음엔 이번 데이터
+작성 김에 "무너진 통로의 흔적"/"갈라진 균열의 표식"/"무너지는 천장의
+파편"/"지진의 전조"라는 구체적인 열쇠 4종을 임의로 만들어 드랍테이블과
+`hasItem` 게이팅에 넣었으나, **사용자가 "게이팅은 차후 실행한다 —
+거기까지 가는 데 필요한 아이템은 아직 만들지 않았다"고 정정** — 아직
+확정되지 않은 아이템을 데이터에 앞서 박아 넣은 것이므로 전부 되돌림:
+- `web/battle-themes.js`의 `cave-floor-2`~`4` 요구조건에서 `hasItem`
+  절 제거 — 지금은 `clearedBattle`(이전 층 클리어)만으로 순서 진행.
+- `supabase/migrations/0025_add_cave_floor_monsters.sql`의 B/D/F/H
+  드랍테이블에서 열쇠 아이템(`category:"keyItem"`) 4종 전부 제거.
+
+**다음에 열쇠 게이팅을 실제로 설계할 때** 참고할 것: 최초 컨셉대로
+"계층마다 전용 열쇠"로 갈지, 이번에 임시로 만들었던 이름들을 재사용할지
+전부 미정 — 처음부터 다시 논의해서 확정할 것.
+
+### `web/battle-themes.js`/`web/battle-encounters.js`/`web/material-table.js`(실제 코드, 직접 반영됨)
 이 세 파일은 (skillTable/monsterRoster와 달리) **DB가 아니라 저장소의
 정적 JS 파일 자체가 런타임 소스**라서 이번에 직접 수정·커밋함(마이그레이션
 아님):
 - `web/battle-themes.js`: 새 테마 `caveTier1`("축축한 동굴") + 전투
-  4개(`cave-floor-1`~`cave-floor-4`) 추가. 2~4층은 `goblin-fortress`의
-  `clearedBattle`+`hasItem` 조합 패턴을 그대로 재사용해 게이팅
-  (이월 축 몬스터가 드랍하는 열쇠 아이템 필요) — 5층(보스/AFTERMATH)은
+  4개(`cave-floor-1`~`cave-floor-4`) 추가. `clearedBattle`로만 순서
+  게이팅(위 항목 참고, 아이템 게이팅은 차후) — 5층(보스/AFTERMATH)은
   이번 범위 밖, 다음 단계에서 추가.
 - `web/battle-encounters.js`: `BATTLE_MONSTER_POOLS`에 4개 층 몬스터
   풀 추가(매 층 3종, 이전 층 이월 축 재사용 — 컨셉 표 그대로).
@@ -1387,11 +1404,6 @@ Supabase에 직접 적용해야 실제 게임에 반영됨, "0024" 때와 같은
   등록(제작 레시피(`RECIPE_TABLE`)는 "다음 파밍 단계로 이어지는
   떡밥"이라 이번엔 등록 안 함 — 컨셉 확정 때부터 다음 단계로 남겨둔
   항목).
-
-열쇠 아이템(전부 `category:"keyItem"`): "무너진 통로의 흔적"(B 드랍,
-1→2층), "갈라진 균열의 표식"(D 드랍, 2→3층), "무너지는 천장의
-파편"(F 드랍, 3→4층), "지진의 전조"(H 드랍, 4→5층 — 5층 자체는 아직
-없어서 당장은 못 씀, 다음 단계 대비 미리 심어둠).
 
 ### 다음 세션에서 이어갈 것
 1. **`supabase/migrations/0025_add_cave_floor_monsters.sql` 실제 실행**
@@ -1401,10 +1413,12 @@ Supabase에 직접 적용해야 실제 게임에 반영됨, "0024" 때와 같은
 3. `initBonusDef` 엔진 개편(위 섹션)이 반영되면 이 9종의 HP/realDef를
    그에 맞춰 재조정 — bonusDef 기반으로 옮겨가면 HP는 오히려 지금보다
    낮춰도 될 가능성이 큼.
-4. 5층(보스/AFTERMATH) `battle-themes.js`/`battle-encounters.js` 항목
+4. **열쇠 게이팅 실제 설계**(차후 실행, 이번엔 명시적으로 보류) — 어떤
+   아이템을 누가 드랍할지부터 다시 논의.
+5. 5층(보스/AFTERMATH) `battle-themes.js`/`battle-encounters.js` 항목
    추가 — 보스 자체 스탯(HP52,000/DEF35)은 이미 확정돼 있으니
-   (`cave-boss-balance-risk-p0-2026-08-25`) 몬스터 데이터 마이그레이션과
-   게이팅 연결만 남음.
+   (`cave-boss-balance-risk-p0-2026-08-25`) 몬스터 데이터 마이그레이션만
+   남음(게이팅은 위 4번과 함께 나중에).
 
 ## 개조된 장비가 상점 구매/전리품과 잘못 합쳐지던 버그 — 3곳에 동일 패턴 (2026-08-22)
 

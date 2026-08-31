@@ -74,8 +74,9 @@
     },
     // 동굴(1티어 던전) 1~4층 — 사슬형 몬스터 체인 컨셉(2026-08-24 확정,
     // CLAUDE.md 참고). 5층(보스/AFTERMATH)은 다음 단계에서 별도 추가 예정,
-    // 이번엔 1~4층만. 각 층은 "이전 층 이월 축이 드랍한 열쇠"로 게이팅함
-    // (goblin-fortress의 hasItem+clearedBattle 조합 패턴 재사용).
+    // 이번엔 1~4층만. 게이팅(랜덤 드랍 아이템으로 다음 계층 진입)은
+    // "아이디어만 있고 실제 아이템은 아직 안 만들었다"(2026-08-31, 사용자)
+    // — 차후 실행. 지금은 clearedBattle 순서 진행만 걸어둠.
     {
       id: "caveTier1",
       name: "축축한 동굴",
@@ -85,15 +86,12 @@
         { id: "cave-floor-1", name: "동굴 입구", requirements: [] },
         { id: "cave-floor-2", name: "무너진 통로", requirements: [
           { type: "clearedBattle", value: "cave-floor-1" },
-          { type: "hasItem", value: "무너진 통로의 흔적" },
         ] },
         { id: "cave-floor-3", name: "갈라진 균열", requirements: [
           { type: "clearedBattle", value: "cave-floor-2" },
-          { type: "hasItem", value: "갈라진 균열의 표식" },
         ] },
         { id: "cave-floor-4", name: "무너지는 천장", requirements: [
           { type: "clearedBattle", value: "cave-floor-3" },
-          { type: "hasItem", value: "무너지는 천장의 파편" },
         ] },
       ],
     },
