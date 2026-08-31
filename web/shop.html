@@ -147,6 +147,7 @@
     </div>
     <div class="gold-badge" id="goldBadge">💰 0 G</div>
   </div>
+  <div class="cat-tabs" id="modeTabs"></div>
   <div class="cat-tabs" id="catTabs"></div>
   <div class="mock-badge">⚠ 테스트 빌드 — 재고/기간/요일 조건은 개인 계정 기준(서버 공유 아님)</div>
 </header>
@@ -164,6 +165,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="supabase-client.js"></script>
 <script src="auth-guard.js"></script>
+<script src="material-table.js"></script>
 <script>
   // 개발자도구 네비 링크는 nav.js가 profiles.is_admin 기준으로 이미 처리함
   // (2026-08-14, CLAUDE.md "관리자 판별을 profiles.is_admin 기준으로 교체" 참조).
@@ -721,6 +723,7 @@
   let session = null;
   let currentGold = 0;
   let shopPurchasedMap = {}; // itemName -> 누적 구매수량(shop_purchased 테이블)
+  let warehouseItems = []; // "판매" 탭용 — 부트스트랩에서 한 번 받아오고 판매할 때마다 다시 받아옴
 
   const CATEGORY_LABELS = {
     equipment: { label: "장비", icon: "⚔️" },
@@ -728,6 +731,52 @@
     keyItem:   { label: "열쇠 아이템", icon: "🗝️" },
     stash:     { label: "보물상자", icon: "🎁" },
   };
+
+  // ============================================================================
+  // "판매" 기능(2026-08-31 신설) — 개별 아이템 가격을 하나하나 정해두지 않고,
+  // 희귀도 등급 하나로만 판매가를 매김(사용자 지시: "판매금액을 세세히
+  // 정해둘 생각은 없고, 온전히 희귀도에 따라 판매가를 정할 생각이다").
+  // 나중에 등급별 가격만 조정하면 전체 판매 경제가 한 번에 같이 움직임.
+  // ============================================================================
+  const RARITY_SELL_PRICE = {
+    common: 10,
+    uncommon: 40,
+    rare: 150,
+    epic: 500,
+    legendary: 1500,
+  };
+  const RARITY_LABELS = {
+    common: "일반", uncommon: "고급", rare: "희귀", epic: "영웅", legendary: "전설",
+  };
+
+  // 아이템 하나의 희귀도를 추론 — 아이템 자체에 rarity 필드가 없어도(대부분의
+  // 기존 드랍/구매 아이템이 그렇다) 최대한 합리적으로 등급을 매김:
+  //  - 소재(material): material-table.js의 MATERIAL_TABLE[name].rarity 참고,
+  //    없으면 "common".
+  //  - 장비(equipment): weight(무게)를 등급의 대리 지표로 씀 — "동굴 진행 시
+  //    내구력은 오르지만 무게를 많이 잡아먹는 트레이드오프" 설계 원칙과
+  //    일치(무거울수록 상위 티어). weight 0→common, 1→uncommon, 2→rare,
+  //    3→epic, 4 이상→legendary.
+  //  - 열쇠 아이템(keyItem)/보물상자(stash)는 판매 대상에서 아예 제외(null).
+  function inferRarity(item) {
+    if (item.rarity) return item.rarity; // 나중에 아이템 자체에 명시적으로 박아두면 그걸 우선함
+    if (item.category === "material") {
+      return (window.MATERIAL_TABLE && window.MATERIAL_TABLE[item.name]?.rarity) || "common";
+    }
+    if (item.category === "equipment") {
+      const w = item.weight || 0;
+      if (w >= 4) return "legendary";
+      if (w === 3) return "epic";
+      if (w === 2) return "rare";
+      if (w === 1) return "uncommon";
+      return "common";
+    }
+    return null; // keyItem/stash 등 — 판매 불가
+  }
+  function sellPriceFor(item) {
+    const rarity = inferRarity(item);
+    return rarity ? (RARITY_SELL_PRICE[rarity] || 0) : 0;
+  }
 
   // ── 저장 헬퍼 — getGold는 이제 캐시된 currentGold만 반환(동기 함수 형태를
   // 유지해서 아래 렌더 함수들을 안 건드림). 실제 값 변경은 confirmPurchase의
@@ -801,6 +850,30 @@
   ];
   let activeShopTab = "equipment";
 
+  // 구매/판매 모드 전환(2026-08-31 신설) — 완전히 다른 데이터 소스(구매는
+  // SHOP_TABLE, 판매는 사용자의 warehouse_items)라 SHOP_TABS와는 별개로
+  // 최상위에서 한 번 더 나눔.
+  const MODE_TABS = [
+    { key: "buy", label: "🛒 구매" },
+    { key: "sell", label: "💴 판매" },
+  ];
+  let activeMode = "buy";
+
+  function renderModeTabs() {
+    const el = document.getElementById("modeTabs");
+    el.innerHTML = MODE_TABS.map((t) => `
+      <button class="cat-tab ${t.key === activeMode ? "active" : ""}" data-mode="${t.key}">${t.label}</button>
+    `).join("");
+    el.querySelectorAll(".cat-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeMode = btn.dataset.mode;
+        document.getElementById("catTabs").style.display = activeMode === "buy" ? "" : "none";
+        renderModeTabs();
+        renderList();
+      });
+    });
+  }
+
   function cartEntries() {
     return SHOP_TABLE.filter((it) => (cart[it.name] || 0) >= 1);
   }
@@ -823,6 +896,7 @@
   }
 
   function renderList() {
+    if (activeMode === "sell") { renderSellList(); return; }
     const el = document.getElementById("mainArea");
     const activeTab = SHOP_TABS.find((t) => t.key === activeShopTab);
     const items = SHOP_TABLE.filter((it) => activeTab.match(it.category) && isItemAvailable(it));
@@ -1075,6 +1149,89 @@
     renderCartBar();
   }
 
+  // ============================================================================
+  // "판매" 화면 — warehouse_items 중 팔 수 있는 것(장착 안 됨=held_by null,
+  // 판매 가능 카테고리=material/equipment)만 나열. 각 행이 이미 하나의
+  // 스택(같은 이름+강화단계+개조여부)이라 구매 화면의 장바구니/모달 같은
+  // 병합 로직이 필요 없음 — 행마다 바로 수량 입력 + 판매 버튼.
+  // ============================================================================
+  function sellableWarehouseItems() {
+    return warehouseItems.filter((w) => !w.held_by && inferRarity(w) !== null && w.quantity > 0);
+  }
+
+  function renderSellList() {
+    const el = document.getElementById("mainArea");
+    const items = sellableWarehouseItems();
+
+    if (items.length === 0) {
+      el.innerHTML = `<div class="empty-wrap">팔 수 있는 아이템이 없어요.</div>`;
+      return;
+    }
+
+    el.innerHTML = items.map((w) => {
+      const catMeta = CATEGORY_LABELS[w.category] || { label: w.category, icon: "❔" };
+      const rarity = inferRarity(w);
+      const unitPrice = sellPriceFor(w);
+      return `
+        <div class="shop-row" data-id="${w.id}">
+          <div class="shop-icon">${catMeta.icon}</div>
+          <div class="shop-main">
+            <div class="shop-name-row">
+              <span class="shop-name">${w.name}${w.enhance_level ? ` +${w.enhance_level}` : ""}</span>
+              <span class="shop-cat-badge ${w.category}">${RARITY_LABELS[rarity] || rarity}</span>
+            </div>
+            <div class="shop-desc">보유 ${w.quantity}개</div>
+            <div class="shop-price">개당 ${unitPrice.toLocaleString()} G</div>
+          </div>
+          <div class="shop-qty-wrap">
+            <span class="shop-qty-label">수량</span>
+            <input type="number" class="sell-qty" min="0" max="${w.quantity}" value="0" />
+          </div>
+          <button class="modal-btn confirm sell-btn" style="flex:none; padding:8px 14px;">판매</button>
+        </div>
+      `;
+    }).join("");
+
+    el.querySelectorAll(".shop-row").forEach((row) => {
+      const id = row.dataset.id;
+      const w = items.find((it) => String(it.id) === id);
+      const qtyInput = row.querySelector(".sell-qty");
+      qtyInput.addEventListener("input", () => {
+        qtyInput.value = Math.max(0, Math.min(w.quantity, Number(qtyInput.value) || 0));
+      });
+      row.querySelector(".sell-btn").addEventListener("click", () => {
+        const qty = Number(qtyInput.value) || 0;
+        if (qty >= 1) sellItem(w, qty);
+      });
+    });
+  }
+
+  // 판매 확정 — 창고 수량을 깎고(0이 되면 행 자체를 삭제) 그만큼 골드를
+  // 더해줌. 구매 확정(confirmPurchase)의 warehouse_items/profiles 갱신
+  // 패턴을 그대로 반대로 적용한 것.
+  async function sellItem(w, qty) {
+    const total = sellPriceFor(w) * qty;
+    if (qty >= w.quantity) {
+      const { error } = await window.sbClient.from("warehouse_items").delete().eq("id", w.id);
+      if (error) { alert(`판매 실패: ${error.message}`); return; }
+    } else {
+      const { error } = await window.sbClient.from("warehouse_items")
+        .update({ quantity: w.quantity - qty }).eq("id", w.id);
+      if (error) { alert(`판매 실패: ${error.message}`); return; }
+    }
+    const { error: goldError } = await window.sbClient.from("profiles")
+      .update({ gold: currentGold + total }).eq("user_id", session.user.id);
+    if (goldError) { alert(`판매 실패: ${goldError.message}`); return; }
+    currentGold += total;
+
+    const { data, error: refetchError } = await window.sbClient
+      .from("warehouse_items").select("*").eq("user_id", session.user.id);
+    if (!refetchError) warehouseItems = data || [];
+
+    document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    renderList();
+  }
+
   document.getElementById("scrollTopBtn").addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
@@ -1089,21 +1246,25 @@
   (async () => {
     session = await window.AuthGuard.requireSession();
 
-    const [shopRes, profileRes, purchasedRes] = await Promise.all([
+    const [shopRes, profileRes, purchasedRes, warehouseRes] = await Promise.all([
       window.sbClient.from("game_content").select("data").eq("key", "shopTable").single(),
       window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single(),
       window.sbClient.from("shop_purchased").select("item_name,quantity").eq("user_id", session.user.id),
+      window.sbClient.from("warehouse_items").select("*").eq("user_id", session.user.id),
     ]);
     if (shopRes.error) { alert(`상점 정보를 불러오지 못했습니다: ${shopRes.error.message}`); return; }
     if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
     if (purchasedRes.error) { alert(`구매 이력을 불러오지 못했습니다: ${purchasedRes.error.message}`); return; }
+    if (warehouseRes.error) { alert(`창고 정보를 불러오지 못했습니다: ${warehouseRes.error.message}`); return; }
 
     SHOP_TABLE = shopRes.data?.data || [];
     currentGold = profileRes.data?.gold ?? 0;
     shopPurchasedMap = {};
     (purchasedRes.data || []).forEach((row) => { shopPurchasedMap[row.item_name] = row.quantity; });
+    warehouseItems = warehouseRes.data || [];
 
     document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
+    renderModeTabs();
     renderCatTabs();
     renderList();
     renderCartBar();
