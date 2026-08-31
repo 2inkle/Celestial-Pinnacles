@@ -4,13 +4,15 @@
 `git rm diff-cave-lowfloor-data-authoring-2026-08-31.md`로 제거 권장.
 
 - **기준 브랜치**: `main`(커밋 `5fb5d37`, 드리프트 없음)
-- **작업 브랜치**: `cave-lowfloor-data-authoring-2026-08-31`(4개 커밋:
+- **작업 브랜치**: `cave-lowfloor-data-authoring-2026-08-31`(7개 커밋:
   `0f0a739` initBonusDef 엔진 개편 아이디어 기록, `1bccdce` 동굴 1~4층
   실제 데이터 작성 본체, `00fe39b` 본 companion 문서, `d4d14fa` 게이팅
-  되돌림 — 아래 "게이팅 되돌림" 항목 참고)
+  되돌림, `4b093de` companion 갱신, `64b22bf` 게이팅 최종 확정("동굴
+  N층 지도"), `2bae660` 상점 판매 기능 신설 — 아래 "게이팅 최종 확정"/
+  "상점 판매 기능" 항목 참고)
 - **변경 파일**: `CLAUDE.md`, `supabase/migrations/0025_add_cave_floor_
   monsters.sql`(신규, **아직 미실행**), `web/battle-themes.js`,
-  `web/battle-encounters.js`, `web/material-table.js`
+  `web/battle-encounters.js`, `web/material-table.js`, `web/shop.html`
 
 ## 배경 요약
 
@@ -73,6 +75,41 @@ HP/realDef만 임시로 기존 공식(HP 4~9배, realDef 3~4배 상향)을 써�
   않음'" 섹션으로 경위를 기록, 다음 세션 TODO에 "열쇠 게이팅 실제
   설계"를 별도 항목으로 추가.
 
+## 게이팅 최종 확정 (6번째 커밋, `64b22bf`)
+
+되돌린 직후 사용자가 실제 설계를 확정함: **"각 층에서만 등장하는
+몬스터에게 동굴 (n)층 지도 아이템을 만들고, cave-floor 2~5에 has item
+조건만 남겨둘 것."**
+- "층 전용 몬스터" = 이월 안 되는 필러 슬롯(C/E/G/I — 컨셉표의 "N층
+  필러" 라벨과 정확히 일치). C(동굴박쥐)→"동굴 1층 지도", E(동굴곰)→
+  "동굴 2층 지도", G(동굴트롤)→"동굴 3층 지도", I(수정골렘)→"동굴 4층
+  지도"(전부 드랍확률 0.15).
+- `web/battle-themes.js`: `cave-floor-2`~`5` 요구조건을 `hasItem`
+  하나로 단순화(`clearedBattle` 제거). `cave-floor-5`는 몬스터 데이터가
+  아직 없어 이름을 "동굴 심층(미정)"으로 두고 요구조건만 미리 걸어둠.
+- `supabase/migrations/0025_...sql`: C/E/G/I 드랍테이블에 각자의 지도
+  추가.
+
+## 상점 "판매" 기능 신설 (7번째 커밋, `2bae660`)
+
+별개 요청(사용자): "나중을 위해 상점에 아이템 판매 기능을 넣어두고
+싶다. 판매금액을 세세히 정해둘 생각은 없고, 온전히 희귀도에 따라
+판매가를 정할 생각이다." `web/shop.html`(구매 로직이 이미 실제
+`warehouse_items`/`profiles.gold`를 직접 갱신하는 살아있는 코드)에
+직접 구현:
+- 희귀도 5단계(common/uncommon/rare/epic/legendary, 각 10/40/150/
+  500/1500G — 러프한 초기값).
+- `inferRarity(item)`: `material`은 `MATERIAL_TABLE[name].rarity`
+  참고(이번에 돌/광석/나무=common, 철광석=uncommon, 정동석=rare로
+  태깅), `equipment`는 `weight`를 대리 지표로 사용(0→common,
+  4 이상→legendary), `keyItem`/`stash`는 판매 대상에서 제외.
+- UI: "🛒 구매"/"💴 판매" 모드 탭 신설, 판매 화면은 `warehouse_items`를
+  직접 나열(행마다 수량+판매 버튼, 장바구니 없음).
+- `sellItem()`: `warehouse_items.quantity` 차감(0이면 행 삭제)+
+  `profiles.gold` 증가 — `confirmPurchase`의 반대 패턴 재사용.
+- ⚠ Node.js 없어 `<script>` 블록 중괄호/소괄호 개수 대조(269/269,
+  390/390)로만 확인 — **실제 브라우저 왕복 테스트는 다음 세션 과제**.
+
 ## ⚠ 중요 — 마이그레이션 파일은 아직 실행 안 됨
 
 `web/monster-roster.html`의 `LEGACY_MONSTER_SEED`와 `skill-table.json`은
@@ -84,9 +121,10 @@ HP/realDef만 임시로 기존 공식(HP 4~9배, realDef 3~4배 상향)을 써�
 `supabase/migrations/0025_add_cave_floor_monsters.sql`만 새로 작성함 —
 **주 워크스테이션 또는 Supabase 콘솔에서 이 마이그레이션을 직접
 실행해야 실제 게임에 반영됨**(0024 때와 동일한 패턴). 반면
-`web/battle-themes.js`/`web/battle-encounters.js`/`web/material-table.js`는
-DB가 아니라 저장소의 정적 JS 파일 자체가 런타임 소스라 이번에 직접
-커밋함 — 이 세 파일은 병합만 되면 바로 반영됨.
+`web/battle-themes.js`/`web/battle-encounters.js`/`web/material-table.js`/
+`web/shop.html`은 DB가 아니라 저장소의 정적 JS/HTML 파일 자체가
+런타임 소스라 이번에 직접 커밋함 — 이 파일들은 병합만 되면 바로
+반영됨(상점 판매 기능도 포함).
 
 ## 병합 전 체크리스트
 
@@ -108,6 +146,13 @@ DB가 아니라 저장소의 정적 JS 파일 자체가 런타임 소스라 이�
       상태에서 이 두 파일만 먼저 병합되면, 존재하지 않는 몬스터를
       참조하는 전투가 됨 — `buildEnemyFromMonsterKey`가 콘솔 에러만
       내고 조용히 건너뛰므로 크래시는 안 나지만 전투에 몬스터가 덜 나옴)
+- [ ] `web/battle-themes.js`의 `cave-floor-2`~`5`가 `hasItem`(동굴 N층
+      지도)만 요구하는지, `clearedBattle`이 안 남아있는지 확인
+- [ ] `web/shop.html`의 "판매" 탭을 실제 브라우저에서 열어 창고 아이템이
+      뜨는지, 판매 후 골드/창고 수량이 정확히 갱신되는지, 열쇠
+      아이템(동굴 N층 지도 등)이 목록에서 빠지는지 확인(이 세션은
+      Node.js가 없어 브레이스/괄호 개수 대조만 했음 — 실제 실행 검증
+      안 됨)
 
 ## 병합 방법
 
@@ -501,4 +546,7 @@ index fbd8335..184b540 100644
 1. `supabase/migrations/0025_add_cave_floor_monsters.sql` 실제 실행(Supabase).
 2. `simulate.js`로 HP/realDef 수치 재검증.
 3. `initBonusDef` 엔진 개편 반영 후 이 9종 수치 재조정.
-4. 5층(보스/AFTERMATH) 게이팅 추가.
+4. 5층(보스/AFTERMATH) 몬스터 데이터·`BATTLE_MONSTER_POOLS` 추가(게이팅
+   `hasItem` 조건은 이미 걸려 있음, "동굴 4층 지도").
+5. 상점 "판매" 기능 실제 브라우저 왕복 테스트, 희귀도별 가격(10/40/
+   150/500/1500) 실제 경제 밸런스에 맞춰 조정.
