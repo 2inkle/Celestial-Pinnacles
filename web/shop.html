@@ -737,16 +737,33 @@
   // 희귀도 등급 하나로만 판매가를 매김(사용자 지시: "판매금액을 세세히
   // 정해둘 생각은 없고, 온전히 희귀도에 따라 판매가를 정할 생각이다").
   // 나중에 등급별 가격만 조정하면 전체 판매 경제가 한 번에 같이 움직임.
+  //
+  // ⚠ 정가 라인업 고정(2026-08-31, 사용자 확정): 판매가는 반드시 아래
+  // 8개 값 중 하나여야 하고, 그 외의 숫자는 절대 쓰지 않는다 —
+  // 100 / 500 / 1,000 / 2,000 / 5,000 / 10,000 / 100,000 / 1,000,000.
+  // RARITY_SELL_PRICE와 NAMED_SELL_PRICE_OVERRIDES에 새 값을 추가할 때도
+  // 반드시 이 라인업 안에서만 고를 것.
   // ============================================================================
   const RARITY_SELL_PRICE = {
-    common: 10,
-    uncommon: 40,
-    rare: 150,
-    epic: 500,
-    legendary: 1500,
+    common: 100,
+    uncommon: 500,
+    rare: 2000,
+    epic: 5000,
+    legendary: 10000,
   };
   const RARITY_LABELS = {
     common: "일반", uncommon: "고급", rare: "희귀", epic: "영웅", legendary: "전설",
+  };
+
+  // 이름으로 판매가를 고정하는 예외(위 라인업 안의 값만) — 희귀도 추론을
+  // 아예 건너뛰고 이 값 그대로 판매됨. keyItem이라 원래 판매 대상에서
+  // 제외되는 아이템도 여기 있으면 판매 가능해짐(불길한 마력 파편이 그 예).
+  const NAMED_SELL_PRICE_OVERRIDES = {
+    // "???"(unknown-battle) 입장권 — 사용자 지시로 10만G 고정.
+    "불길한 마력 파편": 100000,
+    // 보스 고유 드랍(사용자 지시로 전부 100만G 고정) — 새 보스 고유
+    // 아이템이 생기면(예: 동굴 보스의 "Heart of Deepstone") 여기 추가할 것.
+    "왕의 대검": 1000000,
   };
 
   // 아이템 하나의 희귀도를 추론 — 아이템 자체에 rarity 필드가 없어도(대부분의
@@ -774,6 +791,9 @@
     return null; // keyItem/stash 등 — 판매 불가
   }
   function sellPriceFor(item) {
+    if (Object.prototype.hasOwnProperty.call(NAMED_SELL_PRICE_OVERRIDES, item.name)) {
+      return NAMED_SELL_PRICE_OVERRIDES[item.name];
+    }
     const rarity = inferRarity(item);
     return rarity ? (RARITY_SELL_PRICE[rarity] || 0) : 0;
   }
@@ -1156,7 +1176,10 @@
   // 병합 로직이 필요 없음 — 행마다 바로 수량 입력 + 판매 버튼.
   // ============================================================================
   function sellableWarehouseItems() {
-    return warehouseItems.filter((w) => !w.held_by && inferRarity(w) !== null && w.quantity > 0);
+    // sellPriceFor()>0인지로 판단(inferRarity가 아니라) — 이래야 이름
+    // 고정가 예외(NAMED_SELL_PRICE_OVERRIDES, 불길한 마력 파편 등)가
+    // keyItem이라도 목록에 뜸.
+    return warehouseItems.filter((w) => !w.held_by && w.quantity > 0 && sellPriceFor(w) > 0);
   }
 
   function renderSellList() {
@@ -1170,7 +1193,9 @@
 
     el.innerHTML = items.map((w) => {
       const catMeta = CATEGORY_LABELS[w.category] || { label: w.category, icon: "❔" };
+      const isNamedOverride = Object.prototype.hasOwnProperty.call(NAMED_SELL_PRICE_OVERRIDES, w.name);
       const rarity = inferRarity(w);
+      const badgeText = isNamedOverride ? "고정가" : (RARITY_LABELS[rarity] || rarity);
       const unitPrice = sellPriceFor(w);
       return `
         <div class="shop-row" data-id="${w.id}">
@@ -1178,7 +1203,7 @@
           <div class="shop-main">
             <div class="shop-name-row">
               <span class="shop-name">${w.name}${w.enhance_level ? ` +${w.enhance_level}` : ""}</span>
-              <span class="shop-cat-badge ${w.category}">${RARITY_LABELS[rarity] || rarity}</span>
+              <span class="shop-cat-badge ${w.category}">${badgeText}</span>
             </div>
             <div class="shop-desc">보유 ${w.quantity}개</div>
             <div class="shop-price">개당 ${unitPrice.toLocaleString()} G</div>
