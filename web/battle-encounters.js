@@ -137,6 +137,25 @@
         { monsterId: "cave_crystal_golem", row: "front", weight: 40, maxAppearances: 1 },
       ],
     },
+    // 협동 레이드(2026-08-31) — 보스 단독 등장. 잡몹은 보스의 SUMMON_OPENING이
+    // 직접 부르므로 풀에 안 넣는다("adds-clear" 기믹이 그 소환체를 대상으로 함).
+    //
+    // ⚠ 이 키는 web/battle-themes.js에 **일부러 넣지 않는다** — battle-select.html이
+    // BATTLE_THEMES만 렌더하므로(:320), 여기에만 있으면 일반 전투 목록에
+    // 안 새어나간다. 레이드는 raid.html에서 인스턴스를 고른 뒤
+    // battle-view.html?battle=raid-cave-deep-1&raid=<instanceId>로 진입한다.
+    // battle-view의 ensureEntryAllowed도 테마 항목이 없으면 requirements 없음으로
+    // 통과하므로(:363-366) 별도 처리가 필요 없다.
+    //
+    // ⚠ 이 문자열은 game_content.raidTable의 battleId, 그리고 battle_logs.battle_id
+    // (URL의 ?battle= 값)와 **세 군데 모두 동일**해야 한다 — submit_raid_run이
+    // `v_log.battle_id is distinct from v_r.battle_id`로 거절한다.
+    "raid-cave-deep-1": {
+      maxCount: 1,
+      pool: [
+        { monsterId: "raid_deep_dweller", row: "front", weight: 0, maxAppearances: 1, guaranteed: true },
+      ],
+    },
     // 새 전투 예시: "forest-1": { maxCount:2, pool:[{monsterId:"forest_wolf", row:"front", weight:100, maxAppearances:2}] }
   };
 

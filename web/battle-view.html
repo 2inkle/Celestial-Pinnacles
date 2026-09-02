@@ -160,6 +160,7 @@
 <script src="exp-table.js"></script>
 <script src="battle-adapter.js"></script>
 <script src="battle-log-render.js"></script>
+<script src="raid-gimmicks.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="item-sets.js"></script>
 <script src="supabase-client.js"></script>
@@ -185,6 +186,17 @@
   let cachedRoster = [];  // characters 행 → camelCase + equipment(held_by 조회분)
   let currentGold = 0;    // profiles.gold
   let username = "플레이어";
+
+  // ── 협동 레이드 모드(2026-08-31) ──────────────────────────────────────────
+  // ?raid=<raid_instances.id>로 진입하면 켜진다. 켜지면 세 가지가 달라짐:
+  //   1. 보스 maxHp를 "남은 공유 HP"로 덮어씀(아래 loadRaidContext)
+  //   2. 전투 후 로그를 자동 저장(submit_raid_run이 battle_log_id를 요구)
+  //   3. 기믹을 판정해 기여를 서버에 제출
+  // 레이드 보스는 처치 불가 설계(퇴각 기믹)라, 풀을 바닥내는 마지막 런을 빼면
+  // 전투가 100턴 상한에 걸려 outcome이 "draw"로 끝난다 — 정상이다.
+  let raidInstanceId = null;  // ?raid= 값
+  let raidInstance = null;    // raid_instances 행(보스 남은 HP·소속 raid_id)
+  let raidDef = null;         // game_content.raidTable[raid_id] 정의
 
   function mapCharacterRow(row) {
     return {
@@ -462,6 +474,10 @@
     } else {
       await applyBattleRewards(result, roster);
       if (result.outcome === "allyWin") await markCleared(battleId);
+      // 레이드 런이면 기여를 서버에 제출한다(보상은 위 applyBattleRewards가
+      // 이미 처리 — 보물상자 dropTable은 일반 전리품 경로를 그대로 탄다.
+      // 여기서 하는 건 "공유 HP 풀 차감 + 기여도 적립"이라는 별개의 층).
+      if (raidInstanceId) await submitRaidRun(result);
     }
 
     // AFTERMATH는 "1회 진입 = 1회 전투"라 재전투 버튼을 아예 숨김(위
@@ -536,6 +552,119 @@
     btn.disabled = true;
     btn.textContent = "저장 중...";
 
+    const id = await insertBattleLog();
+    if (!id) { alert("전투 로그 저장에 실패했습니다."); btn.disabled = false; btn.textContent = "💾 이 전투 저장"; return; }
+    renderSaveLogRow();
+  }
+
+  // ============================================================================
+  // 협동 레이드 모드 — ?raid=<instanceId>로 진입했을 때만 동작.
+  // ============================================================================
+
+  // 레이드 인스턴스 + 정의를 읽어오고, 보스의 maxHp를 남은 공유 HP로 덮어쓴다.
+  // rosterData를 제자리에서 수정하므로 반드시 setMonsterRoster() 전에 부를 것.
+  async function loadRaidContext(rosterData) {
+    raidInstanceId = new URLSearchParams(location.search).get("raid");
+    if (!raidInstanceId) return;
+
+    const [instRes, raidTableRes] = await Promise.all([
+      window.sbClient.from("raid_instances").select("*").eq("id", raidInstanceId).single(),
+      window.sbClient.from("game_content").select("data").eq("key", "raidTable").single(),
+    ]);
+    if (instRes.error) { alert(`레이드 정보를 불러오지 못했습니다: ${instRes.error.message}`); raidInstanceId = null; return; }
+
+    raidInstance = instRes.data;
+    raidDef = (raidTableRes.data?.data || {})[raidInstance.raid_id] || null;
+
+    // 보스 HP 주입 — 다음 도전자가 "이미 깎여 있는 보스"를 만나는 게 이 모델의
+    // 핵심이므로, 남은 풀 HP를 그대로 보여준다. 보스 패턴의 퇴각 임계는 %라서,
+    // 풀을 바닥내는 마지막 런에서만 퇴각·보물상자가 뜨게 된다.
+    const bossId = raidDef?.bossMonsterId;
+    const boss = bossId ? rosterData.find((m) => m && m.id === bossId) : null;
+    if (boss) {
+      boss.maxHp = Math.max(1, raidInstance.boss_hp_remaining);
+    } else if (bossId) {
+      console.warn(`[battle-view] 레이드 보스 "${bossId}"를 로스터에서 못 찾음 — HP 주입 생략`);
+    }
+  }
+
+  // 전투 후 기여 제출 — 로그 자동 저장 → 기믹 판정 → submit_raid_run.
+  async function submitRaidRun(result) {
+    const logId = await insertBattleLog();
+    if (!logId) {
+      renderRaidNotice(`⚠ 전투 로그를 저장하지 못해 레이드 기여를 제출할 수 없었어요.`, "danger");
+      return;
+    }
+    renderSaveLogRow(); // 자동 저장됐으니 공유 링크도 같이 갱신
+
+    // 기믹 판정은 클라이언트가 하지만 배점은 서버만 안다 — 서버는 자기
+    // 배점표에 있는 id만 인정하므로 없는 id를 넘겨도 무시된다(0027 참고).
+    const achieved = window.RaidGimmicks.evaluate(raidDef?.gimmickRules, result);
+
+    const { data, error } = await window.sbClient.rpc("submit_raid_run", {
+      p_raid_instance_id: raidInstanceId,
+      p_battle_log_id: logId,
+      p_gimmick_ids: achieved,
+    });
+    if (error) { renderRaidNotice(`⚠ 레이드 기여 제출 실패: ${error.message}`, "danger"); return; }
+
+    renderRaidResult(data, achieved);
+  }
+
+  function renderRaidNotice(text, kind) {
+    const wrap = document.getElementById("battleLogWrap");
+    const old = document.getElementById("raidNotice");
+    if (old) old.remove(); // 재전투 때마다 쌓이지 않게
+    const box = document.createElement("div");
+    box.id = "raidNotice";
+    const color = kind === "danger" ? "var(--danger)" : "var(--gold)";
+    box.style.cssText = `margin:14px auto 0; max-width:900px; padding:12px 16px; border:1px solid ${color}; border-radius:8px; color:${color}; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.9;`;
+    box.innerHTML = text;
+    wrap.parentNode.insertBefore(box, wrap);
+  }
+
+  function renderRaidResult(res, achieved) {
+    const lines = [];
+    const applied = Number(res?.appliedDamage || 0);
+    const reported = Number(res?.reportedDamage || 0);
+    const remain = Number(res?.bossHpRemaining || 0);
+    const maxHp = Number(res?.bossMaxHp || 0);
+
+    lines.push(`🕳️ <b>레이드 기여가 반영됐어요.</b>`);
+    lines.push(`이번 판 반영 데미지 <b>${applied.toLocaleString()}</b>`);
+
+    // ⚠ 서버가 상한으로 잘랐으면 반드시 알린다 — 화면에선 보스가 퇴각했는데
+    // 서버 풀은 안 비는 경우가 여기서 갈린다. 진실은 서버 응답 쪽.
+    if (reported > applied) {
+      lines.push(`<span style="color:var(--cyan);">※ 이번 판정은 최대 ${applied.toLocaleString()}까지만 반영됐어요(실제 ${reported.toLocaleString()}). 레이드는 계속됩니다.</span>`);
+    }
+
+    if (maxHp > 0) {
+      const pct = Math.max(0, Math.min(100, (remain / maxHp) * 100));
+      lines.push(`남은 보스 체력 <b>${remain.toLocaleString()}</b> / ${maxHp.toLocaleString()} (${pct.toFixed(1)}%)`);
+    }
+
+    const rules = raidDef?.gimmickRules;
+    if (rules) {
+      const list = window.RaidGimmicks.describe(rules, achieved);
+      lines.push(`기믹 — ` + list.map((g) => g.achieved ? `<b style="color:var(--gold);">✔ ${g.label}</b>` : `<span style="color:var(--mist-dim);">✘ ${g.label}</span>`).join(" · "));
+    }
+
+    if (res?.cleared) lines.push(`<b style="color:var(--gold);">🎉 레이드를 완수했어요! 보상은 레이드 화면에서 수령할 수 있어요.</b>`);
+
+    renderRaidNotice(lines.join("<br/>"), "gold");
+  }
+
+  // 실제 insert만 담당 — 저장된 로그 id를 돌려주고 실패하면 null.
+  // 버튼 경로(saveBattleLog)와 레이드 자동 저장(submitRaidRun)이 둘 다 쓴다.
+  // ⚠ 레이드에 이 통로가 반드시 필요한 이유: submit_raid_run RPC가
+  // battle_log_id를 필수로 요구하는데(데미지를 파라미터가 아니라 저장된
+  // 로그에서 읽는 설계 — 0027 헤더 참고), 로그 저장이 원래 수동 버튼이라
+  // 유저가 안 누르면 기여를 제출할 방법 자체가 없었음.
+  async function insertBattleLog() {
+    if (!lastBattleLog) return null;
+    if (savedLogId) return savedLogId; // 같은 전투 재저장 방지(유저당 10칸 제한)
+
     const { lines, result, battleId, battleName } = lastBattleLog;
     const { data, error } = await window.sbClient.from("battle_logs").insert({
       user_id: session.user.id,
@@ -549,9 +678,9 @@
       events: result.events,
     }).select("id").single();
 
-    if (error) { alert(`전투 로그 저장 실패: ${error.message}`); btn.disabled = false; btn.textContent = "💾 이 전투 저장"; return; }
+    if (error) { console.warn("[battle-view] 전투 로그 저장 실패:", error); return null; }
     savedLogId = data.id;
-    renderSaveLogRow();
+    return savedLogId;
   }
 
   // ============================================================================
@@ -656,7 +785,15 @@
     if (profileRes.error) { alert(`골드 정보를 불러오지 못했습니다: ${profileRes.error.message}`); return; }
 
     cachedRoster = (charRes.data || []).map(mapCharacterRow);
-    window.BattleEncounters.setMonsterRoster(monsterRes.data?.data || []);
+
+    // ⚠ 레이드면 로스터를 주입하기 "전에" 보스 maxHp를 남은 공유 HP로 덮어쓴다.
+    // setMonsterRoster()가 배열을 통째로 캐시하고 getMonsterTable()이 그걸로
+    // id 맵을 만들기 때문에, 주입 후에 고치면 이미 만들어진 MONSTER_TABLE에
+    // 반영되지 않는다. 순서가 중요함.
+    const rosterData = monsterRes.data?.data || [];
+    await loadRaidContext(rosterData);
+
+    window.BattleEncounters.setMonsterRoster(rosterData);
     MONSTER_TABLE = window.BattleEncounters.getMonsterTable();
     // battle-adapter.js의 registerKnownSkills()가 전투 시작마다 동기로
     // 읽으므로 여기서 미리 주입해둠(battle-encounters.js의 setMonsterRoster와
