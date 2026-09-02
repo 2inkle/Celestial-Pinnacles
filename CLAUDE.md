@@ -6,6 +6,118 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 레이드 기믹 판정 로직 + raidTable 시드 (2026-08-31)
+
+`0026`/`0027`은 주 워크스페이스에서 병합·실행 완료(SQL이 **한 글자도 수정되지 않고**
+들어감 — 문법·논리 모두 첫 시도에 통과). 그런데 레이드는 데이터도 판정 로직도
+없어 실제로는 아무것도 돌지 않는 상태였다. 이번에 그걸 채웠다.
+
+### ★ 엔진이 내보내는 구조화 이벤트는 딱 3종뿐 (전수 조사 결과)
+`recordEvent` 호출 지점 8곳을 전부 확인한 결과:
+```
+{ tick, turn, type:"act",   actor, side, act, prepared?, activated? }
+{ tick, turn, type:"death", unit, side }
+{ tick, turn, type:"hit",   actor, target, act, result, crit?, damage? }
+      result ∈ miss | guard | shield | completeDefense | hit
+```
+봉투(`tick`/`turn`)는 `engine.js:129-132`가 붙인다.
+
+**없는 것들 — "빠뜨린" 게 아니라 관측 자체가 불가능**(다음에 재조사하지 말 것):
+- **스탠스 진입/이탈**: `enterStance`/`exitStance`(`skillResolution.js:663,677`)는
+  서사 문자열만 반환. → **"보스가 X 스탠스에 들어가기 전에 처치" 같은 기믹은
+  지금 구조로 만들 수 없다.** 우회하려면 스탠스를 부여하는 스킬 이름을
+  `actNotSeen`으로 잡는 수밖에 없음.
+- **버프/디버프 적용, 자원 증감, 힐량**: 전부 로그 문자열만.
+- **소환된 마릿수**: `performSummon`(`registries.js:527-531`)이 의도적으로 수를
+  숨김. 대신 `participants.enemy`의 `creatureTier==="creature"`를 세면 "몇이나
+  남았는지"는 알 수 있어 그걸로 대체.
+- **패턴 슬롯 인덱스**: `engine.js:353-355`가 "유저가 결과만 보고 패턴을 직접
+  추론하는 게 이 게임의 핵심 재미"라며 일부러 안 남김. 존중함.
+- **`ATTACK`/`DETONATE_MAGIC_CIRCLE` 경로 데미지는 `hit` 이벤트를 안 냄**
+  (`registries.js:301,333`이 `recordDamageDealt`만 부르고 `recordEvent`는 안 부름).
+  → `hitResultCount`는 **스킬 타격만** 센다. 일반 공격 세는 기믹은 불가.
+
+또한 **모든 이벤트는 표시 이름(name)으로만 키잉**된다(id 없음). 같은 몬스터가
+여럿이면 이름이 겹치므로 `unitDefeated`류는 이름이 고유한 대상에만 쓸 것.
+
+⚠ `events`는 `recordEvents:true`일 때만 채워지고, **이를 넘기는 유일한 호출자가
+`battle-view.html:442`**다(파견은 안 넘김 → `events: []`). 레이드는 battle-view로만
+진입하므로 문제없지만, 다른 진입 경로를 만들면 반드시 같이 켜야 함.
+
+### ★ 설계 갭 발견 — 전투 로그 저장이 수동 버튼이었음
+`0027`의 `submit_raid_run`은 **`battle_log_id`를 필수로 요구**한다(데미지를
+파라미터가 아니라 저장된 로그에서 읽는 설계). 그런데 `battle_logs` 저장은
+**수동 "저장" 버튼**이었다(`battle-view.html:522`) — 유저가 안 누르면 레이드
+기여를 제출할 방법 자체가 없었다. `0027`을 설계할 때 자동 저장인 줄 알았던 것.
+→ `insertBattleLog()`를 DOM 버튼에서 분리하고, 레이드 런이면 자동 호출한다.
+⚠ `trim_battle_logs`가 비고정 로그를 유저당 10개로 FIFO 정리하므로 레이드 로그도
+결국 지워진다. `raid_runs.battle_log_id`가 `on delete set null`이라 런 기록은
+남지만 **감사 증거는 사라진다** — 허용하되 알고 있을 것.
+
+### 보스는 처치 불가 — 퇴각 + 보물상자 (사용자 확정)
+마차(`goblin_cart`)/`???`와 같은 방식. 필요한 액션이 **이미 다 구현돼 있어 엔진
+변경 없음**: `RETREAT`(`registries.js:575`, HP를 0으로 만들어 전장에서 제거),
+`REWARD_GRANT`(`:600`, `chains:true`, `rewardObjectSpec` 그대로 상자 생성).
+상자는 `patternSlots:[]`라 아무것도 안 하고, 부수면 적 전멸 → `allyWin`.
+
+패턴: `hp<=2% → REWARD_GRANT(maxUses:1) → RETREAT(maxUses:1)`. 런타임에 보스
+`maxHp`를 **남은 공유 HP로 덮어쓰므로**, 풀을 바닥내는 마지막 런에서만 퇴각·상자가
+뜬다.
+
+**⚠ 이것이 기믹 설계에 주는 제약**: 중간 런은 100턴 상한에 걸려 `outcome`이
+**`draw`**로 끝난다(`engine.js:244-247`). `outcome==="allyWin"`에 건 기믹은 마지막
+런 전용이 되므로, 기믹은 **승패와 무관한 지표**(턴수·생존·소환체 정리·보스 행동
+목격) 위주로 짤 것.
+
+**보상은 두 겹**(사용자 확정): 상자 `dropTable` → 기존 `grantKillReward` 경로로
+그 판에서 즉시(마지막 런 참가자만) / `claim_raid_rewards` → 레이드 종료 시 기여도
+비례 차등지급.
+
+### `gimmickPoints`(서버) / `gimmickRules`(클라) 분리
+`0027`의 `submit_raid_run`이 `gimmick_points`를 **평탄한 `{id: 정수}` 맵**으로
+읽는다(`v_r.gimmick_points ? g`). **이미 배포된 함수라 이 형태를 못 바꾼다.**
+그래서 배점은 그대로 두고 판정 규칙·표시명만 같은 id로 `gimmickRules`에 병기.
+⚠ **두 맵의 키 집합이 정확히 일치해야 한다** — `gimmickRules`에만 있으면 서버가
+조용히 무시하고, `gimmickPoints`에만 있으면 클라가 영원히 달성 못 한다.
+
+### 이번에 만든 것
+- **`web/raid-gimmicks.js`**: 메트릭 레지스트리(`src/registries.js:51`의
+  `ConditionRegistry` 패턴 + `battle-select.html`의 `REQUIREMENT_TYPES` 결).
+  실재가 확인된 메트릭만 등록 — `turnsElapsed`/`damageDealt`/`allySurvivors`/
+  `allyDeaths`/`enemyCreaturesAlive`/`hitResultCount`/`outcome`/`actSeen`/
+  `actNotSeen`/`actSeenByTurn`/`unitDefeated`.
+- **`supabase/migrations/0028_seed_raid_table.sql`**(신규, **미실행**): raidTable
+  시드 + 레이드 보스 `raid_deep_dweller`(퇴각·보물상자·소환 패턴).
+- **`web/battle-encounters.js`**: `raid-cave-deep-1` 편성. **`battle-themes.js`에는
+  일부러 미등록** — `battle-select.html`이 `BATTLE_THEMES`만 렌더하므로 넣지
+  않으면 일반 전투 목록에 안 새어나간다(`ensureEntryAllowed`도 테마 항목이 없으면
+  requirements 없음으로 통과).
+- **`web/battle-view.html`**: 레이드 모드 3종 훅(HP 주입 / 로그 자동 저장 /
+  기믹 판정·제출·결과 표시). HP 주입은 반드시 `setMonsterRoster()` **전에** —
+  이후에 고치면 이미 만들어진 `MONSTER_TABLE`에 반영 안 됨.
+
+⚠ **문자열 3중 일치**: `raid-cave-deep-1`이 `BATTLE_MONSTER_POOLS` 키 /
+raidTable의 `battleId` / `battle_logs.battle_id`(URL `?battle=`) 세 군데 모두
+같아야 한다 — `submit_raid_run`이
+`v_log.battle_id is distinct from v_r.battle_id`로 거절한다.
+
+⚠ **서버 응답이 진실**: 서버는 `least(reported, max_damage_per_run,
+boss_hp_remaining)`으로 자른다. `데미지 >= 남은풀 > 상한`이면 화면에선 퇴각했는데
+서버 풀은 안 비는 불일치가 가능 — `maxDamagePerRun`을 `bossMaxHp`의 1/3로 잡아
+정상 플레이에선 안 닿게 하고, 잘리면 UI가 "최대 N까지만 반영됨"을 명시한다.
+
+### 다음 세션에서 이어갈 것
+1. `0028` 실행(Supabase). `0027` 다음.
+2. 소환 아이템 "심층의 부름"의 **획득 경로가 아직 없다** — 지금은 관리자가
+   `warehouse_items`에 직접 넣어야 테스트 가능. 동굴 5층 보스 드랍 등에 붙일 것.
+3. `web/raid.html`(레이드 목록/개설 UI) + `nav.js` 링크. 참가 자격 필터링은
+   `battle-select.html:216-259`의 `REQUIREMENT_TYPES` 재사용.
+4. `web/auction.html`(경매장 UI).
+5. **선행 버그**: `shop.html`/`battle-view.html`의 절대값 골드 쓰기 →
+   "쓰기 직전 재조회"(사용자 확정 방식). 경매장 UI보다 먼저.
+6. **미해결 정책**: 만료된(실패한) 레이드의 기여도 — 사용자가 "실제로 돌려보고
+   정한다"로 보류. 현재는 보상 없음 + 소환템 반환 없음.
+
 ## [P0 선행조건 포함] 타 플레이어 상호작용 — 경매장 + 협동 레이드 (2026-08-31, 설계+스키마 초안, 미실행)
 
 ### 이 시스템이 깨는 전제
