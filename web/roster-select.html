@@ -53,6 +53,7 @@
   .monster-chip .m-name { font-family:'Cinzel',serif; font-size:12.5px; color:#f2efe8; }
   .monster-chip .m-rare-tag { color:var(--gold); font-family:'JetBrains Mono',monospace; font-size:10px; }
   .monster-chip .m-prob { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mist-dim); }
+  .monster-chip .m-level { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--cyan); }
 
   .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:14px; }
 
@@ -286,6 +287,7 @@
               <div class="monster-chip ${e.isRare ? "rare" : ""}">
                 <span class="m-icon">${monster.portrait}</span>
                 <span class="m-name">${e.isRare ? `<span class="m-rare-tag">[Rare]</span> ` : ""}${monster.name}</span>
+                <span class="m-level">Lv.${monster.level ?? "??"}</span>
                 <span class="m-prob">${probLabel}</span>
               </div>
             `;
