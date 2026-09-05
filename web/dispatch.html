@@ -120,12 +120,14 @@
 // 파견 실행
 //
 // 의뢰권 1장 = TURN_BUDGET(2000)턴. 이 예산이 바닥날 때까지 같은 전투를
-// 반복 시뮬레이션하고, 그동안 쌓인 보상을 나눠서 지급함(경험치 1/8, 전리품 1/100).
+// 반복 시뮬레이션하고, 그동안 쌓인 경험치·전리품을 나눠서 지급함(경험치 1/8,
+// 전리품은 킬 횟수를 1/100로 압축 — 아래 참고). 골드는 나누지 않고 전액 지급
+// (2026-09-05 사용자 결정 — 분할 지급의 근거가 딱히 없다고 판단함).
 //
-// 왜 나누는가: 예산이 2000턴이면 짧은 전투를 수백 회 돌 수 있어서, 직접
-// 한 판 뛴 것과 보상 규모가 자릿수로 벌어짐. 나눠주면 "직접 도전은 온전히,
-// 파견은 축약해서"라는 규칙이 경험치·아이템·골드 전부에 일관되게 적용되고,
-// 희귀 아이템은 직접 도전이 유리하다는 역할 분담도 유지됨.
+// 왜 나누는가(경험치·전리품): 예산이 2000턴이면 짧은 전투를 수백 회 돌 수
+// 있어서, 직접 한 판 뛴 것과 보상 규모가 자릿수로 벌어짐. 나눠주면 "직접
+// 도전은 온전히, 파견은 축약해서"라는 규칙이 유지되고, 희귀 아이템은 직접
+// 도전이 유리하다는 역할 분담도 유지됨.
 //
 // 다만 "유리하다"이지 "독점한다"가 아님 — 파견은 게임에 시간을 많이 쓰기
 // 어려운 사람도 한 번 성취한 구간에서는 주기적으로 보상을 얻어, 액티브 유저와의
@@ -154,7 +156,8 @@
 // ============================================================================
 (async function () {
   const TURN_BUDGET = 2000;
-  // 경험치·골드와 아이템의 나눗값을 따로 둠.
+  // 경험치와 아이템의 나눗값을 따로 둠(골드는 2026-09-05부터 안 나눔, 아래
+  // finalGold 참고).
   //   EXP: 성장 속도 목표(파견 1.4장으로 Lv10→15)에 맞춘 값.
   //   LOOT: 희귀 아이템은 직접 도전이 유리해야 한다는 역할 분담을 지키는 값.
   // 같은 값을 쓰면 둘 중 하나가 반드시 어긋남 — 경험치에 맞추면 왕관 조각이
@@ -325,8 +328,6 @@
         <div class="stat-value ${tickets > 0 ? "gold" : "danger"}">${tickets}</div></div>
       <div class="stat-card"><div class="stat-label">턴 예산</div>
         <div class="stat-value">${TURN_BUDGET.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="stat-label">보상 정산</div>
-        <div class="stat-value cyan" style="font-size:15px;">경험치 1/${EXP_DIVISOR}<br/>전리품 1/${LOOT_DIVISOR}</div></div>
       <div class="stat-card"><div class="stat-label">파견 인원</div>
         <div class="stat-value">${selected.size}<span style="font-size:12px;color:var(--mist-dim);"> / ${MAX_PARTY}</span></div></div>`;
     const problems = [];
@@ -370,10 +371,11 @@
         }
       }
 
-      // 경험치/골드는 원본 누적량이 커서(수만 단위) 내림 손실이 무시할 수준이라
-      // 그냥 버림.
+      // 경험치는 원본 누적량이 커서(수만 단위) 내림 손실이 무시할 수준이라
+      // 그냥 버림. 골드는 2026-09-05부터 나누지 않고 전액 지급(사용자 결정 —
+      // 분할 지급의 별도 근거가 없다고 판단함, 위 파일 헤더 주석 참고).
       const finalExp = Math.floor(exp / EXP_DIVISOR);
-      const finalGold = Math.floor(gold / EXP_DIVISOR);
+      const finalGold = gold;
 
       // 전리품 — "킬 카운트 압축 후 독립 재판정" (2026-08-31 재설계).
       // 몬스터별 raw 킬 횟수를 LOOT_DIVISOR로 확률적 반올림해 "압축된 시행
@@ -477,19 +479,17 @@
           <div class="stat-card"><div class="stat-label">승률</div>
             <div class="stat-value ${r.wins/r.runs >= 0.7 ? "cyan" : "danger"}">${(r.wins/r.runs*100).toFixed(1)}%</div></div>
           <div class="stat-card"><div class="stat-label">획득 경험치</div>
-            <div class="stat-value gold">${r.finalExp.toLocaleString()}</div>
-            <div class="raw">현지 ${r.exp.toLocaleString()} ÷ ${EXP_DIVISOR}</div></div>
+            <div class="stat-value gold">${r.finalExp.toLocaleString()}</div></div>
           <div class="stat-card"><div class="stat-label">획득 골드</div>
-            <div class="stat-value gold">${r.finalGold.toLocaleString()}</div>
-            <div class="raw">현지 ${r.gold.toLocaleString()} ÷ ${EXP_DIVISOR}</div></div>
+            <div class="stat-value gold">${r.finalGold.toLocaleString()}</div></div>
         </div>
       </div>
       <div class="block">
-        <h2 class="section-title">전리품 <span class="hint">몬스터 조우 ${LOOT_DIVISOR}회당 압축 시행 1회로 재판정했어요</span></h2>
+        <h2 class="section-title">전리품</h2>
         ${r.finalLoot.length ? r.finalLoot.map((l) => `
           <div class="loot">
             <span class="loot-name">${l.name}</span>
-            <span><span class="raw">압축 시행 ${l.attempts}회 → </span><span class="loot-qty">×${l.quantity}</span></span>
+            <span class="loot-qty">×${l.quantity}</span>
           </div>`).join("")
         : `<div class="empty">이번엔 가져온 전리품이 없어요.<br />
              희귀한 물건은 직접 다녀오시는 편이 확실합니다.</div>`}
