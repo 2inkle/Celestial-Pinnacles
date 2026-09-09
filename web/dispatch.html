@@ -90,7 +90,10 @@
     <div class="stat-grid" id="preGrid"></div>
     <div class="go-row">
       <div class="warn" id="warn"></div>
-      <button class="go" id="goBtn" disabled>파견 보내기</button>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="go" id="goBtn" disabled>파견 보내기</button>
+        <button class="go" id="goBtnBatch" disabled>×10 한꺼번에 보내기</button>
+      </div>
     </div>
   </div>
 
@@ -171,6 +174,9 @@
   const LOOT_DIVISOR = 100;
   const TICKET_NAME = "파견 의뢰권";
   const MAX_PARTY = 5;
+  // 2026-09-09: 의뢰권이 하루 48장씩 쌓이는데 한 장씩 눌러서 쓰는 게 고역이라는
+  // 요청으로 일괄 발송 버튼을 추가함 — 한 번에 이만큼의 의뢰권을 동시에 씀.
+  const BATCH_SIZE = 10;
 
   const $ = (s) => document.querySelector(s);
 
@@ -281,23 +287,24 @@
     return ticketQty;
   }
   // 티켓 차감은 캐시를 믿지 않고 매번 DB에서 다시 읽음 — 캐시가 낡아 있으면
-  // 없는 의뢰권으로 파견을 보내게 됨(보상이 공짜로 나옴).
-  async function consumeTicket() {
+  // 없는 의뢰권으로 파견을 보내게 됨(보상이 공짜로 나옴). n장을 한 번에
+  // 차감(단일 티켓 소모의 n=1 케이스도 그대로 포함 — 별도 함수로 안 나눔).
+  async function consumeTickets(n) {
     const { data: row, error } = await window.sbClient
       .from("warehouse_items").select("id,quantity")
       .eq("user_id", session.user.id).eq("name", TICKET_NAME).maybeSingle();
     if (error) { alert(`의뢰권 조회 실패: ${error.message}`); return false; }
-    if (!row || row.quantity <= 0) { ticketQty = 0; renderPre(); return false; }
+    if (!row || row.quantity < n) { ticketQty = row?.quantity ?? 0; renderPre(); return false; }
 
-    if (row.quantity <= 1) {
+    if (row.quantity <= n) {
       const { error: delError } = await window.sbClient.from("warehouse_items").delete().eq("id", row.id);
       if (delError) { alert(`의뢰권 차감 실패: ${delError.message}`); return false; }
       ticketQty = 0;
     } else {
       const { error: updError } = await window.sbClient.from("warehouse_items")
-        .update({ quantity: row.quantity - 1 }).eq("id", row.id);
+        .update({ quantity: row.quantity - n }).eq("id", row.id);
       if (updError) { alert(`의뢰권 차감 실패: ${updError.message}`); return false; }
-      ticketQty = row.quantity - 1;
+      ticketQty = row.quantity - n;
     }
     renderPre();
     return true;
@@ -335,90 +342,140 @@
     if (selected.size === 0) problems.push("⚠ 파견할 용병을 1명 이상 선택해 주세요.");
     $("#warn").textContent = problems.join("  ");
     $("#goBtn").disabled = problems.length > 0;
+    // 일괄 발송은 위 문제 없음 조건에 더해 의뢰권이 BATCH_SIZE장 이상 있어야 함.
+    $("#goBtnBatch").disabled = problems.length > 0 || tickets < BATCH_SIZE;
   }
 
-  $("#goBtn").addEventListener("click", async () => {
-    if (!await consumeTicket()) { renderPre(); return; }
-    const btn = $("#goBtn");
-    btn.disabled = true; btn.textContent = "파견 중…";
+  // 의뢰권 "한 장" 분량의 파견 시뮬레이션 — 예산이 바닥날 때까지 반복 전투 후
+  // 그 한 장의 exp/gold/loot 정산까지 끝낸 결과를 돌려줌. 각 판은 실제 전투
+  // 엔진을 그대로 태우므로 직접 도전과 완전히 같은 규칙으로 계산됨(별도 근사
+  // 공식 없음). 일괄 발송(runDispatch)은 이 함수를 N번 반복 호출해 합산한다
+  // — 장별 정산(경험치 1/8, 전리품 킬카운트 압축)은 이 함수 안에서 매번
+  // 독립적으로 적용됨, 여러 장을 먼저 합친 뒤에 한꺼번에 나누지 않음(그러면
+  // 장마다 따로 보낸 것과 결과 분포가 달라짐 — 특히 킬카운트 압축이 raw
+  // 누적량 하나가 아니라 장별로 각각 반올림돼야 "직접 도전과 같은 확률"이
+  // 정확히 유지됨).
+  function runOneTicketDispatch(party, monsterTable) {
+    let spent = 0, runs = 0, wins = 0;
+    let exp = 0, gold = 0;
+    // 몬스터별 실제 조우(=격파) 횟수 — engine.js의 드랍 롤(r.lootGained)은
+    // 이제 안 씀. 대신 이 킬 카운트를 압축해서 우리가 직접 재판정한다
+    // (아래 finalLoot 계산). allyWin이면 그 판의 enemyKeys 전원이
+    // 격파된 것이 보장됨(전멸승 조건과 동일 — 소환된 잡몹은 enemyKeys에
+    // 안 잡히므로 이 카운트에서 자연히 제외됨, 원래도 그랬음).
+    const killCounts = new Map();
 
-    // 예산이 바닥날 때까지 반복. 각 판은 실제 전투 엔진을 그대로 태우므로
-    // 직접 도전과 완전히 같은 규칙으로 계산됨(별도 근사 공식 없음).
+    while (spent < TURN_BUDGET) {
+      const enemyKeys = window.BattleEncounters.spawnEnemies(battleId).map((e) => e.monsterId);
+      const r = window.BattleAdapter.runBattle({
+        allyRosterChars: party, monsterTable, enemySpawnKeys: enemyKeys,
+        maxTurns: 100, username: "파견", logger: () => {},
+      });
+      spent += r.turnsElapsed; runs += 1;
+      if (r.outcome === "allyWin") {
+        wins += 1;
+        exp += r.expGained || 0;
+        gold += r.goldGained || 0;
+        enemyKeys.forEach((id) => { killCounts.set(id, (killCounts.get(id) || 0) + 1); });
+      }
+    }
+
+    // 경험치는 원본 누적량이 커서(수만 단위) 내림 손실이 무시할 수준이라
+    // 그냥 버림. 골드는 2026-09-05부터 나누지 않고 전액 지급(사용자 결정 —
+    // 분할 지급의 별도 근거가 없다고 판단함, 위 파일 헤더 주석 참고).
+    const finalExp = Math.floor(exp / EXP_DIVISOR);
+    const finalGold = gold;
+
+    // 전리품 — "킬 카운트 압축 후 독립 재판정" (2026-08-31 재설계).
+    // 몬스터별 raw 킬 횟수를 LOOT_DIVISOR로 확률적 반올림해 "압축된 시행
+    // 횟수"를 구하고(예: 340킬 → 압축 3~4회), 그 횟수만큼만 실제
+    // monsterTable의 dropTable을 engine.js의 grantKillReward와 동일한
+    // 방식(개별 확률 판정 + [min,max] 수량 굴림)으로 다시 돌린다.
+    // → 몬스터가 파견에서 아무리 자주 잡혀도 아이템 하나하나는 "직접
+    // 도전과 완전히 같은 확률"을 유지함(자주 마주친다고 희귀도가
+    // 무력화되지 않음). 기댓값은 예전과 동일(선형성 — 압축 시행 횟수의
+    // 기댓값이 정확히 raw/LOOT_DIVISOR).
+    // attempts는 화면 표시용 — 이 아이템이 몇 번의 압축 시행 중 나왔는지
+    // (여러 몬스터가 같은 이름을 드랍하면 합산됨, 진짜 판정 근거는 이미
+    // 위에서 다 끝났고 이건 참고용 숫자일 뿐).
+    const loot = new Map();
+    killCounts.forEach((rawKills, monsterId) => {
+      const dropTable = monsterTable[monsterId]?.dropTable;
+      if (!dropTable || !dropTable.length) return;
+
+      const exactKills = rawKills / LOOT_DIVISOR;
+      let compressedKills = Math.floor(exactKills);
+      if (Math.random() < exactKills - compressedKills) compressedKills += 1;
+
+      for (let i = 0; i < compressedKills; i++) {
+        dropTable.forEach((drop) => {
+          const cur = loot.get(drop.name) || { ...drop, quantity: 0, attempts: 0 };
+          cur.attempts += 1;
+          if (Math.random() <= drop.chance) {
+            const [min, max] = drop.quantity;
+            cur.quantity += min + Math.floor(Math.random() * (max - min + 1));
+          }
+          loot.set(drop.name, cur);
+        });
+      }
+    });
+    const finalLoot = [...loot.values()].filter((l) => l.quantity > 0);
+
+    return { spent, runs, wins, exp, gold, finalExp, finalGold, finalLoot };
+  }
+
+  // n장을 한 번에 소모해 파견을 n회 돌리고 결과를 합산 지급함(n=1이면 기존
+  // 단일 파견과 완전히 동일). ExpTable.grantExp는 누적 exp 하나를 한 번에
+  // 줘도, 장마다 나눠서 n번 줘도 최종 level/exp/expToNext가 똑같이 나오는
+  // 순수 누적 함수라(레벨업 판정이 단순 임계값 비교라 경로 무관), 여기서는
+  // DB 왕복을 줄이려고 n장의 finalExp/finalGold/finalLoot를 전부 더한 뒤
+  // 딱 한 번만 저장한다 — 다만 파견 도중 실제로 벌어지는 전투 시뮬레이션
+  // 자체(runOneTicketDispatch)는 반드시 장마다 독립적으로 돌려야 한다(위
+  // 주석 참고, 합쳐서 한 번에 계산하면 안 됨).
+  async function runDispatch(n) {
+    if (!await consumeTickets(n)) { renderPre(); return; }
+    const btn1 = $("#goBtn"), btnN = $("#goBtnBatch");
+    const activeBtn = n === 1 ? btn1 : btnN;
+    btn1.disabled = true; btnN.disabled = true;
+    activeBtn.textContent = n === 1 ? "파견 중…" : `×${n} 파견 중…`;
+
+    // 예산이 바닥날 때까지 반복하는 무거운 동기 루프를 n번 도는 작업이라,
+    // 최소한 "파견 중…" 문구가 화면에 먼저 그려지도록 한 틱 양보함.
     setTimeout(async () => {
       const monsterTable = getMonsterTable();
       const party = roster.filter((c) => selected.has(c.id));
-      let spent = 0, runs = 0, wins = 0;
-      let exp = 0, gold = 0;
-      // 몬스터별 실제 조우(=격파) 횟수 — engine.js의 드랍 롤(r.lootGained)은
-      // 이제 안 씀. 대신 이 킬 카운트를 압축해서 우리가 직접 재판정한다
-      // (아래 finalLoot 계산). allyWin이면 그 판의 enemyKeys 전원이
-      // 격파된 것이 보장됨(전멸승 조건과 동일 — 소환된 잡몹은 enemyKeys에
-      // 안 잡히므로 이 카운트에서 자연히 제외됨, 원래도 그랬음).
-      const killCounts = new Map();
 
-      while (spent < TURN_BUDGET) {
-        const enemyKeys = window.BattleEncounters.spawnEnemies(battleId).map((e) => e.monsterId);
-        const r = window.BattleAdapter.runBattle({
-          allyRosterChars: party, monsterTable, enemySpawnKeys: enemyKeys,
-          maxTurns: 100, username: "파견", logger: () => {},
+      let totalRuns = 0, totalWins = 0, totalSpent = 0;
+      let totalRawExp = 0, totalRawGold = 0, totalFinalExp = 0, totalFinalGold = 0;
+      const lootTotals = new Map();
+
+      for (let i = 0; i < n; i++) {
+        const t = runOneTicketDispatch(party, monsterTable);
+        totalRuns += t.runs; totalWins += t.wins; totalSpent += t.spent;
+        totalRawExp += t.exp; totalRawGold += t.gold;
+        totalFinalExp += t.finalExp; totalFinalGold += t.finalGold;
+        t.finalLoot.forEach((l) => {
+          const cur = lootTotals.get(l.name) || { ...l, quantity: 0 };
+          cur.quantity += l.quantity;
+          lootTotals.set(l.name, cur);
         });
-        spent += r.turnsElapsed; runs += 1;
-        if (r.outcome === "allyWin") {
-          wins += 1;
-          exp += r.expGained || 0;
-          gold += r.goldGained || 0;
-          enemyKeys.forEach((id) => { killCounts.set(id, (killCounts.get(id) || 0) + 1); });
-        }
       }
+      const finalLoot = [...lootTotals.values()];
 
-      // 경험치는 원본 누적량이 커서(수만 단위) 내림 손실이 무시할 수준이라
-      // 그냥 버림. 골드는 2026-09-05부터 나누지 않고 전액 지급(사용자 결정 —
-      // 분할 지급의 별도 근거가 없다고 판단함, 위 파일 헤더 주석 참고).
-      const finalExp = Math.floor(exp / EXP_DIVISOR);
-      const finalGold = gold;
-
-      // 전리품 — "킬 카운트 압축 후 독립 재판정" (2026-08-31 재설계).
-      // 몬스터별 raw 킬 횟수를 LOOT_DIVISOR로 확률적 반올림해 "압축된 시행
-      // 횟수"를 구하고(예: 340킬 → 압축 3~4회), 그 횟수만큼만 실제
-      // monsterTable의 dropTable을 engine.js의 grantKillReward와 동일한
-      // 방식(개별 확률 판정 + [min,max] 수량 굴림)으로 다시 돌린다.
-      // → 몬스터가 파견에서 아무리 자주 잡혀도 아이템 하나하나는 "직접
-      // 도전과 완전히 같은 확률"을 유지함(자주 마주친다고 희귀도가
-      // 무력화되지 않음). 기댓값은 예전과 동일(선형성 — 압축 시행 횟수의
-      // 기댓값이 정확히 raw/LOOT_DIVISOR).
-      // attempts는 화면 표시용 — 이 아이템이 몇 번의 압축 시행 중 나왔는지
-      // (여러 몬스터가 같은 이름을 드랍하면 합산됨, 진짜 판정 근거는 이미
-      // 위에서 다 끝났고 이건 참고용 숫자일 뿐).
-      const loot = new Map();
-      killCounts.forEach((rawKills, monsterId) => {
-        const dropTable = monsterTable[monsterId]?.dropTable;
-        if (!dropTable || !dropTable.length) return;
-
-        const exactKills = rawKills / LOOT_DIVISOR;
-        let compressedKills = Math.floor(exactKills);
-        if (Math.random() < exactKills - compressedKills) compressedKills += 1;
-
-        for (let i = 0; i < compressedKills; i++) {
-          dropTable.forEach((drop) => {
-            const cur = loot.get(drop.name) || { ...drop, quantity: 0, attempts: 0 };
-            cur.attempts += 1;
-            if (Math.random() <= drop.chance) {
-              const [min, max] = drop.quantity;
-              cur.quantity += min + Math.floor(Math.random() * (max - min + 1));
-            }
-            loot.set(drop.name, cur);
-          });
-        }
+      await applyRewards(party, totalFinalExp, totalFinalGold, finalLoot);
+      renderResult({
+        tickets: n, runs: totalRuns, wins: totalWins, spent: totalSpent,
+        exp: totalRawExp, gold: totalRawGold, finalExp: totalFinalExp, finalGold: totalFinalGold, finalLoot,
       });
-      const finalLoot = [...loot.values()].filter((l) => l.quantity > 0);
 
-      await applyRewards(party, finalExp, finalGold, finalLoot);
-      renderResult({ runs, wins, spent, exp, gold, finalExp, finalGold, finalLoot, killCounts: [...killCounts.entries()] });
-
-      btn.textContent = "파견 보내기";
+      btn1.textContent = "파견 보내기";
+      btnN.textContent = `×${BATCH_SIZE} 한꺼번에 보내기`;
       renderPre(); renderMembers();
     }, 30);
-  });
+  }
+
+  $("#goBtn").addEventListener("click", () => runDispatch(1));
+  $("#goBtnBatch").addEventListener("click", () => runDispatch(BATCH_SIZE));
 
   async function applyRewards(party, exp, gold, lootList) {
     // 경험치 — 파견에 나간 용병 전원에게 동일 지급(전투 결과와 같은 규칙).
@@ -471,9 +528,10 @@
   }
 
   function renderResult(r) {
+    const ticketHint = r.tickets > 1 ? `의뢰권 ${r.tickets}장 · ` : "";
     $("#resultArea").innerHTML = `
       <div class="block">
-        <h2 class="section-title">파견 결과 <span class="hint">${r.runs}회 전투 · ${r.spent.toLocaleString()}턴 소모</span></h2>
+        <h2 class="section-title">파견 결과 <span class="hint">${ticketHint}${r.runs}회 전투 · ${r.spent.toLocaleString()}턴 소모</span></h2>
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-label">전투 횟수</div><div class="stat-value">${r.runs}</div></div>
           <div class="stat-card"><div class="stat-label">승률</div>
