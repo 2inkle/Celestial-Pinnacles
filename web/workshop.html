@@ -496,14 +496,16 @@
       if (!def || currentGold < def.appraisalCost) return;
       b.disabled = true;
 
-      const { error: goldError } = await window.sbClient.from("profiles")
-        .update({ gold: currentGold - def.appraisalCost }).eq("user_id", session.user.id);
+      // 절대값 덮어쓰기 대신 adjust_gold() RPC로 증감분만 원자적으로 적용
+      // (2026-09-09).
+      const { data: newGold, error: goldError } = await window.sbClient
+        .rpc("adjust_gold", { p_delta: -def.appraisalCost });
       if (goldError) { alert(`감정 실패: ${goldError.message}`); b.disabled = false; return; }
       const { error: itemError } = await window.sbClient.from("warehouse_items")
         .update({ appraised: true }).eq("id", id);
       if (itemError) { alert(`감정 실패: ${itemError.message}`); b.disabled = false; return; }
 
-      currentGold -= def.appraisalCost;
+      currentGold = newGold;
       await refreshWarehousePool();
       render();
     }));

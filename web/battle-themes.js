@@ -99,7 +99,7 @@
         { id: "cave-floor-4", name: "무너지는 천장", requirements: [
           { type: "hasItem", value: "동굴 3층 지도" },
         ] },
-        { id: "cave-floor-5", name: "동굴 심층(미정)", requirements: [
+        { id: "cave-floor-5", name: "심층의 제단", requirements: [
           { type: "hasItem", value: "동굴 4층 지도" },
         ] },
       ],

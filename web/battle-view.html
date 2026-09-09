@@ -721,11 +721,13 @@
     }
 
     if (result.goldGained) {
-      const next = currentGold + result.goldGained;
-      const { error } = await window.sbClient.from("profiles")
-        .update({ gold: next }).eq("user_id", session.user.id);
+      // 절대값 덮어쓰기 대신 adjust_gold() RPC로 증감분만 원자적으로
+      // 적용(2026-09-09) — 전투 정산 사이 다른 경로로 골드가 바뀌었어도
+      // 그 변동분을 지우지 않음.
+      const { data: newGold, error } = await window.sbClient
+        .rpc("adjust_gold", { p_delta: result.goldGained });
       if (error) alert(`골드 저장 실패: ${error.message}`);
-      else currentGold = next;
+      else currentGold = newGold;
     }
 
     for (const loot of result.lootGained) {

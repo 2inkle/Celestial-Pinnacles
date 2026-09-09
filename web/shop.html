@@ -1158,10 +1158,16 @@
       cart[it.name] = 0; // 구매 완료했으니 장바구니에서 비움
     }
 
-    const { error: goldError } = await window.sbClient.from("profiles")
-      .update({ gold: currentGold - total }).eq("user_id", session.user.id);
+    // 절대값 덮어쓰기(currentGold - total) 대신 증감분만 서버로 보내
+    // adjust_gold() RPC가 원자적으로 gold -= total을 적용하게 함(2026-09-09) —
+    // 이 탭이 열려있는 사이 경매장 등 외부 경로로 골드가 바뀌었어도 그
+    // 변동분을 덮어쓰지 않음. RPC 자체가 "gold - total >= 0"까지 원자적으로
+    // 검사하므로 이중 방어(위 total > getGold() 체크)가 뚫려도 마이너스로
+    // 안 내려감.
+    const { data: newGold, error: goldError } = await window.sbClient
+      .rpc("adjust_gold", { p_delta: -total });
     if (goldError) { alert(`구매 실패: ${goldError.message}`); if (confirmBtn) confirmBtn.disabled = false; return; }
-    currentGold -= total;
+    currentGold = newGold;
 
     closeModal();
     document.getElementById("goldBadge").textContent = `💰 ${getGold().toLocaleString()} G`;
@@ -1244,10 +1250,10 @@
         .update({ quantity: w.quantity - qty }).eq("id", w.id);
       if (error) { alert(`판매 실패: ${error.message}`); return; }
     }
-    const { error: goldError } = await window.sbClient.from("profiles")
-      .update({ gold: currentGold + total }).eq("user_id", session.user.id);
+    const { data: newGold, error: goldError } = await window.sbClient
+      .rpc("adjust_gold", { p_delta: total });
     if (goldError) { alert(`판매 실패: ${goldError.message}`); return; }
-    currentGold += total;
+    currentGold = newGold;
 
     const { data, error: refetchError } = await window.sbClient
       .from("warehouse_items").select("*").eq("user_id", session.user.id);

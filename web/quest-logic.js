@@ -117,8 +117,9 @@
   async function grantRewards(session, rewards) {
     for (const reward of rewards) {
       if (reward.type === "gold") {
-        const { data: profile } = await window.sbClient.from("profiles").select("gold").eq("user_id", session.user.id).single();
-        await window.sbClient.from("profiles").update({ gold: (profile.gold || 0) + reward.amount }).eq("user_id", session.user.id);
+        // 절대값 덮어쓰기(읽고→더하고→쓰기) 대신 adjust_gold() RPC로
+        // 증감분만 원자적으로 적용(2026-09-09).
+        await window.sbClient.rpc("adjust_gold", { p_delta: reward.amount });
       } else if (reward.type === "item") {
         const { name, category, quantity, ...spec } = reward;
         const { data: existing } = category !== "equipment"

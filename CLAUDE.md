@@ -6,6 +6,153 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## [P0 선행 버그 해결] 골드 절대값 쓰기 → adjust_gold() RPC로 증감분 원자 적용 (2026-09-09)
+
+위 "타 플레이어 상호작용" 섹션에서 "경매장 배포 전에 반드시 먼저 고칠 것"으로
+못박아뒀던 선행 버그를 해결함. 사용자가 원인과 해법 방향을 직접 정확히
+짚음 — "①소지한 골드를 불러오고 → ②얻거나 사용한 다음 → ③그 절대값을
+유저 정보에 쏘기 때문에 생기는 문제다. 앞으로는 골드 총량이 아니라 그
+행동으로 증감하는 양만 보내고, 소비의 경우 마이너스가 안 되게 서버에서
+막아야 한다."
+
+**구현**: `supabase/migrations/0033_adjust_gold_rpc.sql`(신규, **미실행**) —
+`adjust_gold(p_delta integer) returns integer`, `security definer`,
+`auth.uid()`로만 본인 행 판별(파라미터로 유저를 안 받음 — 경매장 RPC와
+같은 원칙). 핵심은 단일 UPDATE 문 안에서 증감과 하한 검사를 동시에 함:
+```sql
+update public.profiles
+set gold = gold + p_delta
+where user_id = auth.uid() and gold + p_delta >= 0
+returning gold into v_new_gold;
+```
+`gold + p_delta >= 0`을 WHERE 절에 넣었기 때문에, 이 갱신은 "현재 골드를
+읽어서 확인 후 쓰는" 두 단계가 아니라 **DB가 그 순간의 실제 행 값을 대상으로
+단일 원자 연산으로 검사+적용을 동시에** 한다 — 그래서 애초에 사용자가
+지적한 "①읽기 ②계산 ③쓰기" 사이의 경쟁 구간 자체가 성립하지 않는다.
+조건에 안 걸리면(마이너스가 되는 소비 시도) `v_new_gold`가 NULL로 남고
+`insufficient_gold` 예외를 던져 호출부가 실패로 처리하게 함.
+
+**클라이언트 쪽 9개 호출부를 전부 이 RPC로 교체**(문서에 원래 기록돼
+있던 shop.html/battle-view.html/dispatch.html 세 곳 외에, 실제로 같은
+"절대값 덮어쓰기" 패턴이 있는 곳을 전수 검색해서 6곳을 더 찾음 —
+`grep -rn "update({ gold:" web/*.html web/*.js`로 확인):
+- `shop.html` 구매(1162행 근방)/판매(1248행 근방)
+- `battle-view.html` 전투 승리 보상(726행 근방)
+- `dispatch.html` 파견 정산(500행 근방)
+- `hire.html` 고용비 차감(354행 근방)
+- `refinery.html` 강화 비용 차감(464행 근방)
+- `workshop.html` 감정 비용 차감(500행 근방)
+- `roster-index.html` 튜토리얼 골드 보상(269행 근방, 원래 캐시된
+  `currentGold`도 아니고 그 자리에서 다시 읽어서 쓰는 read-then-write라
+  경쟁 구간이 더 넓었던 케이스)
+- `quest-logic.js`의 `grantRewards()`(121행 근방, 임무 보상 — guild.html/
+  quest-detail.html 양쪽에서 공유되는 공용 함수라 한 곳만 고치면 두
+  화면 다 적용됨)
+
+전부 `sbClient.rpc("adjust_gold", { p_delta })`로 바꾸고, RPC가 돌려주는
+`returning gold`(그 트랜잭션 직후의 실제 서버 값)를 그대로 `currentGold`에
+대입 — 예전처럼 클라이언트가 스스로 `currentGold ± amount`를 계산해서
+로컬 변수를 갱신하지 않음(그 계산 자체가 스냅샷 기반이라 부정확해질 수
+있으므로, 서버가 확정한 값을 그대로 신뢰).
+
+**의도적으로 안 건드린 곳**: `village.html`의 `.update({ gold: 3000 })`
+(관리자 전용 "골드 3000으로 리셋" 개발자 버튼)는 그대로 둠 — 이건
+"행동에 따른 증감"이 아니라 명시적인 절대값 재설정이 목적 그 자체라
+delta 개념이 아예 안 맞음.
+
+**남아있는 참고**: 상점 구매(`shop.html`)/고용(`hire.html`)은 여전히
+"아이템/캐릭터를 먼저 insert한 뒤 골드를 차감"하는 순서라, 골드 RPC가
+`insufficient_gold`로 실패하면 그 직전에 만들어진 아이템/캐릭터는 이미
+지급된 채로 남는다(클라이언트 사전 체크 `if (total > getGold()) return`
+가 정상 경로에서는 이걸 막지만, 그 체크 자체는 스냅샷 기반이라 완전한
+방어는 아님). 이번 수정 범위는 "골드 값 자체가 외부 변동을 지워버리는"
+원래 신고된 문제에 한정 — 지급 순서를 "골드 먼저 차감 후 실패 시 롤백"
+으로 바꾸는 건 별개의 트랜잭션 설계 문제라 이번엔 손 안 댐(필요해지면
+다음에 별도로 다룰 것).
+
+**검증**: `node --check` 상당의 구문 검증(inline `<script>` 블록을
+`new Function()`으로 파싱)을 8개 파일 전부 통과, `node index.js`+전체
+`demo-*.js`(51개) 회귀 통과(엔진 로직 무관 — 회귀 없음 확인 차원).
+**Node에 Postgres가 없어 이 세션에선 RPC 자체의 실제 원자성/동시성을
+실행 검증은 못 함** — 마이그레이션을 Supabase Dashboard SQL Editor에서
+실행한 뒤, 실제 로그인 세션으로 (1) 정상 구매/판매/고용/강화/감정/전투
+보상/파견 보상/임무 보상/튜토리얼 보상이 여전히 정확히 반영되는지,
+(2) 골드보다 비싼 구매를 강제로 시도했을 때 `insufficient_gold`로
+정확히 거부되고 아이템/골드 둘 다 안 바뀌는지 다음 세션에서 실측 필요.
+
+## 동굴 5층 보스 "심층 수호자" 데이터 작성 완료 (2026-09-09)
+
+`0025`~`0031`은 사용자가 실제 Supabase에서 전부 실행 완료했다고 확인함
+(순서: `0025`+`0026`(어느 쪽이든) → `0027` → `0028`, 그 뒤 `0029`/`0030`/
+`0031`은 순서 무관 — 위 각 항목 참고). 이번엔 그동안 "메커니즘·엔진
+인프라만 있고 실제 데이터가 없던" 동굴 5층 보스(`boss-summon-safety-
+mechanism-2026-08-25`에서 이미 병합된 `MY_SIDE_ALIVE_COUNT_LTE`/
+`RANDOM_CHANCE_PCT`/`SUMMON`/`guardAllies` 몬스터 경로)를 실제로 채움.
+
+**신규 몬스터 `cave_depth_guardian`("심층 수호자")** —
+`supabase/migrations/0032_add_cave_floor5_boss.sql`(신규, **미실행**):
+- **스탯**: `maxHp` 52,000→**200,000**(약 3.8배), `realDef`/`realMdef`
+  35→**45**. 근거: "[P0 밸런스 리스크]" 섹션에서 무버프 Lv20 스나이퍼의
+  Hurricane Shot 단발이 러프 스탯 기준 보스 HP의 24.2%를 깎는다고
+  확인했었고, "실전 상한버프 상황"까지 감안하면 더 심각할 수 있다고
+  결론냈던 것을 이번에 상향으로 대응함. `EHP≈363,600`(200,000/0.55)으로
+  고블린의 왕 EHP(≈51,100)의 약 7.1배 — 기존에 이미 승인됐던 "1.56배"
+  기준보다 한층 더 무겁게 잡음. **연타점감 공식 자체(복리화+10%하한
+  절충안)는 여전히 미구현**이라 이번 상향만으로 P0가 완전히 해소된다고
+  단정할 수 없음 — 다음에 그 공식 개편이 들어가면 이 수치도 `simulate.js`로
+  재검증할 것(1티어는 "구조가 서 있는가"만 맞추면 된다는 기존 스코프
+  원칙에 따라, 이번엔 정밀한 하한선 보장이 아니라 방향성 있는 상향만 함).
+  `realDef<100` 유지 원칙(자기강화 슬롯 전제조건)은 그대로 지킴.
+- **패턴**(2026-08-25 확정안 그대로 구현, 엔진 변경 없음 — 기존에 병합된
+  조건/액션만 재사용): ①`teamAlone`(andNext) + `randomChancePct:33` →
+  `SUMMON`(H=`cave_earth_spirit` 재소환 안전장치, 최상위 우선순위) ②`battleTurnMultiple:3`
+  → 신규 스킬 "돌기갑 강화"(`combatStatUpPercent def+30`, `maxUses:3`,
+  H(2턴마다·35%)보다 뜸하고 약하게) ③`always` → 신규 스킬 "붕괴의
+  일격"(`str24/atk38/coefficient1.6`, `preDelayType:"casting"`으로 전조,
+  `postDelay:60`으로 회복 지연 — "좁고 깊게" 원칙, raw는 2026-08-25에
+  이미 승인된 800~1100 범위 안). `guardAllies:true`로 자신을 전열+아군
+  보호로 세워 소환된 H가 단일/다수타겟엔 안 저격당하게 함(전체타겟
+  공격은 이 보호가 안 먹히는 기존 규칙 그대로).
+- **보스는 처치 가능**(RETREAT 없음) — goblin_cart/unknown_entity/
+  raid_deep_dweller와 달리 "졸업 시험"이라 그냥 죽는 보스로 확정.
+  `tier:"boss"`라 결과 화면 HP는 여전히 은폐됨.
+- 신규 스킬 2종은 `skillTable.jobSkills."동굴 몬스터"` 배열에
+  `jsonb_set`+`||` append로 추가(기존 12종은 안 건드림, `0025`와 같은
+  job 버킷 재사용 — 실제 PC 직업이 아니라서 플레이어 스킬트리 오염 없음).
+- `dropTable`은 기존 동굴 재료(철광석/정동석/돌)만 담음.
+
+**보류(다음 세션)**: "심층 수호자의 카드"(BOSS 등급 개조 아이템, 개조비용
+100,000G — `card-modification-item-concept-2026-08-25`의 컨벤션대로
+4대 스탯 조합)와 "Heart of Deepstone"(보스 전용 고유 드랍, weight
+4~5·combatBonus.def/mdef 100~150·maxHpBonus 400~600 — `cave-card-theme-
+and-boss-drop-2026-08-25`의 러프 스펙)은 원래도 "보스 실제 데이터가
+확정되면 함께 작성"으로 예정돼 있던 후속 작업 — 보스 자체의 존재·전투
+성립을 먼저 마무리하고 이번엔 미룸. `shop.html`의
+`NAMED_SELL_PRICE_OVERRIDES`에도 Heart of Deepstone이 생기면
+1,000,000G로 등록할 것(기존에 이미 남겨둔 체크리스트).
+
+**`web/battle-encounters.js`/`web/battle-themes.js`(정적 코드, 직접
+반영됨)**: `BATTLE_MONSTER_POOLS["cave-floor-5"]` 신설
+(`maxCount:2`, H+보스 둘 다 `guaranteed:true` — "H+보스 단 둘로 제한"
+컨셉 그대로, 필러 없음). `cave-floor-5`의 표시명을 "동굴 심층(미정)"→
+**"심층의 제단"**으로 확정(요구조건 `hasItem:"동굴 4층 지도"`는 그대로).
+
+**검증**: `node --check` 통과, `node index.js`+전체 `demo-*.js`(51개)
+회귀 통과(순수 데이터 추가라 회귀는 원래도 무관 — 확인 차원). 이 세션은
+Node/`simulate.js`가 있는 주 워크스페이스라 `loadAdapterEnv()`로 실제
+`battle-adapter.js`를 얹어 직접 검증함: ①보스 캐릭터 빌드가 크래시
+없이 되고 `guardAllies:true`/`patternSlots.length:3`(AND 체이닝이
+`teamAlone`+`randomChancePct`를 슬롯 1개로 정확히 합침)/`maxHp:200000`/
+`realDef:45`/`creatureTier:"boss"` 전부 정확함, ②`summonPool`이
+`cave_earth_spirit` 스펙으로 정확히 해석됨, ③실제 난수(vm 샌드박스는
+Math 객체가 outer Node와 분리돼 있어 `Math.random` 모킹이 안 먹힘 —
+30회 미모킹 시행에 60턴씩 돌려 실측)로 30회 중 최소 1회 이상 실제로
+소환이 발동함을 확인, ④단독 캐릭터 대 보스 50회 반복 시뮬이 크래시 없이
+정상 종료됨(승패 자체는 1인 임시 캐릭터 대상이라 밸런스 검증용 아님,
+엔진 건강성 확인용). **실전 파티 단위 승률/체감은 여전히 미검증** —
+`simulate.js`로 실제 5인 파티 벤치마크(예: `"???"` 검증 때 썼던 방식)를
+돌려보는 건 다음 세션 과제로 남김.
+
 ## 고블린 마차 "직접 처치" — 우연한 엔진 현상을 이스터에그로 승격 (2026-09-07)
 
 사용자가 실전 공략 중 "고블린 마차가 퇴각이 아니라 직접 처치되는 경우가
@@ -315,12 +462,14 @@ append-only `gold_ledger` — 위조를 막지는 못하지만
 `sum(delta)+초기값 <> profiles.gold`가 오탐 없는 탐지기가 되고 잘못된 거래를
 되돌릴 근거가 된다.
 
-### ⚠ 선행 수정 필요한 실제 버그(치팅 아님 — 정상 플레이어가 당함)
+### ⚠ 선행 수정 필요했던 실제 버그(치팅 아님 — 정상 플레이어가 당함) — **2026-09-09 해결됨**
 `shop.html`은 페이지 로드 시점 골드를 JS 변수(`currentGold`)에 들고 있다가
-`{ gold: currentGold - total }` **절대값**으로 쓴다(1161/1247행 근방).
-`battle-view.html`(596행 근방)도 같다. **상점을 열어둔 채 내 경매가 낙찰되면,
-다음 구매가 낙찰 이전 스냅샷 기준으로 골드를 덮어써서 판매대금이 증발한다.**
-경매장 배포 전에 이 세 곳을 상대 갱신(또는 구매/판매 전용 RPC)으로 바꿀 것.
+`{ gold: currentGold - total }` **절대값**으로 썼다(당시 1161/1247행 근방).
+`battle-view.html`(당시 596행 근방)도 같았다. **상점을 열어둔 채 내 경매가
+낙찰되면, 다음 구매가 낙찰 이전 스냅샷 기준으로 골드를 덮어써서 판매대금이
+증발한다.** → 파일 맨 위 "[P0 선행 버그 해결] 골드 절대값 쓰기 →
+adjust_gold() RPC로 증감분 원자 적용" 섹션에서 `adjust_gold()` RPC(구매/
+판매 전용이 아니라 게임 전체 골드 증감 공용)로 교체 완료.
 
 ### 관통 원칙 — "읽기는 넓게, 쓰기는 RPC로만"
 - 새 테이블은 **select 정책만** 만들고 INSERT/UPDATE/DELETE 정책을 **아예 안
@@ -424,8 +573,12 @@ append-only `gold_ledger` — 위조를 막지는 못하지만
 서버사이드 이식이 필요한 별개의 큰 작업.
 
 ### 다음 세션에서 이어갈 것
-1. **선행**: `shop.html`/`battle-view.html`의 절대값 골드 쓰기를 상대 갱신으로
-   교체(위 "실제 버그" 항목). 경매장 배포보다 먼저.
+1. ~~**선행**: `shop.html`/`battle-view.html`의 절대값 골드 쓰기를 상대 갱신으로
+   교체(위 "실제 버그" 항목). 경매장 배포보다 먼저.~~ → **완료(2026-09-09)**,
+   파일 맨 위 "[P0 선행 버그 해결] 골드 절대값 쓰기 → adjust_gold() RPC로
+   증감분 원자 적용" 섹션 참고 — `shop.html`/`battle-view.html`뿐 아니라
+   같은 패턴이 있던 6곳(dispatch/hire/refinery/workshop/roster-index/
+   quest-logic)도 함께 고침.
 2. `0026`/`0027` 실제 실행(Supabase 콘솔) — 실행 전까지 라이브 반영 0.
    `0026`을 먼저(0027이 `_grant_item_snapshot`을 재사용).
 3. `game_content`에 `raidTable` 시드 + 실제 레이드 보스/기믹 데이터.
@@ -1855,10 +2008,10 @@ Supabase에 직접 적용해야 실제 게임에 반영됨, "0024" 때와 같은
 3. `initBonusDef` 엔진 개편(위 섹션)이 반영되면 이 9종의 HP/realDef를
    그에 맞춰 재조정 — bonusDef 기반으로 옮겨가면 HP는 오히려 지금보다
    낮춰도 될 가능성이 큼.
-4. 5층(보스/AFTERMATH) 몬스터 데이터·`BATTLE_MONSTER_POOLS` 항목 추가 —
-   보스 자체 스탯(HP52,000/DEF35)은 이미 확정돼 있으니
-   (`cave-boss-balance-risk-p0-2026-08-25`) 몬스터 데이터 마이그레이션만
-   남음(게이팅 `hasItem` 조건은 이미 걸려 있음).
+4. ~~5층(보스/AFTERMATH) 몬스터 데이터·`BATTLE_MONSTER_POOLS` 항목 추가~~
+   → **완료(2026-09-09)**, 파일 맨 위 "동굴 5층 보스 '심층 수호자'
+   데이터 작성 완료" 섹션 참고 — 스탯은 P0 우려를 반영해 HP52,000/DEF35→
+   HP200,000/DEF45로 상향해서 반영함(원안 그대로가 아님).
 
 ## 상점 "판매" 기능 신설 — 개별 가격 대신 희귀도 등급으로만 매김 (2026-08-31)
 

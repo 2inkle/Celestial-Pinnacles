@@ -137,6 +137,16 @@
         { monsterId: "cave_crystal_golem", row: "front", weight: 40, maxAppearances: 1 },
       ],
     },
+    // 5층 — H(대지정령)+보스(심층 수호자) 단 둘로 제한, 필러 없음(2026-08-25
+    // 컨셉 확정 그대로). 둘 다 guaranteed:true라 매 판 정확히 이 조합으로
+    // 시작하고, H가 죽으면 보스의 SUMMON 안전장치가 재소환함(엔진 패턴).
+    "cave-floor-5": {
+      maxCount: 2,
+      pool: [
+        { monsterId: "cave_earth_spirit", row: "front", weight: 0, maxAppearances: 1, guaranteed: true },
+        { monsterId: "cave_depth_guardian", row: "front", weight: 0, maxAppearances: 1, guaranteed: true },
+      ],
+    },
     // 협동 레이드(2026-08-31) — 보스 단독 등장. 잡몹은 보스의 SUMMON_OPENING이
     // 직접 부르므로 풀에 안 넣는다("adds-clear" 기믹이 그 소환체를 대상으로 함).
     //

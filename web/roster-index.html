@@ -262,11 +262,9 @@
     for (const reward of (step.rewards || [])) {
       if (reward.type === "gold") {
         if (!reward.amount) continue;
-        const { data: profile, error: readErr } = await window.sbClient
-          .from("profiles").select("gold").eq("user_id", tutorialCtx.userId).single();
-        if (readErr) throw readErr;
-        const { error } = await window.sbClient.from("profiles")
-          .update({ gold: (profile.gold || 0) + reward.amount }).eq("user_id", tutorialCtx.userId);
+        // 절대값 덮어쓰기(읽고→더하고→쓰기) 대신 adjust_gold() RPC로
+        // 증감분만 원자적으로 적용(2026-09-09).
+        const { error } = await window.sbClient.rpc("adjust_gold", { p_delta: reward.amount });
         if (error) throw error;
       } else if (reward.type === "item") {
         // quest-table.js의 보상 지급과 같은 "카탈로그 필드 spread" 방식.

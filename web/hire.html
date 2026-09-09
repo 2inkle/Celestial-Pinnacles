@@ -338,28 +338,24 @@
     const character = buildCharacter(name, job);
     character.user_id = session.user.id;
 
-    // 골드 차감은 이 시점에 클라이언트가 들고 있는 currentGold 값 기준(원자적
-    // 갱신 아님) — 예전 localStorage 방식의 read-modify-write와 동일한 수준의
-    // 위험만 있음(단일 유저·단일 탭 사용을 전제로 한 테스트 빌드라 지금은
-    // 허용). 서버 검증/원자적 처리는 CLAUDE.md의 "API 단계에서 검증/방어가
-    // 필요한 지점"에 정리된 더 큰 과제와 함께 나중에 다룰 것.
     const { error: insertError } = await window.sbClient.from("characters").insert(character);
     if (insertError) {
       fieldError.textContent = `고용 실패: ${insertError.message}`;
       hireBtn.disabled = false;
       return;
     }
-    const { error: goldError } = await window.sbClient
-      .from("profiles")
-      .update({ gold: currentGold - cost })
-      .eq("user_id", session.user.id);
+    // 절대값 덮어쓰기 대신 adjust_gold() RPC로 증감분만 원자적으로
+    // 적용(2026-09-09) — "insufficient_gold"면 RPC가 거부함(위 currentGold
+    // 사전 체크는 UX 안내용, 실제 방어는 서버 쪽 원자 검사).
+    const { data: newGold, error: goldError } = await window.sbClient
+      .rpc("adjust_gold", { p_delta: -cost });
     if (goldError) {
       fieldError.textContent = `골드 차감 실패: ${goldError.message}`;
       hireBtn.disabled = false;
       return;
     }
 
-    currentGold -= cost;
+    currentGold = newGold;
     showToast(`${name}(${job})이(가) 용병단에 합류했습니다.`);
     nameInput.value = "";
     updatePreview();

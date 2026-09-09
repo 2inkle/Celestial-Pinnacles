@@ -495,11 +495,13 @@
     }
 
     if (gold) {
-      const next = currentGold + gold;
-      const { error } = await window.sbClient.from("profiles")
-        .update({ gold: next }).eq("user_id", session.user.id);
+      // 절대값 덮어쓰기 대신 adjust_gold() RPC로 증감분만 원자적으로
+      // 적용(2026-09-09) — 파견 정산 사이 다른 경로로 골드가 바뀌었어도
+      // 그 변동분을 지우지 않음.
+      const { data: newGold, error } = await window.sbClient
+        .rpc("adjust_gold", { p_delta: gold });
       if (error) alert(`골드 저장 실패: ${error.message}`);
-      else currentGold = next;
+      else currentGold = newGold;
     }
 
     // 전리품 병합 — 병합 조건은 상점 구매/직접 전투와 동일. held_by(누군가
