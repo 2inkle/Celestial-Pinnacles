@@ -91,16 +91,28 @@
 
 <main id="mainArea"></main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
-  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
-    document.body.innerHTML = `
-      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
-        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
-      </div>
-    `;
-    throw new Error("access-denied");
-  }
+  // 개발자 도구 전용 페이지 — profiles.is_admin 기준으로 접근 자체를 막음
+  // (dev-tools.html과 동일한 이유로 2026-09-09에 고침 — 예전 localStorage
+  // 기반 판정은 사실상 항상 통과했음). 이 페이지 자체는 여전히 로그인한
+  // 브라우저의 localStorage(battleSim_featureRequests)에만 저장하는 순수
+  // 메모장이라(DB 연결 없음) 데이터 유출 위험은 없지만, 관리자 전용 도구를
+  // URL만 알면 아무나 열 수 있는 상태로 두지 않기 위해 통일함.
+  (async () => {
+    const session = await window.AuthGuard.requireSession();
+    const isAdmin = await window.AuthGuard.isAdmin(session);
+    if (!isAdmin) {
+      document.body.innerHTML = `
+        <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+          🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+        </div>
+      `;
+      throw new Error("access-denied");
+    }
+  })();
 
   // ============================================================================
   // 요청 목록 — [{title, description, done}] 배열. 순수하게 "적어두고 파일로

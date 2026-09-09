@@ -85,16 +85,29 @@
   </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-client.js"></script>
+<script src="auth-guard.js"></script>
 <script>
-  // 개발자 도구 전용 페이지 — 2inkle 계정이 아니면 접근 자체를 막음.
-  if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle") {
-    document.body.innerHTML = `
-      <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
-        🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
-      </div>
-    `;
-    throw new Error("access-denied");
-  }
+  // 개발자 도구 전용 페이지 — profiles.is_admin 기준으로 접근 자체를 막음.
+  // 예전엔 localStorage.getItem("battleSim_username")로 판정했는데, Discord
+  // OAuth 흐름이 이 키를 어디서도 set한 적이 없어서 항상 null →
+  // (null || "2inkle") === "2inkle"로 조건이 매번 통과 → 사실상 로그인한
+  // 누구나 이 페이지에 그대로 들어올 수 있었음(2026-09-09 전체 페이지 점검
+  // 중 발견 — nav.js는 이미 is_admin으로 링크 노출만 정확히 가리고 있었지만,
+  // URL을 직접 열면 이 페이지 자체의 게이트가 뚫려 있었던 것). monster-roster.html
+  // 등 나머지 에디터 5종과 동일한 AuthGuard.isAdmin() 패턴으로 통일함.
+  (async () => {
+    const session = await window.AuthGuard.requireSession();
+    const isAdmin = await window.AuthGuard.isAdmin(session);
+    if (!isAdmin) {
+      document.body.innerHTML = `
+        <div style="padding:80px 20px;text-align:center;font-family:'JetBrains Mono',monospace;color:#726d87;">
+          🔒 개발자 도구 전용 페이지입니다.<br/><a href="roster-index.html" style="color:#d9b45c;">← 홈으로</a>
+        </div>
+      `;
+    }
+  })();
 </script>
 </body>
 </html>

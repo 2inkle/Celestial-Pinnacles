@@ -110,13 +110,16 @@
     <button class="section-tab active" data-section="dispatch">📋 Expedition</button>
     <button class="section-tab" data-section="aftermath">⚔️ AFTERMATH</button>
   </div>
-  <div class="mock-badge">⚠ 초안 — 테마/전투 목록만 존재, 실제 난이도·보상·적 편성은 미구현</div>
 </header>
 
 <main>
   <div id="themeList"></div>
 
-  <div class="dev-panel">
+  <!-- 해금 조건 강제 처리/초기화 도구 — 실제 플레이어가 진행을 건너뛰는
+       치트 경로가 되므로 관리자에게만 노출(부트스트랩에서 is_admin 확인 후
+       표시). 기본은 숨김 = 페일클로즈(village.html 개발자 도구 footer와
+       동일한 패턴, 2026-09-09). -->
+  <div class="dev-panel" id="devPanel" style="display:none;">
     <div class="dev-panel-title">🧪 테스트 도구 — 해금 조건 확인용, 실제 진행과 무관</div>
     <div class="dev-row">
       <span>"고블린과 놀기" 승리 처리</span>
@@ -420,6 +423,9 @@
   // ============================================================================
   (async () => {
     session = await window.AuthGuard.requireSession();
+    if (await window.AuthGuard.isAdmin(session)) {
+      document.getElementById("devPanel").style.display = "";
+    }
     await Promise.all([refreshBattleProgress(), refreshWarehouseItems()]);
     render();
   })();
