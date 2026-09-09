@@ -6,6 +6,95 @@ JS로 만드는 턴제 전투 시뮬레이션 웹게임. 패턴 빌드로 스킬
 테마(마을→왕국→그 뒤) 하나만 구현돼 있고, 이걸로 엔진과 성장곡선이
 유효한지 검증하는 게 목표.
 
+## 공개 배포 전 전체 페이지 점검 — 죽은 목업/배지 제거, 관리자 게이트 실제로 동작하게 수정 (2026-09-09)
+
+사용자가 "슬슬 테스트 빌드로 내놓을 생각"이라며 전체 페이지를 훑어 "일반
+유저가 볼 필요 없거나 쓸모없어진 기능"을 쳐내달라고 요청 — 예시로 "마을의
+전투 초안"을 언급함. 27개 `web/*.html` 전부를 `목업`/`초안`/`준비 중`/
+`mock-badge`/`localStorage.*username` 등으로 훑어서 실제로 낡은 것과
+정상적인(테스트 빌드 안내용) 것을 구분함.
+
+**가장 심각했던 발견 — 사이트 루트가 실제 게임이 아니라 옛 README를
+보여주고 있었음**: 저장소 루트에 `index.html`이 없어서, GitHub Pages
+(Jekyll)가 `README.md`(Node 실행법·`web/index.html` 더블클릭 안내가 담긴
+아주 초기 단계 문서, CLAUDE.md에 이미 "낡아서 참고하지 말 것"으로 기록돼
+있던 그 파일)를 자동으로 사이트 홈페이지로 렌더링하고 있었다 —
+`curl https://2inkle.github.io/Celestial-Pinnacles/`로 직접 확인함(title
+"Battle Sim Core", `node index.js`/`web/index.html`을 더블클릭해서 열라는
+안내가 그대로 노출). 실제 게임 진입점(`web/login.html`)은 살아있었지만
+(`.../web/login.html` 200 확인), **바로 그 루트 URL을 공유하면 아무도
+게임에 못 들어가는 상태**였음. 저장소 루트에 `index.html`(즉시
+`web/login.html`로 리다이렉트)을 신설해서 해결 — Jekyll은 루트에
+`index.html`이 있으면 README 자동 렌더링을 안 함.
+
+**두 번째로 심각한 발견 — 관리자 전용 페이지 2곳의 접근 차단이 실제로는
+항상 통과하는 죽은 조건**: `dev-tools.html`/`feature-requests.html`이
+`if ((localStorage.getItem("battleSim_username") || "2inkle") !== "2inkle")`
+로 접근을 막고 있었는데, Discord OAuth 로그인 흐름은 이 localStorage 키를
+어디서도 set한 적이 없다(nav.js 2026-08-14 주석에 이미 정확히 같은 문제가
+기록돼 있었음 — 그때는 nav.js의 노출 조건만 고쳤고, 이 두 페이지 자체의
+게이트는 안 고쳐진 채 남아있었던 것). 결과: `localStorage.getItem(...)`은
+항상 `null` → `(null || "2inkle")` = `"2inkle"` → 조건이 매번 거짓 →
+**로그인한 사람이면 누구나 URL만 알면 그대로 들어갈 수 있었음**. 나머지
+에디터 5종(`monster-roster.html`/`monster-sheet.html`/`skill-table-
+editor.html`/`job-table-editor.html`/`shop-table-editor.html`)은 이미
+`AuthGuard.isAdmin()`으로 정확히 게이트돼 있었음(대조군으로 확인) — 이
+두 페이지가 예외였던 것. 같은 패턴으로 통일해서 수정.
+`feature-requests.html`은 애초에 `supabase-client.js`/`auth-guard.js`
+자체를 로드하지 않고 있어서 그 두 스크립트 태그도 추가함(이 페이지는
+localStorage(`battleSim_featureRequests`)에만 저장하는 순수 개인 메모장이라
+DB 데이터 유출 위험은 없었지만, "URL만 알면 아무나" 상태는 동일하게 막음).
+
+**세 번째 — `battle-select.html`의 "🧪 테스트 도구" 패널이 게이트 없이
+전체 로그인 유저에게 노출**: 해금 조건을 건너뛰고 전투를 강제로 클리어
+처리하거나(`devClearPlayBtn` 등), 게이팅 아이템(고블린 왕국 통행증)을
+스스로 지급하거나, 클리어 기록을 초기화하는 버튼들이 관리자 판별 없이
+그냥 화면에 있었음 — `village.html`의 개발자 도구 footer는 이미
+`is_admin` 확인 후에만 보이도록 돼 있었는데(2026-08-20), 이 페이지는 같은
+처리가 안 돼 있었던 것. `display:none` 기본값 + 부트스트랩에서
+`AuthGuard.isAdmin(session)`이 true일 때만 노출하도록 수정(village.html과
+동일한 페일클로즈 패턴).
+
+**나머지 — 낡은 안내 배지/죽은 링크 정리**:
+- `web/battle-result.html` 삭제 — 하드코딩된 `EXAMPLE_RESULT`를 보여주는
+  완전히 죽은 목업 페이지(`grep -rln "battle-result.html" web/*`로 확인한
+  결과 어디서도 링크하지 않음). 실제 결과 화면은 오래전부터
+  `battle-view.html`이 담당.
+- `login.html`: "⚠ 로그인/세션 감지 검증 단계 — 아직 실제 게임 데이터와
+  연결 안 됨" 배지 제거 — 로그인은 2026-08-14부터 실제 게임 데이터와
+  완전히 연결돼 있었음. **이 배지는 모든 방문자가 가장 먼저 보는 화면에
+  떠 있던 것이라 파급이 가장 컸음.**
+- `village.html`: 사용자가 예시로 든 그 항목 — "전투 (초안)" 카드
+  (`battle-view.html`에 배틀 파라미터 없이 바로 링크하는, 실제 전투
+  진입 경로가 아닌 죽은 링크) 제거. 헤더의 "⚠ 정적 목업 — 고용소·상점·
+  제련공방 동작, 조합소는 추후 구현 예정" 배지도 제거(고용소/상점/
+  제련공방은 이미 오래전에 라이브, "조합소"는 이미 `workshop.html`로
+  완성돼 있었는데 여전히 "준비 중" 플레이스홀더로 방치돼 있었음 — 실제
+  `workshop.html`로 연결).
+- `battle-select.html`: "⚠ 초안 — 테마/전투 목록만 존재, 실제 난이도·
+  보상·적 편성은 미구현" 배지 제거 — 이 페이지는 밸런싱·시뮬레이션까지
+  전부 끝난 라이브 던전 선택 화면.
+- `item.html`: "⚠ 정적 목업 — 실제 사용/소모·거래 기능은 미구현, 조회
+  전용" → "⚠ 조회 전용 — 장비 착용/해제는 Sheet, 구매/판매는 상점, 개조는
+  조합공방에서"로 정정 — "조회 전용"이라는 알맹이는 지금도 사실이라
+  (이 페이지엔 실제로 사용/장착/판매 버튼이 없음) 완전히 지우지 않고,
+  "정적 목업"이라는 틀린 부분만 고침.
+
+**손 안 댄 것**: `hire.html`/`roster-index.html`/`shop.html`/
+`character-sheet.html`/`refinery.html`의 "⚠ 테스트 빌드 — ..." 류
+배지는 지금도 정확한 정보(계정 저장 여부, 재고가 계정별인지 등)라 그대로
+둠 — "낡아서 틀린 것"과 "테스트 빌드 단계임을 정확히 알리는 것"을 구분해서
+후자는 유지함. `character-sheet.html`의 이미 관리자 전용 섹션 안에 있는
+죽은 버튼 4개("🧪 테스트용 무기 지급" 등, "ITEM_TABLE 제거로 갱신 예정"
+라벨 붙은 채 영구 비활성화)는 일반 유저에게 안 보이는 범위라 이번엔
+안 건드림 — 다음에 그 섹션을 손볼 때 같이 정리하면 됨.
+
+**검증**: `node --check` 상당(inline `<script>` 블록 `new Function()`
+파싱)으로 수정한 7개 파일 전부 통과, `node index.js`+전체 `demo-*.js`
+(51개) 회귀 통과(순수 UI/접근제어 변경이라 엔진 로직 무관 — 확인 차원).
+**실제 로그인 세션으로 admin/non-admin 두 계정 각각의 화면 차이를 실측하는
+건 다음 세션 필요** — 이 세션은 로그인 세션이 없어 코드 리뷰로만 확인함.
+
 ## [P0 선행 버그 해결] 골드 절대값 쓰기 → adjust_gold() RPC로 증감분 원자 적용 (2026-09-09)
 
 위 "타 플레이어 상호작용" 섹션에서 "경매장 배포 전에 반드시 먼저 고칠 것"으로
