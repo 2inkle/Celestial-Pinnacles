@@ -15,6 +15,7 @@
   }
 
 const { FactionResourceManager } = require("./resourceManager");
+const { Rng } = require("./rng");
 const { ConditionRegistry, ActionRegistry } = require("./registries");
 const { SkillRegistry } = require("./skillRegistry");
 const { PrepState, checkAffordability, payCosts } = require("./prepState");
@@ -543,9 +544,9 @@ class BattleEngine {
     }
 
     dropTable.forEach((drop) => {
-      if (Math.random() > drop.chance) return; // 확률 미충족 — 드랍 안 됨
+      if (Rng.random() > drop.chance) return; // 확률 미충족 — 드랍 안 됨
       const [min, max] = drop.quantity;
-      const qty = min + Math.floor(Math.random() * (max - min + 1));
+      const qty = min + Math.floor(Rng.random() * (max - min + 1));
       // name/category/chance/quantity 외의 나머지 필드(combatReal, weight,
       // twoHanded, passiveBonus, price, enhanceable 등)를 그대로 스펙으로
       // 넘김 — 상점 구매가 "스탯 전체를 창고에 실어서 저장"하는 것과 같은

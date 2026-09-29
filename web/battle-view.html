@@ -144,6 +144,7 @@
   <div class="battle-log-wrap" id="saveLogRow" style="display:none; margin-top:14px;"></div>
 </main>
 
+<script src="../src/rng.js"></script>
 <script src="../src/resourceTypes.js"></script>
 <script src="../src/resourceManager.js"></script>
 <script src="../src/skillRegistry.js"></script>
@@ -440,8 +441,7 @@
       : roster;
     party.forEach((p) => { if (p.activePresetIdx === undefined) p.activePresetIdx = 0; });
 
-    const enemies = spawnEnemies(battleId);
-    const enemySpawnKeys = enemies.map((e) => e.monsterId);
+    const enemySpawnKeys = spawnEnemies(battleId); // { monsterId, row } — row까지 그대로 넘김
 
     const logLines = [];
     const result = window.BattleAdapter.runBattle({

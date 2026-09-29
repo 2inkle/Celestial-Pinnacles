@@ -498,7 +498,7 @@
   //    문제는 "몬스터키#순번"으로 개체를 구분해서 해결함.
   //    monsterTable: battle-view.html의 MONSTER_TABLE 그대로 넘기면 됨.
   // ==========================================================================
-  function buildEnemyFromMonsterKey(monsterTable, monsterKey, instanceIndex) {
+  function buildEnemyFromMonsterKey(monsterTable, monsterKey, instanceIndex, row) {
     const monsterDef = monsterTable[monsterKey];
     if (!monsterDef) {
       console.error(`[battle-adapter] MONSTER_TABLE에 "${monsterKey}" 항목이 없음`);
@@ -512,11 +512,16 @@
     character.realMatk = monsterDef.combatReal?.matk || 0;
     character.realMdef = monsterDef.combatReal?.mdef || 0;
     character.realSummonEff = monsterDef.combatReal?.summonEff || 0; // 소환 능력이 있는 몬스터는 여기 값을 채워둬야 실제로 유의미한 소환이 됨
+    // 진형 — 전투 편성(BATTLE_MONSTER_POOLS)의 row가 우선, 없으면 몬스터
+    // 정의의 row, 둘 다 없으면 "front". 예전엔 이 인자 자체가 없어서 편성의
+    // row가 스폰 결과에서 버려졌고 적은 전원 전열이었음(2026-08-15 발견,
+    // 2026-09-29 수정) — 후열 우선 스킬(targetPriority:"backRow")이 적에게
+    // 한 번도 의미를 가진 적이 없었던 것.
+    character.row = row || monsterDef.row || "front";
     // 아군(플레이어) 빌드 경로(위쪽 buildAllyFromRoster)는 이미
     // guardAllies를 옮겨 심는데 몬스터 경로엔 대응하는 줄이 없었음
     // (2026-08-25 발견 — 동굴 보스가 소환한 아군을 "전열에서 지키는"
-    // 패턴을 만들려면 몬스터도 guardAllies를 켤 수 있어야 함). row는
-    // BattleCharacter 생성자 기본값이 이미 "front"라 별도 지정 불필요.
+    // 패턴을 만들려면 몬스터도 guardAllies를 켤 수 있어야 함).
     character.guardAllies = !!monsterDef.guardAllies;
     character.expReward = monsterDef.expReward || 0;
     character.goldReward = monsterDef.goldReward || 0;
@@ -580,8 +585,10 @@
   // 5) 실제 전투 실행 진입점.
   //   allyRosterChars: 로스터 캐릭터 배열(Sheet 형식 그대로)
   //   monsterTable: MONSTER_TABLE 그 자체(id로 조회하는 용도)
-  //   enemySpawnKeys: 스폰된 몬스터들의 키 배열(예: ["goblin_scout","goblin_scout","goblin_warrior"])
-  //     — 같은 키가 여러 번 있으면 자동으로 서로 다른 id(#0, #1, ...)를 붙여 구분함.
+  //   enemySpawnKeys: 스폰된 몬스터 목록. 각 원소는 키 문자열(예: "goblin_scout")
+  //     또는 spawnEnemies()의 결과 객체({ monsterId, row }) — 객체면 편성의 row를
+  //     그대로 적용함. 같은 키가 여러 번 있으면 자동으로 서로 다른 id(#0, #1, ...)를
+  //     붙여 구분함.
   // 어댑터는 이걸 "id로 직접 조회"함 — localStorage 조회나 스폰 확률 굴리기 자체는
   // 여전히 호출부(battle-view.html)의 몫이고, 여기선 "이미 정해진 스폰 결과(키
   // 목록)"를 받아 조회~변환~실행만 함.
@@ -591,10 +598,12 @@
 
     const monsterKeyCounts = {};
     const enemies = enemySpawnKeys
-      .map((key) => {
+      .map((spawn) => {
+        const key = typeof spawn === "string" ? spawn : spawn.monsterId;
+        const row = typeof spawn === "string" ? undefined : spawn.row;
         const idx = monsterKeyCounts[key] || 0;
         monsterKeyCounts[key] = idx + 1;
-        return buildEnemyFromMonsterKey(monsterTable, key, idx);
+        return buildEnemyFromMonsterKey(monsterTable, key, idx, row);
       })
       .filter(Boolean); // 테이블에 없는 키는 조용히 제외(에러는 이미 콘솔에 남김)
 

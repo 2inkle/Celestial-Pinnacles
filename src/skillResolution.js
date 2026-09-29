@@ -15,6 +15,7 @@
   }
 
 const { computeSkillPower, applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
+const { Rng } = require("./rng");
 const { TEAM_RESOURCE_TYPES, PERSONAL_RESOURCE_TYPES } = require("./resourceTypes");
 
 // 한국어 조사(받침 유무에 따른 이/가) 자동 처리 — engine.js/registries.js에도
@@ -79,7 +80,7 @@ function statChangeLine(target, amount, label, before, after) {
 // 추가하면 됨.
 // ============================================================================
 function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Rng.random() * arr.length)];
 }
 
 // ============================================================================
@@ -850,7 +851,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
     // 소모시키지 않음(애초에 안 닿았으니까).
     if (skill.skillType === "physical" && skill.targetFaction === "enemy") {
       const hitChancePct = BASE_PHYSICAL_HIT_CHANCE_PCT + actor.getPassiveModValue("accuracyBonusPct");
-      if (Math.random() * 100 >= hitChancePct) {
+      if (Rng.random() * 100 >= hitChancePct) {
         ctx.log(`   ${t.name}에게 빗나갔다.`);
         ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "miss" });
         return;
@@ -900,7 +901,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
       // 확률로 다시 시도됨(Guard/Shield처럼 "쓰면 없어지는" 자원이 아니라
       // 그냥 상시 확률 판정).
       const completeDefenseChancePct = t.getPassiveModValue("completeDefenseChancePct");
-      if (completeDefenseChancePct > 0 && Math.random() * 100 < completeDefenseChancePct) {
+      if (completeDefenseChancePct > 0 && Rng.random() * 100 < completeDefenseChancePct) {
         ctx.log(`   ${t.name}의 완전방어 발동! 데미지 무효화.`);
         ctx.recordEvent?.({ type: "hit", actor: actor.name, target: t.name, act: skill.name, result: "completeDefense" });
         return;
@@ -954,7 +955,7 @@ function applyDamageAndEffects(actor, skill, ctx) {
         // 크리티컬 — 히트마다 독립 판정. 다단히트 스킬은 각 히트가 따로
         // 굴려지므로 "스킬 한 번에 한 방만 크리" 같은 손해 없이, 히트 수가
         // 많을수록 기대값이 자연스럽게 안정됨.
-        const isCrit = Math.random() * 100 <= actor.critRate;
+        const isCrit = Rng.random() * 100 <= actor.critRate;
         const critMul = isCrit ? actor.critMultiplier : 1;
         const finalPower = applyDealtPassiveMods(actor, Math.floor(power * critMul), damageType, skill.stat, t.creatureTier);
         const minimumBasis = applyDealtPassiveMods(actor, Math.floor(powerBeforeDiminish * critMul), damageType, skill.stat, t.creatureTier);

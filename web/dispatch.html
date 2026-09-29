@@ -100,6 +100,7 @@
   <div id="resultArea"></div>
 </main>
 
+<script src="../src/rng.js"></script>
 <script src="../src/resourceTypes.js"></script>
 <script src="../src/resourceManager.js"></script>
 <script src="../src/skillRegistry.js"></script>
@@ -366,9 +367,10 @@
     const killCounts = new Map();
 
     while (spent < TURN_BUDGET) {
-      const enemyKeys = window.BattleEncounters.spawnEnemies(battleId).map((e) => e.monsterId);
+      const spawned = window.BattleEncounters.spawnEnemies(battleId); // { monsterId, row }
+      const enemyKeys = spawned.map((e) => e.monsterId);
       const r = window.BattleAdapter.runBattle({
-        allyRosterChars: party, monsterTable, enemySpawnKeys: enemyKeys,
+        allyRosterChars: party, monsterTable, enemySpawnKeys: spawned,
         maxTurns: 100, username: "파견", logger: () => {},
       });
       spent += r.turnsElapsed; runs += 1;

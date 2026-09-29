@@ -178,7 +178,7 @@ function loadAdapterEnv({ skillTablePath, baseDir = __dirname, quiet = true } = 
   vm.createContext(sandbox);
 
   const files = [
-    "src/resourceTypes.js", "src/resourceManager.js", "src/skillRegistry.js",
+    "src/rng.js", "src/resourceTypes.js", "src/resourceManager.js", "src/skillRegistry.js",
     "src/combatFormulas.js", "src/registries.js", "src/character.js",
     "src/prepState.js", "src/skillResolution.js", "src/importer.js",
     // ⚠ web/item-sets.js는 battle-adapter.js가 세트 보너스를 읽는 소스라 반드시

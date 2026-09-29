@@ -19,6 +19,7 @@
 // ============================================================================
 
 const { TEAM_RESOURCE_TYPES } = require("./resourceTypes");
+const { Rng } = require("./rng");
 const { applyDealtPassiveMods, applyLifesteal } = require("./combatFormulas");
 
 // skillResolution.js에도 같은 이름·같은 모양으로 있음(중복 — josa 헬퍼가
@@ -243,7 +244,7 @@ ConditionRegistry.register("MY_SIDE_ALIVE_COUNT_LTE", (actor, ctx, value) => {
 // 조건(2026-08-25 신설 — 확률 게이트가 이전엔 전혀 없어서, 결정론적
 // 조건뿐이던 패턴 시스템에 처음 추가되는 축).
 ConditionRegistry.register("RANDOM_CHANCE_PCT", (actor, ctx, value) => {
-  return Math.random() * 100 < value;
+  return Rng.random() * 100 < value;
 });
 
 // value: [{cond, val}, ...] — 배열 안의 조건을 전부 만족해야 true("○이면서 ○").
@@ -293,7 +294,7 @@ ActionRegistry.register("ATTACK", (actor, ctx) => {
   }
 
   const damage = Math.floor(actor.effectiveStr * 2);
-  const isCrit = Math.random() * 100 <= actor.critRate;
+  const isCrit = Rng.random() * 100 <= actor.critRate;
   const finalDamage = applyDealtPassiveMods(actor, isCrit ? Math.floor(damage * actor.critMultiplier) : damage, "physical", null, target.creatureTier);
 
   const before = target.currentHp;
@@ -370,7 +371,7 @@ ActionRegistry.register("EXTEND_BATTLE_LIMIT", (actor, ctx) => {
 // 함수로 자연스럽게 처리됨 — 풀 크기가 1인 특수 케이스일 뿐).
 function weightedPick(candidates) {
   const totalWeight = candidates.reduce((sum, c) => sum + (c.weight || 1), 0);
-  let roll = Math.random() * totalWeight;
+  let roll = Rng.random() * totalWeight;
   for (const c of candidates) {
     roll -= c.weight || 1;
     if (roll <= 0) return c;
